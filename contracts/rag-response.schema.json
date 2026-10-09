@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/rag-response/1.0",
+  "title": "Recommendation Response (RAG contract v1.0)",
+  "description": "200 body of POST /v1/recommendations (architecture §10.2). Degraded answers (mode extractive, or everything withheld) are still successes and are stored and delivered like generated ones (§10.3). The orchestrator's ValidateResponse step checks this schema and that every section carries a citation; it never re-judges clinical content.",
+  "type": "object",
+  "required": ["contractVersion", "caseId", "revision", "mode", "retrievalMode", "corpusVersion", "sections", "citations", "withheld"],
+  "properties": {
+    "contractVersion": { "const": "1.0" },
+    "caseId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "mode": { "enum": ["generated", "extractive"], "description": "extractive = no language model reachable" },
+    "retrievalMode": { "enum": ["hybrid", "lexical"], "description": "lexical = a vector lookup missed (logged as a defect)" },
+    "corpusVersion": { "type": "string", "description": "Frozen guideline snapshot, e.g. iwgdf-2023.r1; stored in provenance" },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["heading", "text", "citationTags"],
+        "properties": {
+          "heading": { "type": "string" },
+          "text": { "type": "string", "description": "Cited protocol text containing [Sn] tags" },
+          "citationTags": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 }
+        }
+      }
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tag", "chunkHash"],
+        "properties": {
+          "tag": { "type": "string", "pattern": "^S[0-9]+$" },
+          "chunkHash": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "withheld": {
+      "type": "array",
+      "description": "Named refusals from the admissibility gate: never silently dropped",
+      "items": {
+        "type": "object",
+        "required": ["missingField", "blockedCount"],
+        "properties": {
+          "missingField": { "type": "string" },
+          "blockedCount": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "nextBestAssessment": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Fields the clinician should record next to unlock withheld guidance"
+    },
+    "escalation": {
+      "type": ["object", "null"],
+      "properties": {
+        "triggered": { "type": "boolean" },
+        "rule": { "type": "string" },
+        "par": { "type": "number", "description": "Percent area reduction" },
+        "elapsedWeeks": { "type": "number" },
+        "clock": { "type": "string" }
+      }
+    },
+    "figures": {
+      "type": "array",
+      "description": "Tier A/B figure references, served via GET /v1/figures/{corpusVersion}/{figureId} through the gateway",
+      "items": {
+        "type": "object",
+        "required": ["figureId", "corpusVersion"],
+        "properties": {
+          "figureId": { "type": "string" },
+          "corpusVersion": { "type": "string" },
+          "tier": { "enum": ["A", "B"] },
+          "caption": { "type": "string" }
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "description": "Generation attempts, embedding/rerank model versions and gate decisions; its reference is stored in provenance"
+    }
+  }
+}

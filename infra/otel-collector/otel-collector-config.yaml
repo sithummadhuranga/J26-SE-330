@@ -1,0 +1,33 @@
+# OTel collector: traces go to Jaeger, metrics to Prometheus on :8889.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:HOSTNAME}:4317
+      http:
+        endpoint: ${env:HOSTNAME}:4318
+
+processors:
+  batch:
+
+exporters:
+  prometheus:
+    endpoint: ${env:HOSTNAME}:8889
+    # service_name etc. become labels, so dashboards can split by service.
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]

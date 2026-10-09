@@ -1,0 +1,3 @@
+# Grafana reads this folder at start-up and logs an error when it is missing. No plugins are provisioned.
+apiVersion: 1
+apps: []

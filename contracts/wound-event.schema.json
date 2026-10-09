@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/wound-event/1.0",
+  "title": "Wound Event",
+  "description": "The one document exchanged at every sync boundary (architecture §5). Size cap of 16 KB is enforced by the gateway, not by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "eventId", "assessmentId", "revision", "woundId",
+    "patientRef", "deviceId", "facilityId", "capturedAt", "analytics", "clinicalAssessment"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "eventId": { "$ref": "#/$defs/uuidv7", "description": "Idempotency key for the whole pipeline. Client-generated." },
+    "assessmentId": { "$ref": "#/$defs/uuidv7" },
+    "revision": { "type": "integer", "minimum": 1, "description": "Edits create revision + 1; never updated in place." },
+    "woundId": { "$ref": "#/$defs/uuidv7" },
+    "patientRef": { "type": "string", "pattern": "^p-[0-9a-f]{6,32}$", "description": "Pseudonymous; never a name or MRN." },
+    "deviceId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "facilityId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "capturedAt": { "type": "string", "format": "date-time", "description": "Device clock. Untrusted for ordering." },
+    "analytics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["areaMm2", "colourRegions", "fitzpatrickClass", "pipeline"],
+      "properties": {
+        "areaMm2": { "type": "number", "minimum": 0 },
+        "colourRegions": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cluster", "percent"],
+            "properties": {
+              "cluster": { "type": "integer", "minimum": 1 },
+              "percent": { "type": "number", "minimum": 0, "maximum": 100 }
+            }
+          }
+        },
+        "fitzpatrickClass": { "enum": ["I", "II", "III", "IV", "V", "VI"] },
+        "pipeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["calibration", "segmentation"],
+          "properties": {
+            "calibration": { "type": "string", "description": "Member 1 pipeline version" },
+            "segmentation": { "type": "string", "description": "Member 2 model version" }
+          }
+        }
+      }
+    },
+    "clinicalAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Every key is required. A missing key fails validation; it is never read as not_recorded. Final field list is an open item (§15).",
+      "required": ["pedalPulses", "protectiveSensation"],
+      "properties": {
+        "pedalPulses": { "$ref": "#/$defs/triState" },
+        "protectiveSensation": { "$ref": "#/$defs/triState" }
+      }
+    }
+  },
+  "$defs": {
+    "uuidv7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "triState": { "enum": ["present", "absent", "not_recorded"] }
+  }
+}

@@ -1,0 +1,73 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/local.properties
+*.g.dart
+
+# Python / research
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+research/**/data/
+research/**/runs/
+research/**/weights/
+
+# Secrets and local config
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+key.properties
+secrets/
+*.secret
+*.secrets.json
+appsettings.Development.json
+appsettings.*.local.json
+
+# Docs and Markdown (kept local, not in the repo)
+*.md
+docs/
+
+# AI assistant files and generated notes
+.claude/
+CLAUDE.md
+AGENTS.md
+.cursor/
+.cursorrules
+.copilot/
+.aider*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+# Personal VS Code settings stay local; the shared run/debug setup is tracked.
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# Local run logs
+.logs/
+
+# Device simulator output (tests/device-simulator/README.md)
+tests/device-simulator/results/
+
+# Evaluation results (tests/evaluation/README.md)
+tests/evaluation/results/

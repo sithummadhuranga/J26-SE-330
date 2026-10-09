@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: melanin-wound-cdss
+    folder: Melanin Wound CDSS
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,97 @@
+{
+  // F5 targets for the backend (README: "Run from VS Code"). "Backend: all services" builds once, then starts all six;
+  // a single configuration does not build (six parallel builds would collide), so press Ctrl+Shift+B first.
+  // Start the infrastructure first
+  // (task "infrastructure: up"); if the full stack is running in Docker, stop its backend containers
+  // (task "infrastructure: stop backend containers") so the ports are free.
+  //
+  // Ports match the API gateway's routes: identity 8085, sync-gateway 8086, api-gateway 8080 (the URL clients use).
+  // Services read their appsettings.json: Kafka on localhost:29092, Postgres on localhost:5432 (owner login cdss),
+  // the rag-stub on localhost:5080. Telemetry is exported only if OTEL_EXPORTER_OTLP_ENDPOINT is set.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "identity-service",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/identity-service/bin/Debug/net10.0/IdentityService.dll",
+      "args": ["--urls", "http://localhost:8085"],
+      "cwd": "${workspaceFolder}/backend/apps/identity-service",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "sync-gateway",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/sync/sync-gateway/bin/Debug/net10.0/SyncGateway.dll",
+      "args": ["--urls", "http://localhost:8086"],
+      "cwd": "${workspaceFolder}/backend/apps/sync/sync-gateway",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "api-gateway",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/api-gateway/bin/Debug/net10.0/ApiGateway.dll",
+      "args": ["--urls", "http://localhost:8080"],
+      "cwd": "${workspaceFolder}/backend/apps/api-gateway",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ingest-persister",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/sync/ingest-persister/bin/Debug/net10.0/IngestPersister.dll",
+      "cwd": "${workspaceFolder}/backend/apps/sync/ingest-persister",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "outbox-relay",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/sync/outbox-relay/bin/Debug/net10.0/OutboxRelay.dll",
+      "cwd": "${workspaceFolder}/backend/apps/sync/outbox-relay",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "orchestrator",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/apps/sync/orchestrator/bin/Debug/net10.0/Orchestrator.dll",
+      "cwd": "${workspaceFolder}/backend/apps/sync/orchestrator",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "db-migrator (apply migrations + seed)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/tools/db-migrator/bin/Debug/net10.0/DbMigrator.dll",
+      "args": ["--seed"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "device simulator (5 devices × 10 events)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/device-simulator/bin/Debug/net10.0/DeviceSimulator.dll",
+      "args": ["--devices", "5", "--events", "10"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Backend: all services",
+      "configurations": ["identity-service", "sync-gateway", "api-gateway", "ingest-persister", "outbox-relay", "orchestrator"],
+      "preLaunchTask": "build",
+      "stopAll": true
+    }
+  ]
+}

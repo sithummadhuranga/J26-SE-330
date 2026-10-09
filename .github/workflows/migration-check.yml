@@ -1,0 +1,27 @@
+name: migration-check
+
+on:
+  pull_request:
+    paths: ["db/**", "backend/tools/db-migrator/**"]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: cdss
+          POSTGRES_PASSWORD: cdss
+          POSTGRES_DB: cdss
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cdss" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet run --project backend/tools/db-migrator
+        env:
+          ConnectionStrings__Postgres: "Host=localhost;Username=cdss;Password=cdss;Database=cdss"

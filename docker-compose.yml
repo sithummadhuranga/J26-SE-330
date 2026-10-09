@@ -1,0 +1,435 @@
+# Local stack: `docker compose up -d --build` for everything, add `--profile tools` for Toxiproxy and observability.
+name: melanin-wound-cdss
+
+x-backend: &backend
+  build: &backend-build
+    context: .
+    dockerfile: backend/Dockerfile
+  restart: unless-stopped
+  # Owner login is for db-migrate only; each service uses its own role, with pool sizes kept under Postgres' 100 connections.
+  environment: &backend-env
+    ConnectionStrings__Postgres: "Host=postgres;Username=${POSTGRES_USER:-cdss};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env};Database=${POSTGRES_DB:-cdss}"
+    Kafka__BootstrapServers: "kafka:9092"
+    # Send traces and metrics to the collector; harmlessly dropped when the tools profile isn't running.
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+  depends_on: &backend-deps
+    db-migrate:
+      condition: service_completed_successfully
+    kafka-init:
+      condition: service_completed_successfully
+
+services:
+  # ---- Infrastructure -------------------------------------------------------------------------
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: kafka
+    ports:
+      - "29092:29092"          # host access: localhost:29092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # Keep Kafka's log on the volume so recreating the container doesn't lose unconsumed messages.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Demo only: replication factor 1. Do not claim durability under broker loss (§8.2).
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cdss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cdss}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cdss}"]
+      interval: 5s
+      retries: 10
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on: [kafka]
+
+  # Web UI for Postgres at http://localhost:8082 (debug only, never expose it).
+  adminer:
+    image: adminer:4
+    ports:
+      - "127.0.0.1:8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on: [postgres]
+
+  # ---- One-shot setup jobs --------------------------------------------------------------------
+
+  # Topics from §8.1 (same list as infra/kafka/create-topics.sh). Safe to run again.
+  kafka-init:
+    image: apache/kafka:3.9.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -eo pipefail
+        # Drop kafka-topics.sh's harmless '.' vs '_' warning but keep every other message.
+        t() { /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic "$$1" --partitions "$$2" --replication-factor 1 2>&1 | { grep -v "Due to limitations in metric names" || true; }; }
+        t wound-events 6
+        t wound-events.persisted 6
+        t recommendations.ready 3
+        t wound-events.retry.30s 3
+        t wound-events.retry.5m 3
+        t wound-events.dlq 1
+    restart: "no"
+
+  # Runs migrations, the dev seed and demo users (local dev only).
+  db-migrate:
+    <<: *backend
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/tools/db-migrator/DbMigrator.csproj
+        ENTRY: DbMigrator.dll
+    image: melanin-wound-cdss/db-migrator
+    restart: "no"
+    environment:
+      <<: *backend-env
+      ServiceRoles__identity_svc: ${DB_PASSWORD_IDENTITY:?set DB_PASSWORD_IDENTITY in .env}
+      ServiceRoles__gateway_svc: ${DB_PASSWORD_GATEWAY:?set DB_PASSWORD_GATEWAY in .env}
+      ServiceRoles__persister_svc: ${DB_PASSWORD_PERSISTER:?set DB_PASSWORD_PERSISTER in .env}
+      ServiceRoles__relay_svc: ${DB_PASSWORD_RELAY:?set DB_PASSWORD_RELAY in .env}
+      ServiceRoles__orchestrator_svc: ${DB_PASSWORD_ORCHESTRATOR:?set DB_PASSWORD_ORCHESTRATOR in .env}
+      ServiceRoles__rag_svc: ${DB_PASSWORD_RAG:?set DB_PASSWORD_RAG in .env}
+      ServiceRoles__housekeeping_svc: ${DB_PASSWORD_HOUSEKEEPING:?set DB_PASSWORD_HOUSEKEEPING in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["--seed"]
+
+  seed-demo-users:
+    <<: *backend
+    image: melanin-wound-cdss/identity-service
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/identity-service/IdentityService.csproj
+        ENTRY: IdentityService.dll
+    restart: "no"
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=identity_svc;Password=${DB_PASSWORD_IDENTITY:?set DB_PASSWORD_IDENTITY in .env};Maximum Pool Size=20"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        dotnet IdentityService.dll create-clinician --if-not-exists admin.demo Demo-Admin-2026! admin fac-001 Demo Admin
+        dotnet IdentityService.dll create-clinician --if-not-exists n.silva Demo-Pass-2026! nurse fac-001 N. Silva
+
+  # ---- Member 4 backend units (§4) ------------------------------------------------------------
+
+  # The only public port; routes auth/admin to identity and everything else to the sync gateway.
+  api-gateway:
+    <<: *backend
+    image: melanin-wound-cdss/api-gateway
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/api-gateway/ApiGateway.csproj
+        ENTRY: ApiGateway.dll
+    ports:
+      - "8080:8080"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      Jwt__MetadataAddress: "http://identity-service:8080/.well-known/openid-configuration"
+      ReverseProxy__Clusters__identity__Destinations__d1__Address: "http://identity-service:8080/"
+      ReverseProxy__Clusters__sync__Destinations__d1__Address: "http://sync-gateway:8080/"
+    depends_on:
+      - identity-service
+      - sync-gateway
+
+  # Admin dashboard at http://localhost:3001; the browser calls the API gateway directly.
+  admin-dashboard:
+    image: melanin-wound-cdss/admin-dashboard
+    build:
+      context: frontend/admin_dashboard
+      args:
+        API_BASE_URL: ${DASHBOARD_API_BASE_URL:-http://localhost:8080}
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - api-gateway
+
+  # Issues and signs every token; reached only through the API gateway.
+  identity-service:
+    <<: *backend
+    image: melanin-wound-cdss/identity-service
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/identity-service/IdentityService.csproj
+        ENTRY: IdentityService.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=identity_svc;Password=${DB_PASSWORD_IDENTITY:?set DB_PASSWORD_IDENTITY in .env};Maximum Pool Size=20"
+      # Local development values. Without Jwt__SigningKeyPem a key is generated at start-up (restart = devices refresh).
+      Jwt__SigningKeyPem: ${Jwt__SigningKeyPem:-}
+      Secrets__EncryptionKey: ${Secrets__EncryptionKey:-local-dev-only-encryption-key-change-me-0123456}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+  sync-gateway:
+    <<: *backend
+    image: melanin-wound-cdss/sync-gateway
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/sync/sync-gateway/SyncGateway.csproj
+        ENTRY: SyncGateway.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=gateway_svc;Password=${DB_PASSWORD_GATEWAY:?set DB_PASSWORD_GATEWAY in .env};Maximum Pool Size=30"
+      Jwt__MetadataAddress: "http://identity-service:8080/.well-known/openid-configuration"
+      # Figures proxy (§10.4) and REST baseline (§13.1). Stub by default; see the recommendation-service entry.
+      RecommendationService__BaseUrl: ${RECOMMENDATION_SERVICE_URL:-http://rag-stub:8080}
+      Ablation__Enabled: ${ABLATION:-false}   # §13 duplicate ablation, evaluation only (tests/evaluation)
+    depends_on:
+      <<: *backend-deps
+      identity-service:
+        condition: service_started
+
+  ingest-persister:
+    <<: *backend
+    image: melanin-wound-cdss/ingest-persister
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/sync/ingest-persister/IngestPersister.csproj
+        ENTRY: IngestPersister.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=persister_svc;Password=${DB_PASSWORD_PERSISTER:?set DB_PASSWORD_PERSISTER in .env};Maximum Pool Size=10"
+      Ablation__Enabled: ${ABLATION:-false}   # §13 duplicate ablation, evaluation only (tests/evaluation)
+
+  outbox-relay:
+    <<: *backend
+    image: melanin-wound-cdss/outbox-relay
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/sync/outbox-relay/OutboxRelay.csproj
+        ENTRY: OutboxRelay.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=relay_svc;Password=${DB_PASSWORD_RELAY:?set DB_PASSWORD_RELAY in .env};Maximum Pool Size=5"
+
+  # Cleanup every 10 minutes; run one by hand with `docker compose run --rm housekeeping run-once`.
+  housekeeping:
+    <<: *backend
+    image: melanin-wound-cdss/housekeeping
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/sync/housekeeping/Housekeeping.csproj
+        ENTRY: Housekeeping.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=housekeeping_svc;Password=${DB_PASSWORD_HOUSEKEEPING:?set DB_PASSWORD_HOUSEKEEPING in .env};Maximum Pool Size=2"
+
+  orchestrator:
+    <<: *backend
+    image: melanin-wound-cdss/orchestrator
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/sync/orchestrator/Orchestrator.csproj
+        ENTRY: Orchestrator.dll
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=orchestrator_svc;Password=${DB_PASSWORD_ORCHESTRATOR:?set DB_PASSWORD_ORCHESTRATOR in .env};Maximum Pool Size=10"
+      RecommendationService__BaseUrl: ${RECOMMENDATION_SERVICE_URL:-http://rag-stub:8080}
+      # Messages handled at once, across partitions (each partition stays in order). 1 = one at a time.
+      Ablation__Enabled: ${ABLATION:-false}   # §13 duplicate ablation, evaluation only (tests/evaluation)
+      Orchestrator__MaxConcurrency: ${ORCHESTRATOR_MAX_CONCURRENCY:-6}
+      # Retry topic delays (§8.3). Defaults 30 s and 5 min; tests shorten them.
+      Retry__FirstDelaySeconds: ${RETRY_FIRST_DELAY_SECONDS:-30}
+      Retry__SecondDelaySeconds: ${RETRY_SECOND_DELAY_SECONDS:-300}
+
+  # Member 3's real Recommendation Service; needs `--profile rag` and RECOMMENDATION_SERVICE_URL.
+  recommendation-service:
+    <<: *backend
+    image: melanin-wound-cdss/recommendation-service
+    profiles: [rag]
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/apps/recommendation-service/RecommendationService.csproj
+        ENTRY: RecommendationService.dll
+    ports:
+      - "5081:8080"
+    environment:
+      <<: *backend-env
+      ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=rag_svc;Password=${DB_PASSWORD_RAG:?set DB_PASSWORD_RAG in .env};Maximum Pool Size=20"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+
+  # Stand-in for Member 3's Recommendation Service until the real one is ready (§13.1).
+  rag-stub:
+    image: melanin-wound-cdss/rag-stub
+    build:
+      <<: *backend-build
+      args:
+        PROJECT: backend/tests/rag-stub/RagStub.csproj
+        ENTRY: RagStub.dll
+    restart: unless-stopped
+    ports:
+      - "5080:8080"
+    environment:
+      STUB_DELAY_MS: ${STUB_DELAY_MS:-0}
+      STUB_FAIL_MODE: ${STUB_FAIL_MODE:-none}
+
+  # ---- Optional: fault injection and observability (needs Docker drive sharing) ----
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    profiles: [tools]
+    ports:
+      - "8474:8474"            # Toxiproxy API
+      - "18080:18080"          # device simulator -> toxiproxy -> sync gateway
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./infra/toxiproxy:/config:ro
+
+  # Observability: Grafana :3000, Jaeger :16686, Prometheus :9090.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    profiles: [tools]
+    command: ["--config=/etc/otel/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"            # OTLP gRPC
+      - "4318:4318"            # OTLP HTTP
+    volumes:
+      - ./infra/otel-collector:/etc/otel:ro
+    depends_on: [jaeger]
+
+  jaeger:
+    # Jaeger v2 (v1 is end-of-life): OTLP in, traces in memory. Config: jaeger_config below.
+    image: jaegertracing/jaeger:2.22.0
+    profiles: [tools]
+    command: ["--config=/etc/jaeger/config.yaml"]
+    ports:
+      - "16686:16686"          # UI
+    configs:
+      - source: jaeger_config
+        target: /etc/jaeger/config.yaml
+
+  # Consumer-group lag per partition for Prometheus (§13).
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    profiles: [tools]
+    command: ["--kafka.server=kafka:9092"]
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    profiles: [tools]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.6.16      # 11.3.0 logged "plugin xychart is already registered" at every start
+    profiles: [tools]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on: [prometheus]
+
+# Inline config so it doesn't depend on host file sharing.
+configs:
+  jaeger_config:
+    # Jaeger trimmed to OTLP in, in-memory storage and the UI ($$ is a literal $ for Compose).
+    content: |
+      service:
+        extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+        pipelines:
+          traces:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [jaeger_storage_exporter]
+        telemetry:
+          resource:
+            attributes:
+              - name: service.name
+                value: jaeger
+          logs:
+            level: info
+      extensions:
+        jaeger_query:
+          storage:
+            traces: memstore
+          http:
+            endpoint: $${env:HOSTNAME}:16686
+          grpc:
+            endpoint: $${env:HOSTNAME}:16685
+        jaeger_storage:
+          backends:
+            memstore:
+              memory:
+                max_traces: 100000
+        healthcheckv2:
+          use_v2: true
+          http:
+            endpoint: $${env:HOSTNAME}:13133
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+      processors:
+        batch:
+      exporters:
+        jaeger_storage_exporter:
+          trace_storage: memstore
+
+volumes:
+  kafka-data:
+  postgres-data:

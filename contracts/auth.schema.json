@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/auth/1.1",
+  "title": "Auth (login / refresh / logout / MFA / discovery)",
+  "description": "Request and response bodies for /v1/auth/* (architecture §7.3) and the identity service's OpenID Connect metadata (ADR 0003). Each operation is a named definition under $defs. All requests go through the API gateway (ADR 0004). The access token is a 15-minute RS256 JWT (see accessTokenClaims); the refresh token is opaque and stored server-side only as a SHA-256 hash.",
+  "$defs": {
+    "loginRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["username", "password"],
+      "properties": {
+        "username": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "password": { "type": "string", "minLength": 1 },
+        "deviceId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "totp": { "type": ["string", "null"], "pattern": "^[0-9]{6}$", "description": "Required once MFA is enabled" },
+        "clientId": {
+          "enum": ["mobile", "admin-dashboard"],
+          "default": "mobile",
+          "description": "Who the session is for (ADR 0005). mobile: the app on a registered device. admin-dashboard: a browser, role admin only."
+        }
+      },
+      "if": { "properties": { "clientId": { "const": "admin-dashboard" } }, "required": ["clientId"] },
+      "then": { "not": { "required": ["deviceId"] } },
+      "else": { "required": ["deviceId"] }
+    },
+    "refreshRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["refreshToken"],
+      "properties": { "refreshToken": { "type": "string", "minLength": 1 } },
+      "description": "Body of POST /v1/auth/refresh (rotates both tokens, same client) and POST /v1/auth/logout (revokes the session)"
+    },
+    "tokenResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accessToken", "refreshToken", "expiresIn"],
+      "properties": {
+        "accessToken": { "type": "string" },
+        "refreshToken": { "type": "string", "description": "Valid 30 days for mobile, 12 hours for admin-dashboard" },
+        "expiresIn": { "type": "integer", "description": "Access token lifetime in seconds (900)" }
+      }
+    },
+    "accessTokenClaims": {
+      "type": "object",
+      "description": "Payload of the access JWT, signed RS256 by the identity service. Resource servers validate it locally with the keys from jwks. The Sync Gateway accepts only the device audience, so admin-dashboard tokens cannot push, pull or read patient records.",
+      "required": ["iss", "aud", "exp", "sub", "facility_id", "role", "client_id"],
+      "properties": {
+        "iss": { "const": "melanin-wound-cdss" },
+        "aud": { "enum": ["melanin-wound-cdss-devices", "melanin-wound-cdss-admin"] },
+        "exp": { "type": "integer" },
+        "sub": { "type": "string", "format": "uuid", "description": "clinician_id" },
+        "facility_id": { "type": "string" },
+        "role": { "enum": ["nurse", "wound_specialist", "admin"] },
+        "client_id": { "enum": ["mobile", "admin-dashboard"] },
+        "device_id": { "type": "string", "description": "Mobile tokens only" }
+      },
+      "if": { "properties": { "client_id": { "const": "mobile" } } },
+      "then": { "required": ["device_id"], "properties": { "aud": { "const": "melanin-wound-cdss-devices" } } },
+      "else": { "not": { "required": ["device_id"] }, "properties": { "aud": { "const": "melanin-wound-cdss-admin" }, "role": { "const": "admin" } } }
+    },
+    "authError": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_CREDENTIALS", "CREDENTIAL_LOCKED", "MFA_REQUIRED", "INVALID_TOTP",
+            "DEVICE_NOT_ALLOWED", "CLIENT_NOT_ALLOWED", "INVALID_REFRESH_TOKEN",
+            "MISSING_FIELDS", "DEVICE_NOT_EXPECTED", "UNKNOWN_CLIENT"
+          ]
+        }
+      },
+      "description": "Error body. 401: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED, CLIENT_NOT_ALLOWED (dashboard login by a non-admin), INVALID_REFRESH_TOKEN. 400: MISSING_FIELDS, DEVICE_NOT_EXPECTED, UNKNOWN_CLIENT. The API gateway may also answer 429 with Retry-After. The device's offline queue is never affected by any auth error."
+    },
+    "mfaEnrollResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secret", "otpauthUri"],
+      "properties": {
+        "secret": { "type": "string", "pattern": "^[A-Z2-7]+$", "description": "Base32" },
+        "otpauthUri": { "type": "string", "pattern": "^otpauth://totp/" }
+      }
+    },
+    "mfaConfirmRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": { "code": { "type": "string", "pattern": "^[0-9]{6}$" } }
+    },
+    "openidConfiguration": {
+      "type": "object",
+      "description": "GET /.well-known/openid-configuration. URLs follow the address the caller used (the API gateway for clients).",
+      "required": ["issuer", "jwks_uri", "id_token_signing_alg_values_supported"],
+      "properties": {
+        "issuer": { "const": "melanin-wound-cdss" },
+        "jwks_uri": { "type": "string", "format": "uri" },
+        "token_endpoint": { "type": "string", "format": "uri" },
+        "grant_types_supported": { "type": "array", "items": { "type": "string" } },
+        "id_token_signing_alg_values_supported": { "type": "array", "contains": { "const": "RS256" } }
+      }
+    },
+    "jwks": {
+      "type": "object",
+      "description": "GET /.well-known/jwks.json. Public keys only; cache it and refetch when a token carries an unknown kid.",
+      "additionalProperties": false,
+      "required": ["keys"],
+      "properties": {
+        "keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kty", "use", "alg", "kid", "n", "e"],
+            "properties": {
+              "kty": { "const": "RSA" },
+              "use": { "const": "sig" },
+              "alg": { "const": "RS256" },
+              "kid": { "type": "string" },
+              "n": { "type": "string" },
+              "e": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
