@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+.git/
+.github/
+.logs/
+.env
+mobile/
+research/
+docs/
+tests/
+infra/
+# The pinned SDK in global.json may not match the SDK in the build image.
+global.json

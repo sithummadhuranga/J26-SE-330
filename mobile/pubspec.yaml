@@ -1,0 +1,55 @@
+name: melanin_wound_cdss
+description: Offline-first wound assessment for melanin-rich skin (J26-SE-330).
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.0
+  flutter: ">=3.38.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Member 4: offline queue and sync (architecture §6, §7)
+  drift: ^2.35.1
+  sqlite3: ^3.7.0                    # bundles SQLite through Dart hooks; the SQLCipher build is chosen below
+  flutter_secure_storage: ^11.2.0    # refresh token + database key in the Android Keystore (§6, §12)
+  http: ^1.6.0
+  uuid: ^4.6.0                       # client-generated UUIDv7 event ids (§5)
+  connectivity_plus: ^7.3.1
+  path_provider: ^2.1.6
+  path: ^1.9.0
+  workmanager: 0.10.10
+  # Members 1 and 2 add their on-device ML dependencies here (LiteRT, camera, FFI).
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:                  # on-device runs: offline sync and frame timings (§13, §14.1)
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  fake_async: ^1.3.3                 # drives the sync triggers' timers in tests
+  drift_dev: ^2.35.1
+  build_runner: ^2.16.1
+
+# package:sqlite3 bundles SQLCipher so the Drift queue is encrypted at rest.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher
+
+flutter:
+  uses-material-design: true
+  # Inter (SIL Open Font License, assets/fonts/inter/LICENSE.txt), bundled so the app needs no network for fonts.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/inter/Inter-ExtraBold.ttf
+          weight: 800

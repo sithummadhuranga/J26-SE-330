@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/persisted-event/1.0",
+  "title": "Persisted Event (internal Kafka message)",
+  "description": "Value of messages on wound-events.persisted (key: woundId). Written to messaging.outbox by the ingest persister in the same transaction as the assessment, published by the outbox relay, consumed by the orchestrator. Identifiers only: the orchestrator reads the stored assessment itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "assessmentId", "revision", "woundId"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "assessmentId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "woundId": { "type": "string", "format": "uuid" }
+  }
+}

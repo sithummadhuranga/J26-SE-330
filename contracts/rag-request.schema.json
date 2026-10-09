@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/rag-request/1.0",
+  "title": "Recommendation Request (RAG contract v1.0)",
+  "description": "Body of POST /v1/recommendations on Member 3's Recommendation Service (architecture §10.2). Built by the orchestrator's BuildContext step. No identifiers cross this boundary: caseId is the assessment UUID, never patientRef, deviceId or facilityId, and fitzpatrickClass is dropped (data minimisation). Every clinical field allows not_recorded; a missing key is a 422.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "caseId", "revision", "capturedAt", "receivedAt", "woundAnalytics", "clinicalAssessment", "healingHistory"],
+  "properties": {
+    "contractVersion": { "const": "1.0" },
+    "caseId": { "type": "string", "format": "uuid", "description": "= assessmentId" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "receivedAt": { "type": "string", "format": "date-time" },
+    "woundAnalytics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["areaMm2", "colourRegions", "pipeline"],
+      "properties": {
+        "areaMm2": { "type": "number", "minimum": 0 },
+        "colourRegions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cluster", "percent"],
+            "properties": {
+              "cluster": { "type": "integer", "minimum": 1 },
+              "percent": { "type": "number", "minimum": 0, "maximum": 100 }
+            }
+          }
+        },
+        "pipeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["calibration", "segmentation"],
+          "properties": {
+            "calibration": { "type": "string" },
+            "segmentation": { "type": "string" }
+          }
+        }
+      }
+    },
+    "clinicalAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Field list is an open team item (§15). Listed fields follow §10.2.",
+      "required": ["ulcerLocation", "protectiveSensation", "pedalPulses", "probeToBone", "infectionGrade", "woundBedLabels"],
+      "properties": {
+        "ulcerLocation": { "type": "string", "description": "Value set to be agreed; includes not_recorded" },
+        "protectiveSensation": { "$ref": "#/$defs/triState" },
+        "pedalPulses": { "$ref": "#/$defs/triState" },
+        "probeToBone": { "$ref": "#/$defs/triState" },
+        "infectionGrade": { "type": "string", "description": "IWGDF/IDSA grade or not_recorded; value set to be agreed" },
+        "woundBedLabels": {
+          "oneOf": [
+            { "const": "not_recorded" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "To be agreed with Member 1 (colourRegions are unlabelled clusters today)"
+        }
+      }
+    },
+    "healingHistory": {
+      "type": "array",
+      "description": "Earlier captures of the same wound, oldest first, for the percent-area-reduction trajectory (BPS 15 stalled-healing rule)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capturedAt", "areaMm2", "pipeline"],
+        "properties": {
+          "capturedAt": { "type": "string", "format": "date-time" },
+          "areaMm2": { "type": "number", "minimum": 0 },
+          "pipeline": {
+            "type": "object",
+            "required": ["calibration", "segmentation"],
+            "properties": {
+              "calibration": { "type": "string" },
+              "segmentation": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "triState": { "enum": ["present", "absent", "not_recorded"] }
+  }
+}

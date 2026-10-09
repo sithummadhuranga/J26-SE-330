@@ -1,0 +1,53 @@
+<Solution>
+  <Folder Name="/backend/" />
+  <Folder Name="/backend/apps/" />
+  <Folder Name="/backend/apps/api-gateway/">
+    <Project Path="backend/apps/api-gateway/ApiGateway.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/identity-service/">
+    <Project Path="backend/apps/identity-service/IdentityService.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/ingestion-pipeline/">
+    <Project Path="backend/apps/ingestion-pipeline/IngestionPipeline.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/recommendation-service/">
+    <Project Path="backend/apps/recommendation-service/RecommendationService.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/sync/" />
+  <Folder Name="/backend/apps/sync/housekeeping/">
+    <Project Path="backend/apps/sync/housekeeping/Housekeeping.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/sync/ingest-persister/">
+    <Project Path="backend/apps/sync/ingest-persister/IngestPersister.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/sync/orchestrator/">
+    <Project Path="backend/apps/sync/orchestrator/Orchestrator.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/sync/outbox-relay/">
+    <Project Path="backend/apps/sync/outbox-relay/OutboxRelay.csproj" />
+  </Folder>
+  <Folder Name="/backend/apps/sync/sync-gateway/">
+    <Project Path="backend/apps/sync/sync-gateway/SyncGateway.csproj" />
+  </Folder>
+  <Folder Name="/backend/libs/">
+    <Project Path="backend/libs/Sync.Common/Sync.Common.csproj" />
+  </Folder>
+  <Folder Name="/backend/tests/">
+    <Project Path="backend/tests/Sync.Common.Tests/Sync.Common.Tests.csproj" />
+    <Project Path="backend/tests/DeviceSimulator.Tests/DeviceSimulator.Tests.csproj" />
+    <Project Path="backend/tests/Housekeeping.Tests/Housekeeping.Tests.csproj" />
+    <Project Path="backend/tests/IdentityService.Tests/IdentityService.Tests.csproj" />
+    <Project Path="backend/tests/Orchestrator.Tests/Orchestrator.Tests.csproj" />
+  </Folder>
+  <Folder Name="/backend/tests/rag-stub/">
+    <Project Path="backend/tests/rag-stub/RagStub.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/device-simulator/">
+    <Project Path="tests/device-simulator/DeviceSimulator.csproj" />
+  </Folder>
+  <Folder Name="/backend/tools/" />
+  <Folder Name="/backend/tools/db-migrator/">
+    <Project Path="backend/tools/db-migrator/DbMigrator.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "0198f2c4-7b1e-7c3a-9d52-3e1f0a6b8c12",
+  "assessmentId": "0198f2c4-7a90-7e02-8b1d-5c44e2f7a903",
+  "revision": 2,
+  "woundId": "0198f1aa-13d4-7f10-a2c8-9b70d3e5c611",
+  "patientRef": "p-7f3a9c",
+  "deviceId": "dev-a41c",
+  "facilityId": "fac-001",
+  "capturedAt": "2026-10-03T09:55:00+05:30",
+  "analytics": {
+    "areaMm2": 400.1,
+    "colourRegions": [],
+    "fitzpatrickClass": "V",
+    "pipeline": { "calibration": "2.1.0", "segmentation": "yolo11n-seg-0.4" }
+  },
+  "clinicalAssessment": {
+    "protectiveSensation": "absent"
+  }
+}

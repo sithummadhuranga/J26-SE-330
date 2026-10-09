@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/tests/auth-login-request",
+  "description": "CI entry point: validates contracts/examples/auth.login.*.json against auth.schema.json $defs/loginRequest (ajv-cli can only target a whole schema).",
+  "$ref": "https://j26-se-330/contracts/auth/1.1#/$defs/loginRequest"
+}

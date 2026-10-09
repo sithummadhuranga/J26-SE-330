@@ -1,0 +1,24 @@
+# Swap the @handles for each member's GitHub username; the last matching pattern wins.
+
+*                                   @member4-lowe
+
+/contracts/                         @member1-nanayakkara @member2-dissanayake @member3-nimnath @member4-lowe
+
+/research/member1-calibration/      @member1-nanayakkara
+/mobile/lib/features/calibration/   @member1-nanayakkara
+/mobile/native/                     @member1-nanayakkara
+
+/research/member2-segmentation/     @member2-dissanayake
+/mobile/lib/features/measurement/   @member2-dissanayake
+
+/research/member3-rag/              @member3-nimnath
+/backend/apps/recommendation-service/ @member3-nimnath
+/backend/apps/ingestion-pipeline/   @member3-nimnath
+/db/migrations/rag/                 @member3-nimnath
+/mobile/lib/features/recommendations/ @member3-nimnath
+
+/mobile/lib/features/sync/          @member4-lowe
+/backend/apps/sync/                 @member4-lowe
+/backend/libs/                      @member4-lowe
+/db/                                @member4-lowe
+/infra/                             @member4-lowe

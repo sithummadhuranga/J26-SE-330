@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- INTERNET is needed in development for hot reload and breakpoints. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug builds only: the local Docker backend is plain HTTP (http://10.0.2.2:8080). Release builds use HTTPS (§12). -->
+    <application android:usesCleartextTraffic="true"/>
+</manifest>

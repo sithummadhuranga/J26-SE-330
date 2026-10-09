@@ -1,0 +1,53 @@
+{
+  // Tasks for running the backend from VS Code (README: "Run from VS Code").
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "detail": "dotnet build MelaninWoundCdss.slnx",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/MelaninWoundCdss.slnx", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "infrastructure: up",
+      "detail": "Kafka, Postgres, topics, migrations, demo users and the rag-stub in Docker (no backend services)",
+      "type": "shell",
+      "command": "docker compose up -d kafka postgres kafka-ui kafka-init db-migrate seed-demo-users rag-stub",
+      "problemMatcher": []
+    },
+    {
+      "label": "infrastructure: stop backend containers",
+      "detail": "Frees ports 8080 etc. when the full stack is running in Docker, so the services can run from VS Code",
+      "type": "shell",
+      "command": "docker compose stop api-gateway identity-service sync-gateway ingest-persister outbox-relay orchestrator",
+      "problemMatcher": []
+    },
+    {
+      "label": "observability: up",
+      "detail": "OTel collector, Jaeger, Prometheus, Grafana, kafka-exporter, Toxiproxy (tools profile)",
+      "type": "shell",
+      "command": "docker compose --profile tools up -d otel-collector jaeger prometheus grafana kafka-exporter toxiproxy",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: unit",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["test", "${workspaceFolder}/MelaninWoundCdss.slnx"],
+      "group": "test",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test: e2e smoke",
+      "detail": "Needs the backend running (Docker or the 'Backend: all services' launch)",
+      "type": "process",
+      "command": "python",
+      "args": ["${workspaceFolder}/tests/integration/e2e_smoke.py"],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

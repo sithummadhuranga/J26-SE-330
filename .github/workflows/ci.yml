@@ -1,0 +1,141 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build MelaninWoundCdss.slnx -c Release
+      - run: dotnet test MelaninWoundCdss.slnx -c Release --no-build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # ajv-formats adds date-time/uuid/uri so strict mode accepts the contract schemas.
+      - name: Install ajv
+        run: npm install --no-save --no-package-lock ajv-cli@5 ajv-formats@3
+      - name: Every contract compiles
+        run: |
+          for s in contracts/*.schema.json; do
+            # sync-changes embeds the RAG response; give it that schema to resolve the reference.
+            if [ "$s" = contracts/sync-changes.schema.json ]; then refs="-r contracts/rag-response.schema.json"; else refs=""; fi
+            npx ajv compile --spec=draft2020 -c ajv-formats -s "$s" $refs
+          done
+      - name: Wound Event examples (§5)
+        run: |
+          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/wound-event.schema.json -d "contracts/examples/wound-event.*.valid.json" --valid
+          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/wound-event.schema.json -d "contracts/examples/wound-event.*.invalid.json" --invalid
+      - name: Auth login examples (§7.3, ADR 0005)
+        run: |
+          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-login-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.login.*.valid.json" --valid
+          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-login-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.login.*.invalid.json" --invalid
+
+  # Dev tooling checks: compose file, Python scripts, VS Code config and the generated Grafana dashboard.
+  tooling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker-compose.yml is valid (including the tools profile)
+        # Placeholders only: this step checks the file's syntax, nothing connects to a database.
+        env:
+          POSTGRES_PASSWORD: ci-placeholder
+          DB_PASSWORD_IDENTITY: ci-placeholder
+          DB_PASSWORD_GATEWAY: ci-placeholder
+          DB_PASSWORD_PERSISTER: ci-placeholder
+          DB_PASSWORD_RELAY: ci-placeholder
+          DB_PASSWORD_ORCHESTRATOR: ci-placeholder
+          DB_PASSWORD_RAG: ci-placeholder
+          DB_PASSWORD_HOUSEKEEPING: ci-placeholder
+        run: docker compose --profile tools config --quiet
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Test and evaluation scripts compile
+        run: python -m compileall -q tests infra
+      - name: VS Code launch and task files parse
+        run: |
+          python - <<'EOF'
+          import json, re
+          for path in [".vscode/launch.json", ".vscode/tasks.json", ".vscode/extensions.json"]:
+              json.loads(re.sub(r"^\s*//.*$", "", open(path, encoding="utf-8").read(), flags=re.M))
+              print("ok", path)
+          EOF
+      - name: Grafana dashboard matches its generator
+        run: |
+          python infra/grafana/build_dashboard.py
+          git diff --exit-code infra/grafana/dashboards
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      # hashFiles() only works in step conditions; skip until a test exists since flutter test fails on an empty folder.
+      - if: hashFiles('mobile/test/**/*_test.dart') != ''
+        run: flutter test
+
+  # The dashboard's tests drive the real backend, so this job starts it in Docker first.
+  admin-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Throwaway passwords for this CI database only; locally they come from .env.
+      POSTGRES_PASSWORD: ci-postgres-only
+      DB_PASSWORD_IDENTITY: ci-identity-only
+      DB_PASSWORD_GATEWAY: ci-gateway-only
+      DB_PASSWORD_PERSISTER: ci-persister-only
+      DB_PASSWORD_RELAY: ci-relay-only
+      DB_PASSWORD_ORCHESTRATOR: ci-orchestrator-only
+      DB_PASSWORD_RAG: ci-rag-only
+      DB_PASSWORD_HOUSEKEEPING: ci-housekeeping-only
+    defaults:
+      run:
+        working-directory: frontend/admin_dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the backend (API gateway, identity service, Sync Gateway, demo users)
+        working-directory: .
+        run: docker compose up -d --build api-gateway identity-service sync-gateway seed-demo-users
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/admin_dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Wait until the backend answers and the demo admin exists
+        working-directory: .
+        run: |
+          for i in $(seq 1 120); do
+            seeded=$(docker compose ps -a seed-demo-users --format '{{.State}} {{.ExitCode}}')
+            if curl -sf http://localhost:8080/health >/dev/null && [ "$seeded" = "exited 0" ]; then echo "backend ready"; exit 0; fi
+            sleep 5
+          done
+          echo "backend did not start in time"; exit 1
+      - run: npm test
+      - run: npm run build
+      - name: Backend logs (on failure)
+        if: failure()
+        working-directory: .
+        run: docker compose logs --tail 80 db-migrate seed-demo-users identity-service api-gateway sync-gateway

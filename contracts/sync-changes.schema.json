@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/sync-changes/1.0",
+  "title": "Sync Changes (pull response)",
+  "description": "Response of GET /v1/sync/changes?cursor=&limit= (architecture §7.2). The device upserts each change by (assessmentId, revision, type) and stores nextCursor in the same local transaction. Changes from the last 60 seconds are re-sent regardless of cursor, so duplicates here are expected and harmless.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["changes", "nextCursor", "hasMore"],
+  "properties": {
+    "changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/change" }
+    },
+    "nextCursor": { "type": "integer", "minimum": 0 },
+    "hasMore": { "type": "boolean" }
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "type", "assessmentId", "revision"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1, "description": "sync.change_log.server_seq" },
+        "type": { "enum": ["PERSISTED", "RECOMMENDATION_READY", "ADVICE_DEFERRED", "SUPERSEDED"] },
+        "assessmentId": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "mode": {
+          "type": ["string", "null"],
+          "enum": ["generated", "extractive", null],
+          "description": "Only for RECOMMENDATION_READY"
+        },
+        "recommendation": {
+          "description": "Only for RECOMMENDATION_READY: the stored Recommendation Service response (rag-response.schema.json)",
+          "oneOf": [
+            { "$ref": "https://j26-se-330/contracts/rag-response/1.0" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}
