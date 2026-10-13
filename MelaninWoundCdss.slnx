@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/backend/apps/recommendation-service/">
     <Project Path="backend/apps/recommendation-service/RecommendationService.csproj" />
+    <Project Path="backend/apps/recommendation-service/WoundRag.Shared/WoundRag.Shared.csproj" />
   </Folder>
   <Folder Name="/backend/apps/sync/" />
   <Folder Name="/backend/apps/sync/housekeeping/">
@@ -38,6 +39,7 @@
     <Project Path="backend/tests/Housekeeping.Tests/Housekeeping.Tests.csproj" />
     <Project Path="backend/tests/IdentityService.Tests/IdentityService.Tests.csproj" />
     <Project Path="backend/tests/Orchestrator.Tests/Orchestrator.Tests.csproj" />
+    <Project Path="backend/tests/IngestionPipeline.Tests/IngestionPipeline.Tests.csproj" />
   </Folder>
   <Folder Name="/backend/tests/rag-stub/">
     <Project Path="backend/tests/rag-stub/RagStub.csproj" />

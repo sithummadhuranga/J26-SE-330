@@ -6,4 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The WoundRag.* libraries live in sub-folders; keep the SDK from compiling them in here too. -->
+
+    <Compile Remove="WoundRag.*/**" />
+    <Content Remove="WoundRag.*/**" />
+    <None Remove="WoundRag.*/**" />
+  </ItemGroup>
+
 </Project>
