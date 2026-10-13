@@ -1,0 +1,14 @@
+opencv-python>=4.9.0
+scikit-image>=0.22
+numpy>=1.26
+matplotlib>=3.8
+imbalanced-learn>=0.12
+Pillow>=10.2
+pandas>=2.2
+pytest>=8.0
+streamlit>=1.30
+
+# tflite-runtime is only needed later for the optional on-device FST CNN
+# fallback classifier (Phase 3+). No official wheel for all platforms
+# (e.g. macOS arm64), install manually when needed:
+#   pip install tflite-runtime

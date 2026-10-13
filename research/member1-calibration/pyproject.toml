@@ -1,0 +1,9 @@
+[project]
+name = "color-pipeline"
+version = "0.1.0"
+description = "Colorimetric bias-correction preprocessing pipeline for wound-assessment AI (Member 2)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
