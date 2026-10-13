@@ -14,8 +14,10 @@ from colorimetric.illumination import (
 from colorimetric.preprocess import (
     final_normalise,
     lab_to_rgb,
+    letterbox,
     process_raw_input,
     rgb_to_lab,
+    unletterbox,
 )
 
 SKIN = (200, 150, 120)
@@ -57,10 +59,32 @@ def test_rejects_non_uint8_or_wrong_shape():
 
 # --- Step 1 (T30) ------------------------------------------------------------
 
-@pytest.mark.parametrize("shape", [(192, 256), (1000, 800), (512, 512)])
-def test_process_raw_input_output_size_and_dtype(shape):
+@pytest.mark.parametrize("shape", [(192, 256), (1000, 800), (512, 512), (100, 333)])
+def test_process_raw_input_keeps_exact_shape(shape):
     out = process_raw_input(skin_image(*shape))
-    assert out.shape == (512, 512, 3) and out.dtype == np.uint8
+    assert out.shape == (*shape, 3) and out.dtype == np.uint8
+
+
+def test_every_calibration_step_keeps_shape_on_non_square_image():
+    """Same shape in, same shape out for steps 1, 2, 5 and 6 (area measurement depends on it)."""
+    img = skin_image(120, 200)
+    for fn in (process_raw_input, gray_world, white_balance, single_scale_retinex_L,
+               multi_scale_retinex_L, remove_specular, clahe_median):
+        assert fn(img).shape == img.shape, fn.__name__
+
+
+def test_letterbox_preserves_aspect_ratio_and_round_trips_masks():
+    img = skin_image(192, 256)
+    boxed, info = letterbox(img, 512)
+    assert boxed.shape == (512, 512, 3)
+    assert info.scale == 2.0 and (info.new_h, info.new_w) == (384, 512)
+    assert boxed[: info.pad_top].max() == 0  # black border
+    mask = np.zeros((192, 256), dtype=np.uint8)
+    mask[50:100, 60:140] = 1
+    boxed_mask, _ = letterbox(np.repeat(mask[..., None], 3, axis=2) * 255, 512)
+    restored = unletterbox(boxed_mask[..., 0], info)
+    assert restored.shape == mask.shape
+    assert abs((restored > 127).sum() - mask.sum()) / mask.sum() < 0.03  # area preserved within 3%
 
 
 def test_process_raw_input_keeps_hue():

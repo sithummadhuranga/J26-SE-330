@@ -1,10 +1,13 @@
-"""Pipeline Step 1 (raw input processing), Step 7 (final normalisation) and LAB helpers.
+"""Pipeline Step 1 (raw input processing), Step 7 (final normalisation), LAB helpers and
+the model-side letterbox.
 
 Conventions: images are uint8 RGB (H, W, 3). LAB arrays are float64 with
 L in [0, 100] and a*, b* signed (roughly [-128, 127]), the same scale as ita.py/ccm.py.
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -40,14 +43,16 @@ def lab_to_rgb(lab: np.ndarray) -> np.ndarray:
 
 def process_raw_input(
     rgb: np.ndarray,
-    size: int = 512,
     low_pct: float = 0.5,
     high_pct: float = 99.5,
     denoise: bool = True,
 ) -> np.ndarray:
-    """Step 1: resize to size x size, stretch intensity, soften JPEG artefacts.
+    """Step 1: stretch intensity and soften JPEG artefacts, keeping the exact input shape.
 
-    * Resize uses INTER_AREA when shrinking and INTER_CUBIC when enlarging.
+    Geometry is never changed (agreed with Member 1: same height and width in and
+    out), because resizing or stretching would corrupt wound-area measurement. The
+    resize for the model is done separately by `letterbox`, on the model side.
+
     * The intensity stretch maps one (low_pct, high_pct) percentile range of the
       whole image to [0, 255] with the SAME gain for all three channels, so it
       never changes hue (a per-channel stretch would shift skin colour).
@@ -55,21 +60,54 @@ def process_raw_input(
       (assumed interpretation of the tracker's "JPEG artefacts"; revisit in ablation).
     """
     _check_rgb(rgb)
-    h, w = rgb.shape[:2]
-    interp = cv2.INTER_AREA if size < max(h, w) else cv2.INTER_CUBIC
-    out = cv2.resize(rgb, (size, size), interpolation=interp)
-
+    out = rgb
     lo, hi = np.percentile(out, [low_pct, high_pct])
     if hi - lo > 1e-6:
         out = np.clip((out.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
-
     if denoise:
         out = cv2.bilateralFilter(out, d=5, sigmaColor=25, sigmaSpace=5)
     return out
 
 
+@dataclass(frozen=True)
+class LetterboxInfo:
+    """How an image was fitted into a square, so results can be mapped back."""
+
+    scale: float
+    pad_left: int
+    pad_top: int
+    orig_h: int
+    orig_w: int
+    new_h: int
+    new_w: int
+
+
+def letterbox(rgb: np.ndarray, size: int = 512, fill: int = 0) -> tuple[np.ndarray, LetterboxInfo]:
+    """Model-side resize: uniform downscale/upscale to fit size x size, black borders.
+
+    The aspect ratio is preserved (same scale on both axes), so lengths and areas
+    can be recovered exactly with the returned info. Not part of calibration.
+    """
+    _check_rgb(rgb)
+    h, w = rgb.shape[:2]
+    scale = size / max(h, w)
+    new_h, new_w = max(1, round(h * scale)), max(1, round(w * scale))
+    interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    resized = cv2.resize(rgb, (new_w, new_h), interpolation=interp)
+    top, left = (size - new_h) // 2, (size - new_w) // 2
+    canvas = np.full((size, size, 3), fill, dtype=np.uint8)
+    canvas[top : top + new_h, left : left + new_w] = resized
+    return canvas, LetterboxInfo(scale, left, top, h, w, new_h, new_w)
+
+
+def unletterbox(arr: np.ndarray, info: LetterboxInfo, interpolation: int = cv2.INTER_NEAREST) -> np.ndarray:
+    """Map a square model output (e.g. a mask) back to the original height and width."""
+    crop = arr[info.pad_top : info.pad_top + info.new_h, info.pad_left : info.pad_left + info.new_w]
+    return cv2.resize(crop, (info.orig_w, info.orig_h), interpolation=interpolation)
+
+
 def final_normalise(rgb: np.ndarray, mode: str = "imagenet") -> np.ndarray:
-    """Step 7: uint8 RGB -> float32 model input of the same shape.
+    """Step 7 (model side): uint8 RGB -> float32 model input of the same shape.
 
     mode "imagenet": (x/255 - mean) / std with ImageNet statistics.
     mode "zscore":   per-image, per-channel (x - mean) / std.

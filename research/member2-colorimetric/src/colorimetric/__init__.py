@@ -14,7 +14,7 @@ from .ccm import (
     estimate_adaptive_ccm,
     apply_adaptive_ccm,
 )
-from .preprocess import rgb_to_lab, lab_to_rgb, process_raw_input, final_normalise
+from .preprocess import rgb_to_lab, lab_to_rgb, process_raw_input, final_normalise, letterbox, unletterbox, LetterboxInfo
 from .illumination import gray_world, single_scale_retinex_L, multi_scale_retinex_L, white_balance
 from .enhance import specular_mask, remove_specular, clahe_median
 from .evaluation import evaluate_fairness, auroc, colour_consistency, cci_reduction, fst_to_group
@@ -36,6 +36,9 @@ __all__ = [
     "lab_to_rgb",
     "process_raw_input",
     "final_normalise",
+    "letterbox",
+    "unletterbox",
+    "LetterboxInfo",
     "gray_world",
     "single_scale_retinex_L",
     "multi_scale_retinex_L",
