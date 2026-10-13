@@ -18,6 +18,7 @@ from .preprocess import rgb_to_lab, lab_to_rgb, process_raw_input, final_normali
 from .illumination import gray_world, single_scale_retinex_L, multi_scale_retinex_L, white_balance
 from .enhance import specular_mask, remove_specular, clahe_median
 from .evaluation import evaluate_fairness, auroc, colour_consistency, cci_reduction, fst_to_group
+from .pipeline import ABLATION_VARIANTS, PipelineConfig, ProcessResult, process_image
 
 __all__ = [
     "FitzpatrickType",
@@ -51,4 +52,8 @@ __all__ = [
     "colour_consistency",
     "cci_reduction",
     "fst_to_group",
+    "ABLATION_VARIANTS",
+    "PipelineConfig",
+    "ProcessResult",
+    "process_image",
 ]
