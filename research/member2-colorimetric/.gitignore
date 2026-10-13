@@ -6,3 +6,7 @@ __pycache__/
 data/raw/
 data/isic_subset/
 *.egg-info/
+
+# Markdown/docs stay local (not in the repo)
+*.md
+docs/
