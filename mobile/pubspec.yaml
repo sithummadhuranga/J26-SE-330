@@ -21,6 +21,7 @@ dependencies:
   path: ^1.9.0
   workmanager: 0.10.10
   # Members 1 and 2 add their on-device ML dependencies here (LiteRT, camera, FFI).
+  flutter_litert: 3.9.4              # CV: runs the exported YOLO11n-seg model; pinned exactly (fast-moving third-party plugin)
 
 dev_dependencies:
   flutter_test:
