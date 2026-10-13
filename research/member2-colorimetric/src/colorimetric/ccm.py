@@ -99,8 +99,13 @@ def estimate_adaptive_ccm(
     fitzpatrick_type: FitzpatrickType,
     wound_bbox: tuple[int, int, int, int] | None = None,
     k: int = 6,
+    correct: bool | None = None,
 ) -> np.ndarray | None:
     """Estimate a per-image 3x3 CCM for FST IV-VI images; None for FST I-III (no correction).
+
+    `correct` overrides the FST gate: True/False forces/skips the correction (used to
+    evaluate other gates, e.g. `needs_ccm(ita, GATE_CUTOFF_FITTED)`); None keeps the
+    default FST IV-VI rule.
 
     v1 approach (documented approximation, revisit during Phase 4
     evaluation): sample k representative skin colors from the image, then
@@ -111,7 +116,9 @@ def estimate_adaptive_ccm(
     which is a simplification — validate against real annotated
     before/after pairs once available, per the Phase 4 ablation study.
     """
-    if fitzpatrick_type in (FitzpatrickType.I, FitzpatrickType.II, FitzpatrickType.III):
+    if correct is None:
+        correct = fitzpatrick_type not in (FitzpatrickType.I, FitzpatrickType.II, FitzpatrickType.III)
+    if not correct:
         return None
 
     source_colors = sample_skin_lab_colors(rgb_image, wound_bbox=wound_bbox, k=k)

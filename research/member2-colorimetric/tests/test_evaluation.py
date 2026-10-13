@@ -11,6 +11,7 @@ from colorimetric.evaluation import (
     colour_consistency,
     evaluate_fairness,
     fst_to_group,
+    gate_metrics,
     mean_skin_L,
     sensitivity_specificity,
 )
@@ -98,3 +99,12 @@ def test_mean_skin_L_on_swatch_and_nonskin():
     skin = np.full((40, 40, 3), (230, 190, 170), dtype=np.uint8)  # inside the HSV skin mask (H=20, S=26%, V=90%)
     assert mean_skin_L(skin) == pytest.approx(80.0, abs=1.0)
     assert np.isnan(mean_skin_L(np.full((40, 40, 3), (0, 0, 255), dtype=np.uint8)))  # pure blue
+
+
+def test_gate_metrics_counts():
+    true = np.array([0, 1, 3, 5, 5, 2])      # light, light, dark, dark, dark, light
+    ita = np.array([40.0, 10.0, 5.0, -20.0, 20.0, 35.0])
+    g = gate_metrics(true, ita, cutoff=15.0)  # corrected: idx 1 (light), 2, 3 (dark)
+    assert g.accuracy == pytest.approx(4 / 6)
+    assert g.dark_recall == pytest.approx(2 / 3)
+    assert g.light_false_correction == pytest.approx(1 / 3)

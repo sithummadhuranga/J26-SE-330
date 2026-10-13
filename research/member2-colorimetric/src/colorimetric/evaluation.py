@@ -189,3 +189,27 @@ def cci_reduction(before: np.ndarray, after: np.ndarray) -> float:
     """Fractional reduction in CCI after correction (0.25 = 25% less spread)."""
     b, a = colour_consistency(before), colour_consistency(after)
     return float(1.0 - a / b) if b and not np.isnan(b) else float("nan")
+
+
+@dataclass
+class GateMetrics:
+    cutoff: float
+    accuracy: float
+    dark_recall: float  # truly dark (IV-VI) images that get corrected
+    light_false_correction: float  # truly light (I-III) images wrongly corrected
+
+
+def gate_metrics(true_fst_index: np.ndarray, ita_angle: np.ndarray, cutoff: float) -> GateMetrics:
+    """Score the CCM gate (ITA <= cutoff means 'correct') against true FST (0=I .. 5=VI).
+
+    A true dark image is FST IV-VI (index >= 3).
+    """
+    dark = np.asarray(true_fst_index) >= 3
+    corrected = np.asarray(ita_angle, dtype=np.float64) <= cutoff
+    nd, nl = dark.sum(), (~dark).sum()
+    return GateMetrics(
+        cutoff=float(cutoff),
+        accuracy=float((corrected == dark).mean()),
+        dark_recall=float((corrected & dark).sum() / nd) if nd else float("nan"),
+        light_false_correction=float((corrected & ~dark).sum() / nl) if nl else float("nan"),
+    )

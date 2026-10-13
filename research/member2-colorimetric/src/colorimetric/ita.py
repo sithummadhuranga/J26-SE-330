@@ -57,6 +57,19 @@ CORRECTION_STRENGTH: dict[FitzpatrickType, str] = {
 }
 
 
+# CCM gate: images with ITA <= cutoff are treated as FST IV-VI and get colour correction.
+# STANDARD is the textbook III/IV boundary. FITTED was fitted on 594 dermatologist-labelled
+# Fitzpatrick17k photos (about 77% cross-validated light/dark accuracy vs 69% for STANDARD);
+# re-check it on a larger sample before relying on it. Both are evaluated in the ablation.
+GATE_CUTOFF_STANDARD = 28.0
+GATE_CUTOFF_FITTED = 14.0
+
+
+def needs_ccm(ita_angle: float, cutoff: float = GATE_CUTOFF_STANDARD) -> bool:
+    """True when the image should get the adaptive CCM (ITA at or below `cutoff`)."""
+    return bool(ita_angle <= cutoff)
+
+
 def compute_ita(L: np.ndarray | float, b: np.ndarray | float) -> np.ndarray | float:
     """ITA = arctan((L* - 50) / b*) * (180 / pi).
 

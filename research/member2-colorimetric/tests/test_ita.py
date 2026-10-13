@@ -9,6 +9,9 @@ import numpy as np
 import pytest
 
 from colorimetric.ita import (
+    GATE_CUTOFF_FITTED,
+    GATE_CUTOFF_STANDARD,
+    needs_ccm,
     FitzpatrickType,
     classify_fitzpatrick,
     classify_image,
@@ -86,3 +89,15 @@ def test_classify_image_raises_on_insufficient_skin_pixels():
     image = _solid_rgb_patch((0, 0, 255))
     with pytest.raises(ValueError):
         classify_image(image)
+
+
+def test_gate_matches_fst_bands_at_standard_cutoff():
+    for ita in (60.0, 45.0, 30.0, 28.5):
+        assert not needs_ccm(ita) and classify_fitzpatrick(ita).value in ("I", "II", "III")
+    for ita in (28.0, 15.0, 0.0, -50.0):
+        assert needs_ccm(ita) and classify_fitzpatrick(ita).value in ("IV", "V", "VI")
+
+
+def test_fitted_gate_is_stricter_than_standard():
+    assert GATE_CUTOFF_FITTED < GATE_CUTOFF_STANDARD
+    assert needs_ccm(20.0) and not needs_ccm(20.0, GATE_CUTOFF_FITTED)

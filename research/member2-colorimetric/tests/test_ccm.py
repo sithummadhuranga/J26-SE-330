@@ -79,3 +79,11 @@ def test_apply_adaptive_ccm_lightens_dark_skin_patch():
 
     # correction targets the light-skin reference, so mean L* should increase
     assert corrected_L > original_L
+
+
+def test_gate_override_forces_or_skips_correction():
+    patch = _dark_skin_patch()
+    assert estimate_adaptive_ccm(patch, FitzpatrickType.VI, k=4, correct=False) is None
+    assert estimate_adaptive_ccm(patch, FitzpatrickType.I, k=4, correct=True) is not None
+    # default (None) keeps the FST rule
+    assert estimate_adaptive_ccm(patch, FitzpatrickType.I, k=4) is None

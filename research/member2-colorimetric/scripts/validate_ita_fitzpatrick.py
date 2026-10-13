@@ -20,7 +20,8 @@ from pathlib import Path
 import cv2
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from colorimetric.ita import classify_image  # noqa: E402
+from colorimetric.evaluation import gate_metrics  # noqa: E402
+from colorimetric.ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image  # noqa: E402
 
 TYPES = ["I", "II", "III", "IV", "V", "VI"]
 
@@ -77,6 +78,16 @@ def main() -> int:
         tot = sum(cm[i])
         rec = f"{cm[i][i] / tot:.0%}" if tot else "-"
         print(f"{t:>5} " + "".join(f"{v:>5}" for v in cm[i]) + f"   {rec} (n={tot})")
+
+    import numpy as np
+
+    true_idx = np.array([idx[t] for _, t, _, _, _ in results])
+    angles = np.array([a for _, _, _, a, _ in results])
+    print("\nCCM gate (ITA <= cutoff -> IV-VI gets corrected)")
+    print("  cutoff   accuracy   dark found   light wrongly corrected")
+    for name, c in (("standard", GATE_CUTOFF_STANDARD), ("fitted", GATE_CUTOFF_FITTED)):
+        g = gate_metrics(true_idx, angles, c)
+        print(f"  {c:5.1f}    {g.accuracy:7.1%}    {g.dark_recall:9.1%}    {g.light_false_correction:9.1%}   ({name})")
 
     if args.out:
         out = args.out.expanduser()
