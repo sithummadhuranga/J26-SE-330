@@ -3,7 +3,7 @@
 Each row is one image: original | Retinex only | Retinex + CCM | full pipeline.
 The caption shows the ITA angle, FST estimate, and whether the CCM ran.
 
-Usage (from research/member2-colorimetric):
+Usage (from research/IT23343702/colorimetric-calibration):
     python scripts/preview_pipeline.py --images data/isic_subset --out data/outputs/preview.png
     python scripts/preview_pipeline.py --files ISIC_0000001.jpg ISIC_0000085.jpg --gate-cutoff 14
 """

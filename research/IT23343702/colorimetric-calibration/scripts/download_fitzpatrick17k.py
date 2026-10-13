@@ -8,7 +8,7 @@ what is already there.
 Licence: CC BY-NC-SA 3.0, scientific use only, delete after the project.
 Keep the images out of git (data/ is outside the repo).
 
-Usage (from research/member2-colorimetric):
+Usage (from research/IT23343702/colorimetric-calibration):
     python scripts/download_fitzpatrick17k.py --per-fst 20          # small balanced sample
     python scripts/download_fitzpatrick17k.py --per-fst 0           # everything reachable
     python scripts/download_fitzpatrick17k.py --host dermaamin.com  # other source

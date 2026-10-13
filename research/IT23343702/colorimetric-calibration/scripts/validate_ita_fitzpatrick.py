@@ -4,7 +4,7 @@ Runs classify_image() on every downloaded image listed as 'ok' in the download
 log and compares it with `fitzpatrick_scale`. Prints a confusion matrix, exact
 and within-one-step accuracy, and per-type recall. Optionally writes a CSV.
 
-Usage (from research/member2-colorimetric):
+Usage (from research/IT23343702/colorimetric-calibration):
     python scripts/validate_ita_fitzpatrick.py \
         --data ~/Documents/Color-pipeline/data/fitzpatrick17k \
         --out ~/Documents/Color-pipeline/data/annotations/ita_vs_fitzpatrick17k.csv

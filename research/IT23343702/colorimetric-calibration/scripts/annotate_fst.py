@@ -5,7 +5,7 @@ column of the metadata CSV after every key press, so you can quit any time and
 resume later. The ITA auto-label is hidden until you press 'g' so it doesn't
 bias your label.
 
-Usage (from research/member2-colorimetric):
+Usage (from research/IT23343702/colorimetric-calibration):
     python scripts/annotate_fst.py \
         --images data/isic_subset \
         --csv data/annotations/isic_subset_metadata.csv \
