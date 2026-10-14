@@ -70,10 +70,13 @@ switch (command)
     case "annotate":
         return IngestionPipeline.Steps.AnnotateCommand.Annotate(paths);
 
+    case "propose-figures":
+        return IngestionPipeline.Steps.FiguresCommand.ProposeFigures(paths);
+
     case "divergence-report":
         return IngestionPipeline.Steps.DivergenceReportCommand.Write(paths);
 
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | divergence-report>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report>");
         return 2;
 }
