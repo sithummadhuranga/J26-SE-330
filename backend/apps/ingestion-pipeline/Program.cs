@@ -76,7 +76,11 @@ switch (command)
     case "divergence-report":
         return IngestionPipeline.Steps.DivergenceReportCommand.Write(paths);
 
+    // Paid API calls: run with --dry-run first (cost estimate and ceiling, nothing sent).
+    case "smoke":
+        return await IngestionPipeline.Steps.SmokeTestCommand.RunAsync(paths, args[1..]);
+
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run]>");
         return 2;
 }
