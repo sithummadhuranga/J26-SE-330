@@ -78,7 +78,7 @@ public static partial class QueryTemplates
         return result;
     }
 
-// The first slot varies slowest; values come in file order, as the deserializer fills each dictionary.
+    // The first slot varies slowest; values come in file order, as the deserializer fills each dictionary.
     private static List<List<KeyValuePair<string, string>>> Combinations(
         List<string> slots, Dictionary<string, Dictionary<string, string>> phrases)
     {

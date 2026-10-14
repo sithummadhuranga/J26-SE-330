@@ -43,7 +43,7 @@ public class LoadTests(LoadFixture fixture) : IClassFixture<LoadFixture>
     public void The_manifest_columns_follow_the_decisions()
     {
         var v = fixture.Get().Version;
-        Assert.Equal(("iwgdf-2023.r1", "qwen3.7-text-embedding", 256, 20), (v.CorpusVersion, v.EmbeddingModel, v.EmbeddingDimensions, v.RetrievalK));
+        Assert.Equal(("iwgdf-2023.r2", "qwen3.7-text-embedding", 256, 20), (v.CorpusVersion, v.EmbeddingModel, v.EmbeddingDimensions, v.RetrievalK));
         Assert.Equal(("table-v1", false, false), (v.TableSerializer, v.RetrieveProse, v.RetrieveRationale));
     }
 
@@ -117,7 +117,7 @@ public class LoadTests(LoadFixture fixture) : IClassFixture<LoadFixture>
             return;
         }
 
-// replace: a version loaded by `load` is deleted inside this transaction and comes back on rollback.
+        // replace: a version loaded by `load` is deleted inside this transaction and comes back on rollback.
         var report = await CorpusWriter.WriteAsync(conn, tx, set, replace: true);
         var counts = report.Counts.ToDictionary(c => c.Table, c => c.Rows);
         Assert.Equal(626, counts["guideline_chunks"]);

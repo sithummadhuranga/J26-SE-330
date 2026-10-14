@@ -5,7 +5,7 @@ namespace IngestionPipeline.ModelApi;
 
 public static class RerankStability
 {
-// Just above the largest drift measured across 7 identical calls, 0.0545; changed only by a new decision.
+    // Just above the largest drift measured across 7 identical calls, 0.0545; changed only by a new decision.
     public const double Delta = 0.06;
 
     public static string? FindProblem(IReadOnlyList<RerankHit> first, IReadOnlyList<RerankHit> second, double delta)

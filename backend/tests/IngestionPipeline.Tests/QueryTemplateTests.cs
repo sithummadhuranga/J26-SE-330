@@ -37,7 +37,7 @@ public class QueryTemplateTests
     }
 
     [Fact]
-// The demo contract's value sets, which r1 was built with. Member 4's contract has not agreed them yet (decision 63).
+    // The demo contract's value sets, which r1 was built with. Member 4's contract has not agreed them yet (decision 63).
     public void Clinical_value_sets_are_the_ones_r1_was_built_with()
     {
         var phrases = File_().SlotPhrases;

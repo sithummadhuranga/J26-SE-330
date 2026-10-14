@@ -72,7 +72,7 @@ public sealed class Annotator
     private readonly Regex _prohibitAnywhere;
     private readonly Dictionary<string, List<string>> _authorPrerequisites;
 
-// "•" counts as a word: PAD-R23–R25 list their main clauses as bullets after a colon.
+    // "•" counts as a word: PAD-R23–R25 list their main clauses as bullets after a colon.
     private static readonly Regex AfterPunct = new(@"[,:]\s*(•|[\w'-]+)", RegexOptions.CultureInvariant);
 
     public Annotator(AnnotationFileDto file)
@@ -105,7 +105,7 @@ public sealed class Annotator
         _prohibitAnywhere = new Regex(file.ProhibitAnywhere, Ci);
     }
 
-// The decision 7 vocabulary, the same list as the CHECK in rag/0003.
+    // The decision 7 vocabulary, the same list as the CHECK in rag/0003.
     public static readonly IReadOnlySet<string> Vocabulary = new HashSet<string>(StringComparer.Ordinal)
         { "ulcerLocation", "protectiveSensation", "pedalPulses", "probeToBone", "infectionGrade", "healingTrajectory" };
 
@@ -132,8 +132,8 @@ public sealed class Annotator
 
     private static List<string> Merged(List<string> a, List<string> b) => [.. a.Union(b).Order(StringComparer.Ordinal)];
 
-// Drops the context header and the GRADE / best-practice marker, cut at its "(" only when one directly
-// precedes it: 24 statements follow a full stop with no parenthesis, so an earlier "(" is real text.
+    // Drops the context header and the GRADE / best-practice marker, cut at its "(" only when one directly
+    // precedes it: 24 statements follow a full stop with no parenthesis, so an earlier "(" is real text.
     public static string BareStatement(string chunkText)
     {
         var nl = chunkText.IndexOf('\n');
@@ -198,8 +198,8 @@ public sealed class Annotator
         return [.. found];
     }
 
-// A field named only after a qualifier_watch word ("a possible infected ulcer") does not gate (author,
-// 4 Oct 2026); named once without one, it still gates.
+    // A field named only after a qualifier_watch word ("a possible infected ulcer") does not gate (author,
+    // 4 Oct 2026); named once without one, it still gates.
     private (List<string> Gating, List<string> Qualified) ClauseFields(string s, IEnumerable<Clause> clauses)
     {
         var gating = new SortedSet<string>(StringComparer.Ordinal);
@@ -244,12 +244,12 @@ public sealed class Annotator
         var menA = Merged(FieldsIn(s, Outside(s.Length, clauseA)), qualifiedA);
         var menC = Merged(FieldsIn(s, Outside(s.Length, cs)), qualifiedC);
 
-// Polarity is read where the main clause opens: after the variant-A clause, or from the start.
+        // Polarity is read where the main clause opens: after the variant-A clause, or from the start.
         var main = a is null ? s : s[a.End..].TrimStart(',', ':', ' ');
         var polarity = _prohibit.Any(p => p.IsMatch(main)) || _prohibitAnywhere.IsMatch(s) ? "PROHIBIT" : "RECOMMEND";
 
         if (a?.EndedBy == "end of statement") flags.Add("A clause runs to the end of the statement");
-// Normal for a closing clause, but an over-long clause would hide here, so the review shows it.
+        // Normal for a closing clause, but an over-long clause would hide here, so the review shows it.
         if (cs.Any(c => c.EndedBy == "end of statement")) flags.Add("C clause runs to the end of the statement");
         if (polarity == "RECOMMEND" && _negation.IsMatch(s)) flags.Add("RECOMMEND but contains a negation");
         if (!reqA.SequenceEqual(reqC)) flags.Add("A and C differ");
@@ -283,7 +283,7 @@ public sealed class Annotator
         return result;
     }
 
-// From the previous ". " to the next; a decimal point is no sentence end, as ". " needs a space.
+    // From the previous ". " to the next; a decimal point is no sentence end, as ". " needs a space.
     private static string SentenceAround(string s, int i)
     {
         var start = s.LastIndexOf(". ", i, StringComparison.Ordinal);

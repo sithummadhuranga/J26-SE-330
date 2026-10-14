@@ -18,7 +18,7 @@ public sealed record RerankHit(int Index, double Score);
 
 public sealed record RerankResponse(IReadOnlyList<RerankHit> Results, string? Model, int TotalTokens, string? RequestId);
 
-public sealed partial class ModelStudioClient
+public sealed partial class ModelStudioClient : IReranker
 {
     public const string EmbeddingModel = "qwen3.7-text-embedding";
     public const string RerankModel = "qwen3-rerank";
@@ -32,7 +32,7 @@ public sealed partial class ModelStudioClient
 
     public ModelStudioClient(HttpClient http, string apiKey, string workspaceId)
     {
-// The ID becomes part of a host name, so anything but letters, digits and hyphens is refused.
+        // The ID becomes part of a host name, so anything but letters, digits and hyphens is refused.
         if (!WorkspaceIdPattern().IsMatch(workspaceId))
             throw new ArgumentException("MODELSTUDIO_WORKSPACE_ID must contain only letters, digits and hyphens", nameof(workspaceId));
         _http = http;
@@ -51,7 +51,7 @@ public sealed partial class ModelStudioClient
         using var doc = await PostAsync(EmbeddingPath, body, ct);
         var root = doc.RootElement;
 
-// Each vector is placed by its text_index rather than by response order.
+        // Each vector is placed by its text_index rather than by response order.
         var vectors = new double[texts.Count][];
         foreach (var e in root.GetProperty("output").GetProperty("embeddings").EnumerateArray())
         {
@@ -74,7 +74,7 @@ public sealed partial class ModelStudioClient
             ["model"] = RerankModel,
             ["query"] = query,
             ["documents"] = ToJsonArray(documents),
-// Every document comes back: the stored scores must cover the whole candidate set.
+            // Every document comes back: the stored scores must cover the whole candidate set.
             ["top_n"] = documents.Count,
         };
         if (instruct is not null)

@@ -19,7 +19,7 @@ public sealed record LoadReport(string PostgresVersion, string PgvectorVersion, 
 
 public static class CorpusWriter
 {
-// Children before parents: the order to delete in; inserts go in reverse.
+    // Children before parents: the order to delete in; inserts go in reverse.
     private static readonly string[] VersionTables =
     [
         "rerank_scores", "query_vectors", "figure_links", "figures", "verified_tables",
@@ -163,7 +163,7 @@ public static class CorpusWriter
             ("certainty", c.GradeCertainty), ("bps", c.IsBestPractice), ("body", c.BodyLabel), ("list", c.ListLabel),
             ("aliases", c.AliasLabels), ("divergence", c.TextDivergence), ("connector", c.SplitConnector));
 
-// Each float in its shortest round-trip form, so PostgreSQL parses back exactly the float in the cache.
+    // Each float in its shortest round-trip form, so PostgreSQL parses back exactly the float in the cache.
     public static string VectorText(float[] vector) =>
         "[" + string.Join(",", vector.Select(x => x.ToString("R", CultureInfo.InvariantCulture))) + "]";
 

@@ -123,10 +123,9 @@ public static class LoadCommand
         var verified = LoadRows.VerifiedTables(tables, codes, figuresFile);
 
         var version = new VersionRow(RecommendationChunks.CorpusVersion, Sha256(paths.SourcePdf), chunkerVersion,
-// Decision 32: the API returns no model name, so the requested one is recorded.
             ModelStudioClient.EmbeddingModel,   // decision 32: the API returns no model name
             EmbeddingCache.Dimensions, RetrievalK, TableSerializer.Version,
-            RetrieveProse: false, RetrieveRationale: false,   // decision 6, for iwgdf-2023.r1
+            RetrieveProse: false, RetrieveRationale: false,   // decision 6
             Sha256(CorpusBuild.PatternPath(paths, "label_aliases.yaml")));
         return new LoadSet(version, chunks, queryRows, Annotator.LocateThresholds(annotation, corpus.Recommendations),
             canaries, figures, links, verified);

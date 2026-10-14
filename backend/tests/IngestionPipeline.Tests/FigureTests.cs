@@ -97,7 +97,7 @@ public class FigureTests
         var sections = SectionsFile.Read(Path.Combine(paths.Patterns, "sections.yaml"))!;
         var counter = WordPieceCounter.Load(paths.Vocabulary);
         var x = Figures.Xrefs(RecommendationChunks.Build(doc, aliases, sections, counter), RationaleChunks.Build(doc, aliases, sections, counter));
-// 0 references in statements, 4 in rationales (CHA 10, PAD 13, 18, 20); PAD 17 shares PAD 18's rationale.
+        // 0 references in statements, 4 in rationales (CHA 10, PAD 13, 18, 20); PAD 17 shares PAD 18's rationale.
         Assert.DoesNotContain(x, r => r.SourceField == "statement");
         Assert.Equal(["CHA-R10", "PAD-R13", "PAD-R17", "PAD-R18", "PAD-R20"], x.Select(r => r.RecommendationChunkId).Order(StringComparer.Ordinal));
         Assert.All(x, r => Assert.DoesNotContain(r.FigureLabel + ":", r.Evidence));

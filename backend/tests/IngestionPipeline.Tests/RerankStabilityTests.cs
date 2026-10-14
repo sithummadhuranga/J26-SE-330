@@ -18,7 +18,7 @@ public class RerankStabilityTests
     [Fact]
     public void Passages_within_delta_may_swap()
     {
-// The measured case: two low passages about 0.01 apart changed places.
+        // The measured case: two low passages about 0.01 apart changed places.
         var first = Hits((0, 0.90), (1, 0.105), (7, 0.095));
         var second = Hits((0, 0.89), (7, 0.11), (1, 0.10));
         Assert.Null(RerankStability.FindProblem(first, second, RerankStability.Delta));

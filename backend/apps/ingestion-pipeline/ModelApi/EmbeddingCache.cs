@@ -40,7 +40,7 @@ public static class EmbeddingCache
         return result;
     }
 
-// Checked for 256 dimensions, normalised in Shared, rounded to float as pgvector stores it, then checked again.
+    // Checked for 256 dimensions, normalised in Shared, rounded to float as pgvector stores it, then checked again.
     public static StoredEmbedding ToStored(string id, string key, IReadOnlyList<double> raw)
     {
         if (raw.Count != Dimensions)

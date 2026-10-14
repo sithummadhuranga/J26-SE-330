@@ -86,7 +86,10 @@ switch (command)
     case "load":
         return await IngestionPipeline.Steps.LoadCommand.RunAsync(paths, args[1..]);
 
+    case "rerank":
+        return await IngestionPipeline.Steps.RerankCommand.RunAsync(paths, args[1..]);
+
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run] | embed [--dry-run] | load [--dry-run] [--replace]>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run] | embed [--dry-run] | load [--dry-run] [--replace] | rerank [--dry-run]>");
         return 2;
 }

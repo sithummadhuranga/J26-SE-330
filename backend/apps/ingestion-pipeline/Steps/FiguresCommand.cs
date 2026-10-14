@@ -23,7 +23,7 @@ public static class FiguresCommand
         var existing = FiguresFile.Read(FiguresPath(paths));
         var counter = WordPieceCounter.Load(paths.Vocabulary);
         using var pdf = PdfDocument.Open(paths.SourcePdf);
-// Captions are found in the full document; chunks come from the running text (decision 30).
+        // Captions are found in the full document; chunks come from the running text (decision 30).
         var doc = GuidelineDocument.Load(pdf);
         var running = TableChunks.RunningText(pdf, doc, paths.Corpus);
         var recs = RecommendationChunks.Build(running, aliases, sections, counter);

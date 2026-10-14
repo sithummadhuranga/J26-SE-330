@@ -96,7 +96,7 @@ public static class Png
         return ms.ToArray();
     }
 
-// CRC-32 as the PNG specification defines it (polynomial 0xEDB88320).
+    // CRC-32 as the PNG specification defines it (polynomial 0xEDB88320).
     private static readonly uint[] Table = Enumerable.Range(0, 256).Select(n =>
     {
         var c = (uint)n;

@@ -42,7 +42,7 @@ public static class LoadRows
         foreach (var c in corpus.Recommendations)
         {
             var n = notes.TryGetValue(c.ChunkId, out var a) ? a : throw new InvalidDataException($"{c.ChunkId}: not annotated");
-// Decision 1: the body wording is canonical; the list wording is kept beside it.
+            // Decision 1: the body wording is canonical; the list wording is kept beside it.
             rows.Add(new ChunkRow(c.ChunkId, "RECOMMENDATION", c.SubGuideline, c.Section, c.RecommendationId,
                 null, c.RationaleChunkId, c.ContextHeader, c.Text, c.VariantText, "body", c.PdfIndex, c.PdfIndexEnd,
                 c.ChunkHash, c.TokenCount, Vector(c.ChunkId, c.ChunkHash),
@@ -57,7 +57,7 @@ public static class LoadRows
             rows.Add(Plain(c.ChunkId, "PROSE", c.SubGuideline, c.Section, null, c.ContextHeader, c.Text, "body",
                 c.PdfIndex, c.PdfIndexEnd, c.ChunkHash, c.TokenCount, Vector(c.ChunkId, c.ChunkHash)));
         foreach (var c in corpus.Tables)
-// A TABLE is a parent only and is not embedded.
+            // A TABLE is a parent only and is not embedded.
             rows.Add(Plain(c.ChunkId, c.ChunkType, c.SubGuideline, c.Section, c.ParentChunkId, c.ContextHeader, c.Text,
                 c.Source, c.PdfIndex, c.PdfIndexEnd, c.ChunkHash, c.TokenCount,
                 c.ChunkType == "TABLE" ? null : Vector(c.ChunkId, c.ChunkHash)));
@@ -112,7 +112,7 @@ public static class LoadRows
 
             foreach (var link in entry.Links)
             {
-// The evidence is the verbatim sentence that names the figure.
+                // The evidence is the verbatim sentence that names the figure.
                 var x = xrefs.FirstOrDefault(x => x.SubGuideline == entry.SubGuideline && x.FigureLabel == entry.Label
                                                   && x.RecommendationChunkId == link.ChunkId && x.SourceField == link.SourceField)
                         ?? throw new InvalidDataException($"{entry.FigureId} → {link.ChunkId}: no cross-reference in the text");

@@ -31,7 +31,7 @@ public static class Figures
             var caps = new List<(string Label, double Y, string Text)>();
             foreach (var ln in doc.RawLines[i])
             {
-// The structure check's caption rule, so the count reconciles with it.
+                // The structure check's caption rule, so the count reconciles with it.
                 var m = Patterns.Caption.Match(WhitespaceText.Strip(ln.Text));
                 if (!m.Success || WhitespaceText.Strip(m.Groups[2].Value).Length == 0) continue;
                 var label = m.Groups[1].Value;
@@ -46,12 +46,12 @@ public static class Figures
             for (var k = 0; k < caps.Count; k++)
             {
                 var below = k + 1 < caps.Count ? caps[k + 1].Y : double.MaxValue;
-// "Directly below": the image's top lies between this caption and the next.
+                // "Directly below": the image's top lies between this caption and the next.
                 var under = images.Where(x => x.Top >= caps[k].Y && x.Top < below).ToList();
                 var isTable = caps[k].Label.StartsWith("Table", StringComparison.Ordinal);
                 if (isTable && under.Count == 0) continue;   // a text table: not an image table
-// A figure has exactly one image. A table takes the nearest: PAD Table 1E has a second image further down,
-// its "Key:" legend (open item O-9), which is reported as under no caption, not attached.
+                // A figure has exactly one image. A table takes the nearest: PAD Table 1E has a second image further down,
+                // its "Key:" legend (open item O-9), which is reported as under no caption, not attached.
                 if (!isTable && under.Count != 1)
                     throw new InvalidDataException($"{doc.Labels[i]} {caps[k].Label} (pdf_index {i + 1}): {under.Count} images below the caption, expected 1");
                 var nearest = under.MinBy(x => x.Top);
@@ -61,8 +61,8 @@ public static class Figures
         return found;
     }
 
-// A DCTDecode stream is a JPEG file and is kept byte for byte. A FlateDecode stream is raw samples, so it is
-// written as a PNG with exactly those samples and the PDF's own ICC profile.
+    // A DCTDecode stream is a JPEG file and is kept byte for byte. A FlateDecode stream is raw samples, so it is
+    // written as a PNG with exactly those samples and the PDF's own ICC profile.
     public static ExportedImage Export(PdfDocument pdf, IPdfImage image)
     {
         var d = image.ImageDictionary;
@@ -115,7 +115,7 @@ public static class Figures
         return new ExportedImage(png, "image/png", rawSha, Convert.ToHexStringLower(SHA256.HashData(png)), samples);
     }
 
-// Captions ("Figure 1:") are not references. A rationale reference links every recommendation it serves.
+    // Captions ("Figure 1:") are not references. A rationale reference links every recommendation it serves.
     public static List<FigureXref> Xrefs(IReadOnlyList<RecommendationChunk> recs, IReadOnlyList<RationaleChunk> rats)
     {
         var result = new List<FigureXref>();

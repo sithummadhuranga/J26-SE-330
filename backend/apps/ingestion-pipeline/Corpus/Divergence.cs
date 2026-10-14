@@ -55,7 +55,7 @@ public static partial class Divergence
             var bareList = Annotator.BareStatement("\n" + list);
             var markerOnly = Words(bareBody).Select(w => w.Word).SequenceEqual(Words(bareList).Select(w => w.Word));
 
-// Clauses are found on each bare wording; BareStatement only trims the end, so offsets carry over.
+            // Clauses are found on each bare wording; BareStatement only trims the end, so offsets carry over.
             var touches = Inside(onlyBody, body, bareBody, annotator) || Inside(onlyList, list, bareList, annotator);
             var number = onlyBody.Concat(onlyList).Any(w => w.Word.Any(char.IsDigit));
             rows.Add(new DivergenceRow(r.ChunkId, r.ListLabel, r.BodyLabel, r.PdfIndex, onlyBody, onlyList, markerOnly, touches, number));

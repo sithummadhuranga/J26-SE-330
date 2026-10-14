@@ -17,7 +17,8 @@ public sealed record RecommendationChunk(
 
 public static partial class RecommendationChunks
 {
-    public const string CorpusVersion = "iwgdf-2023.r1";
+    // r2: the chunks equal r1's, but rerank was scored again in this repository (decision 65).
+    public const string CorpusVersion = "iwgdf-2023.r2";
 
     private const string HeaderRoot = "IWGDF 2023";
 

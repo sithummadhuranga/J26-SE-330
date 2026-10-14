@@ -49,7 +49,7 @@ public static class EmbedCommand
             Plan(paths, Canaries, "document", [.. queriesFile.Canaries.Select(c => new Item(c.Id, EmbeddingCache.TextKey(c.Text), c.Text))]),
         };
 
-// WordPiece is not the provider's tokenizer (the demo's document run measured 1.082 times the estimate).
+        // WordPiece is not the provider's tokenizer (the demo's document run measured 1.082 times the estimate).
         int Estimate(IEnumerable<Item> items) => items.Sum(i => counter.Count(i.Text, withSpecialTokens: true));
         foreach (var w in work)
             Console.WriteLine($"{w.Kind,-10} {w.All.Count,4} texts ({w.TextType}); already embedded {w.All.Count - w.Pending.Count}; " +
@@ -109,7 +109,7 @@ public static class EmbedCommand
         return missing == 0 ? 0 : 1;
     }
 
-// A string stored under two filters has one vector: the vector depends on the text alone.
+    // A string stored under two filters has one vector: the vector depends on the text alone.
     private static List<Item> QueryItems(QueriesFileDto file)
     {
         var items = new List<Item>();
