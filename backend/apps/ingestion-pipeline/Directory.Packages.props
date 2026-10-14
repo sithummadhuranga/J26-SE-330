@@ -3,6 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="Tabula" Version="1.0.1" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />

@@ -80,7 +80,13 @@ switch (command)
     case "smoke":
         return await IngestionPipeline.Steps.SmokeTestCommand.RunAsync(paths, args[1..]);
 
+    case "embed":
+        return await IngestionPipeline.Steps.EmbedCommand.RunAsync(paths, args[1..]);
+
+    case "load":
+        return await IngestionPipeline.Steps.LoadCommand.RunAsync(paths, args[1..]);
+
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run]>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run] | embed [--dry-run] | load [--dry-run] [--replace]>");
         return 2;
 }

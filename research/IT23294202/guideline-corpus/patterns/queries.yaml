@@ -1,0 +1,96 @@
+# queries.yaml — the CLOSED query set (PLAN.md §M5 T1–T5) and the embedding canaries.
+#
+# Written by hand on 4 Oct 2026 as a PROPOSAL. The author reviews every phrase, then sets
+# status: confirmed, confirmed_by and confirmed_on. `embed` refuses to embed queries from a
+# proposed file. No guideline text is stored here: every phrase is a plain clinical term
+# written for this file.
+#
+# How a query string is built (Corpus/QueryTemplates.cs): the template's text, with each
+# {slot} replaced by the phrase for that slot's value. Every combination of the template's
+# slot values is built, so T1 = 5 × 3 = 15 strings, T2 = 15, T3 = 9, T4 = 5, T5 = 3:
+# 47 strings. Each string is stored once per filter listed for its template (decision 31):
+# 47 + 9 + 3 = 59 query keys. Key = SHA-256(text || '|' || filter) (WoundRag.Shared.QueryKey).
+#
+# "not_recorded" has an EMPTY phrase: a field that was not assessed adds nothing to the
+# query. Withholding what needs it is the gate's job (Req(d) ⊆ Obs(x)), not retrieval's.
+# The value sets of the five clinical fields must equal the contract's enums
+# (contracts/rag-request.schema.json); a test checks it.
+
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-10-04"
+
+# Retrieval filters (decision 31). default = the whole retrieval pool; vascular_escalation =
+# the chunks of the Intersocietal PAD Guideline, searched when healing is stalled.
+"filters": ["default", "vascular_escalation"]
+
+# Phrase per slot value. Each starts with ", " so phrases read as a list after the template.
+"slot_phrases":
+  "ulcerLocation":
+    "plantar_forefoot": ", located on the plantar forefoot"
+    "plantar_midfoot": ", located on the plantar midfoot"
+    "plantar_hindfoot": ", located on the plantar hindfoot"
+    "non_plantar": ", located on a non-plantar site"
+    "not_recorded": ""
+  "protectiveSensation":
+    "present": ", protective sensation present"
+    "absent": ", loss of protective sensation"
+    "not_recorded": ""
+  "pedalPulses":
+    "present": ", pedal pulses palpable"
+    "absent": ", pedal pulses absent"
+    "not_recorded": ""
+  "probeToBone":
+    "positive": ", probe-to-bone test positive"
+    "negative": ", probe-to-bone test negative"
+    "not_recorded": ""
+  "infectionGrade":
+    "uninfected": ", no signs of infection"
+    "mild": ", mild infection"
+    "moderate": ", moderate infection"
+    "severe": ", severe infection"
+    "not_recorded": ""
+  # Not a request field: derived by B2 (WoundRag.Core.Trajectory). stalled = PAR < 50% at
+  # >= 4 weeks (PAD BPS 15); not_stalled = computable and not stalled; not_computable = no
+  # baseline, too early, or the measurement pipeline changed.
+  "healingState":
+    "stalled": ", ulcer area reduced by less than 50% after 4 weeks of treatment"
+    "not_stalled": ", ulcer area reducing as expected"
+    "not_computable": ""
+
+"templates":
+- "id": "T1"
+  "topic": "offloading"
+  "text": "Offloading a diabetes-related foot ulcer{ulcerLocation}{protectiveSensation}"
+  "filters": ["default"]
+- "id": "T2"
+  "topic": "infection"
+  "text": "Assessing and treating infection in a diabetes-related foot ulcer{infectionGrade}{probeToBone}"
+  "filters": ["default"]
+- "id": "T3"
+  "topic": "perfusion"
+  "text": "Assessing perfusion and peripheral artery disease in a diabetes-related foot ulcer{pedalPulses}{healingState}"
+  "filters": ["default", "vascular_escalation"]
+- "id": "T4"
+  "topic": "wound care"
+  "text": "Wound care for a diabetes-related foot ulcer{infectionGrade}"
+  "filters": ["default"]
+- "id": "T5"
+  "topic": "trajectory"
+  "text": "Healing of a diabetes-related foot ulcer{healingState}"
+  "filters": ["default", "vascular_escalation"]
+
+# Fixed texts embedded with every corpus version (rag.embedding_canaries). Re-embedding them
+# later and comparing detects a silent change of the model behind the same name (decision 32).
+# Synthetic sentences; C2 and C3 are the M2 polarity pair (RESULTS.md §M2).
+"canaries":
+- "id": "C1"
+  "text": "Offloading reduces pressure on a plantar foot ulcer."
+- "id": "C2"
+  "text": "Do not apply the dressing directly to the open wound."
+- "id": "C3"
+  "text": "Apply the dressing directly to the open wound."
+- "id": "C4"
+  "text": "Absent pedal pulses suggest peripheral artery disease."
+- "id": "C5"
+  "text": "Warmth, redness and swelling around an ulcer are signs of infection."

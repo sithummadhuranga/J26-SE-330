@@ -3,6 +3,7 @@
 
 using IngestionPipeline;
 using IngestionPipeline.Corpus;
+using IngestionPipeline.Steps;
 
 namespace IngestionPipeline.Tests;
 
@@ -42,6 +43,24 @@ public sealed class TablesTheoryAttribute : TheoryAttribute
     }
 }
 
+public sealed class LoadFactAttribute : FactAttribute
+{
+    public LoadFactAttribute()
+    {
+        var reason = CorpusFiles.LoadMissingReason();
+        if (reason is not null) Skip = reason;
+    }
+}
+
+public sealed class LoadDatabaseFactAttribute : FactAttribute
+{
+    public LoadDatabaseFactAttribute()
+    {
+        var reason = CorpusFiles.LoadMissingReason() ?? (TestDatabase.RagConnectionString() is null ? TestDatabase.MissingReason : null);
+        if (reason is not null) Skip = reason;
+    }
+}
+
 public static class CorpusFiles
 {
     public static string? MissingReason()
@@ -64,5 +83,14 @@ public static class CorpusFiles
             if (!File.Exists(Path.Combine(paths.Corpus, f.File)))
                 return $"transcription not present at {f.File} (gitignored)";
         return null;
+    }
+
+    /// <summary>The load also needs the embedding cache, which `embed` writes to the gitignored .cache/.</summary>
+    public static string? LoadMissingReason()
+    {
+        var reason = TablesMissingReason();
+        if (reason is not null) return reason;
+        var cache = EmbedCommand.CachePath(RepoPaths.Discover(), EmbedCommand.Documents);
+        return File.Exists(cache) ? null : $"embedding cache not present at {cache} (gitignored)";
     }
 }
