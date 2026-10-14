@@ -16,6 +16,9 @@ public sealed class RepoPaths
 
     public string Vocabulary => Path.Combine(Cache, "vocab-nomic-embed-text.json");
 
+    /// <summary>One committed manifest per frozen corpus version; no guideline text.</summary>
+    public string Manifests => Path.Combine(Corpus, "manifests");
+
     /// <summary>Gitignored scratch output; may hold guideline text.</summary>
     public string Cache => Path.Combine(Corpus, ".cache");
 

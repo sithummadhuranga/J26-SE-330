@@ -20,9 +20,9 @@ public static class RerankCommand
     // qwen3-rerank, US$ per 1M input tokens, International (Singapore), model-pricing page dated 28 Sep 2026.
     private const decimal RerankUsdPerMillion = 0.1m;
 
-    // The embedding runs measured 13–17 tokens per text above the WordPiece count; the rerank tokenizer is not
-    // documented, so the estimate adds the same allowance per text.
-    private const int AllowancePerText = 17;
+    // The r2 run returned 162,314 tokens for 111,749 WordPiece tokens over 1,239 texts: about 41 more per text
+    // overall, though 28 to 57 per key, so a single key's estimate can still be low.
+    private const int AllowancePerText = 41;
 
     public static async Task<int> RunAsync(RepoPaths paths, string[] args)
     {
