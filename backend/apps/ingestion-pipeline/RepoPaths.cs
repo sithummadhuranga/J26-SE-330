@@ -19,6 +19,9 @@ public sealed class RepoPaths
     /// <summary>Gitignored scratch output; may hold guideline text.</summary>
     public string Cache => Path.Combine(Corpus, ".cache");
 
+    /// <summary>The local Phase A notes; docs/ is gitignored, so reports written here are never committed.</summary>
+    public string Notes => Path.Combine(Root, "docs", "IT23294202", "guideline-corpus");
+
     private RepoPaths(string root) => Root = root;
 
     public static RepoPaths Discover(string? start = null)

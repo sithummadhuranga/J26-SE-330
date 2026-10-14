@@ -67,7 +67,13 @@ switch (command)
     case "chunk":
         return IngestionPipeline.Steps.ChunkCommand.Chunk(paths);
 
+    case "annotate":
+        return IngestionPipeline.Steps.AnnotateCommand.Annotate(paths);
+
+    case "divergence-report":
+        return IngestionPipeline.Steps.DivergenceReportCommand.Write(paths);
+
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | divergence-report>");
         return 2;
 }
