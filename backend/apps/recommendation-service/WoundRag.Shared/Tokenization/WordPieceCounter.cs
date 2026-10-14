@@ -1,5 +1,5 @@
 // Counts tokens with greedy longest-match-first WordPiece over the uncased nomic-embed-text vocabulary.
-// Used only for counting (A1 statistics, chunk size caps); no model ever sees its output.
+// Used only for counting (structure statistics, chunk size caps); no model ever sees its output.
 
 using System.Globalization;
 using System.Text;
@@ -61,7 +61,7 @@ public sealed class WordPieceCounter
     {
         var normalised = StripAccents(text.ToLowerInvariant());
         var words = new List<string>();
-        foreach (var chunk in PyText.Split(normalised))
+        foreach (var chunk in WhitespaceText.Split(normalised))
         {
             var buf = new StringBuilder();
             foreach (var rune in chunk.EnumerateRunes())

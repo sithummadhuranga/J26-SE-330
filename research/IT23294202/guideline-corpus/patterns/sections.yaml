@@ -1,0 +1,473 @@
+# sections.yaml — what each section heading of the 7 recommendation-bearing sub-guidelines is.
+#
+# Written by `ingestion-pipeline -- propose-sections` (status: proposed). The author reviews
+# it, then sets status: confirmed, confirmed_by and confirmed_on. From then on the chunker
+# reads ONLY this confirmed file and fails on any heading it does not list.
+#
+# wraps:    a heading printed over two lines; the two lines are one heading.
+# headings: every heading OUTSIDE the LIST OF RECOMMENDATIONS and body RECOMMENDATIONS
+#           sections (those two are handled by the recommendation chunker), in order:
+#   prose    its text becomes PROSE chunks (decisions 6, 14);
+#   exclude  its text is not chunked; reason says which decision excludes it;
+#   sub      a sub-heading: its text is treated like the section above it.
+# Lines before a sub-guideline's first heading (title page) are not chunked (decision 14).
+# No guideline body text belongs in this file — headings, pages and reasons only.
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-09-28"
+"source_pdf_sha256": "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36"
+"generated": "2026-09-28"
+"sub_guidelines":
+- "name": "IWGDF Prevention Guideline"
+  "wraps": []
+  "headings":
+  - "heading": "AUTHORS"
+    "page": 34
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 34
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 35
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 38
+    "kind": "prose"
+    "reason": 
+  - "heading": "WHAT’S NEW IN THIS 2023 UPDATE"
+    "page": 39
+    "kind": "sub"
+    "reason": 
+  - "heading": "METHODS"
+    "page": 39
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "CONFLICT OF INTEREST STATEMENT"
+    "page": 41
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "RESULTS"
+    "page": 41
+    "kind": "exclude"
+    "reason": "systematic-review results, part of the method (decision 14)"
+  - "heading": "CONSIDERATIONS"
+    "page": 59
+    "kind": "prose"
+    "reason": 
+  - "heading": "FUTURE RESEARCH AGENDA"
+    "page": 60
+    "kind": "prose"
+    "reason": 
+  - "heading": "CONCLUDING REMARKS"
+    "page": 62
+    "kind": "prose"
+    "reason": 
+  - "heading": "GLOSSARY"
+    "page": 63
+    "kind": "exclude"
+    "reason": "glossary (decision 6)"
+  - "heading": "CONFLICT OF INTEREST STATEMENTS"
+    "page": 66
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 66
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "AUTHOR CONTRIBUTIONS"
+    "page": 66
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 67
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "IWGDF Classification Guideline"
+  "wraps":
+  - "first": "FURTHER CONSIDERATIONS / FUTURE RESEARCH / KEY"
+    "second": "CONTROVERSIES"
+    "page": 92
+  "headings":
+  - "heading": "AUTHORS"
+    "page": 72
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 72
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 73
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 75
+    "kind": "prose"
+    "reason": 
+  - "heading": "WHAT’S NEW"
+    "page": 76
+    "kind": "sub"
+    "reason": 
+  - "heading": "METHODS"
+    "page": 76
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "DIAFORA"
+    "page": 80
+    "kind": "sub"
+    "reason": 
+  - "heading": "IDSA/IWGD"
+    "page": 80
+    "kind": "sub"
+    "reason": 
+  - "heading": "SINBAD"
+    "page": 80
+    "kind": "sub"
+    "reason": 
+  - "heading": "MANAGEMENT OF CONFLICT OF INTERESTS"
+    "page": 81
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "RESULTS"
+    "page": 82
+    "kind": "exclude"
+    "reason": "systematic-review results, part of the method (decision 14)"
+  - "heading": "FURTHER CONSIDERATIONS / FUTURE RESEARCH / KEY CONTROVERSIES"
+    "page": 92
+    "kind": "prose"
+    "reason": 
+  - "heading": "CONCLUDING REMARKS"
+    "page": 94
+    "kind": "prose"
+    "reason": 
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 95
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "CONTRIBUTION OF AUTHORS"
+    "page": 95
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 96
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "IWGDF Infection Guideline"
+  "wraps": []
+  "headings":
+  - "heading": "IWGDF/IDSA 2023"
+    "page": 102
+    "kind": "sub"
+    "reason": 
+  - "heading": "AUTHORS"
+    "page": 103
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 103
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 104
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "ABBREVIATIONS"
+    "page": 105
+    "kind": "exclude"
+    "reason": "abbreviations, like the glossary (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 109
+    "kind": "prose"
+    "reason": 
+  - "heading": "BACKGROUND"
+    "page": 110
+    "kind": "prose"
+    "reason": 
+  - "heading": "METHODOLOGY"
+    "page": 111
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "AREAS WITH ABSENT OR INCONSISTENT EVIDENCE"
+    "page": 134
+    "kind": "prose"
+    "reason": 
+  - "heading": "KEY CONTROVERSIES"
+    "page": 135
+    "kind": "prose"
+    "reason": 
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 136
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "CONFLICT OF INTERESTS"
+    "page": 136
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "AUTHOR CONTRIBUTIONS"
+    "page": 137
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 138
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "Intersocietal PAD Guideline"
+  "wraps":
+  - "first": "EXTERNAL EXPERTS, PATIENT REPRESENTATIVES AND REVIEW"
+    "second": "PROCESS"
+    "page": 155
+  "headings":
+  - "heading": "IWGDF, ESVS, SVS"
+    "page": 147
+    "kind": "sub"
+    "reason": 
+  - "heading": "AUTHORS"
+    "page": 148
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 148
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 149
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "ABBREVIATIONS"
+    "page": 150
+    "kind": "exclude"
+    "reason": "abbreviations, like the glossary (decision 14)"
+  - "heading": "EXTERNAL EXPERTS, PATIENT REPRESENTATIVES AND REVIEW PROCESS"
+    "page": 155
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "METHODOLOGY"
+    "page": 155
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "TARGET POPULATION AND TARGET AUDIENCE"
+    "page": 157
+    "kind": "prose"
+    "reason": 
+  - "heading": "GUIDELINE WRITING GROUP CONFLICT OF INTEREST POLICY"
+    "page": 158
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "DEFINITIONS AND TERMINOLOGY AS USED IN THIS DOCUMENT"
+    "page": 158
+    "kind": "prose"
+    "reason": 
+  - "heading": "INTRODUCTION"
+    "page": 160
+    "kind": "prose"
+    "reason": 
+  - "heading": "RELATED GUIDELINES"
+    "page": 161
+    "kind": "prose"
+    "reason": 
+  - "heading": "POSTSCRIPT"
+    "page": 188
+    "kind": "prose"
+    "reason": 
+  - "heading": "FUTURE RESEARCH PRIORITIES"
+    "page": 188
+    "kind": "prose"
+    "reason": 
+  - "heading": "FURTHER QUESTIONS"
+    "page": 189
+    "kind": "prose"
+    "reason": 
+  - "heading": "CONTRIBUTION OF AUTHORS"
+    "page": 190
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 190
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "REFERENCES"
+    "page": 191
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "IWGDF Offloading Guideline"
+  "wraps": []
+  "headings":
+  - "heading": "AUTHORS"
+    "page": 200
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 200
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 201
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 204
+    "kind": "prose"
+    "reason": 
+  - "heading": "WHAT’S NEW"
+    "page": 205
+    "kind": "sub"
+    "reason": 
+  - "heading": "METHODS"
+    "page": 206
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "CONFLICT OF INTEREST STATEMENT"
+    "page": 207
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "RESULTS"
+    "page": 208
+    "kind": "exclude"
+    "reason": "systematic-review results, part of the method (decision 14)"
+  - "heading": "KEY CONSIDERATIONS FOR FUTURE RESEARCH"
+    "page": 228
+    "kind": "prose"
+    "reason": 
+  - "heading": "CONCLUDING REMARKS"
+    "page": 230
+    "kind": "prose"
+    "reason": 
+  - "heading": "GLOSSARY"
+    "page": 231
+    "kind": "exclude"
+    "reason": "glossary (decision 6)"
+  - "heading": "CONFLICT OF INTEREST STATEMENTS"
+    "page": 235
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 235
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "AUTHOR CONTRIBUTIONS"
+    "page": 235
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 236
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "IWGDF Wound Healing Guideline"
+  "wraps":
+  - "first": "AUTOLOGOUS PLATELETS – WITH EXCEPTION OF THE AUTOLOGOUS LEUCOCYTE"
+    "second": "AND PLATELET PATCH"
+    "page": 263
+  - "first": "AGENTS THAT STIMULATE RED CELL PRODUCTION OR PROTEIN"
+    "second": "SUPPLEMENTATION"
+    "page": 269
+  "headings":
+  - "heading": "AUTHORS"
+    "page": 241
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 241
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 242
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 245
+    "kind": "prose"
+    "reason": 
+  - "heading": "WHAT’S NEW"
+    "page": 245
+    "kind": "sub"
+    "reason": 
+  - "heading": "METHODS"
+    "page": 246
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "FURTHER CONSIDERATIONS"
+    "page": 272
+    "kind": "prose"
+    "reason": 
+  - "heading": "FUTURE RESEARCH AGENDA"
+    "page": 274
+    "kind": "prose"
+    "reason": 
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 275
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "GUIDELINE WORKING GROUP CONFLICT OF INTEREST POLICY"
+    "page": 275
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "AUTHOR CONTRIBUTIONS"
+    "page": 276
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 277
+    "kind": "exclude"
+    "reason": "references (decision 6)"
+- "name": "IWGDF Charcot Guideline"
+  "wraps": []
+  "headings":
+  - "heading": "AUTHORS"
+    "page": 293
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "INSTITUTIONS"
+    "page": 293
+    "kind": "exclude"
+    "reason": "author list (decision 6)"
+  - "heading": "ABSTRACT"
+    "page": 294
+    "kind": "exclude"
+    "reason": "summary of the recommendations (decision 14)"
+  - "heading": "ABBREVIATIONS"
+    "page": 294
+    "kind": "exclude"
+    "reason": "abbreviations, like the glossary (decision 14)"
+  - "heading": "INTRODUCTION"
+    "page": 298
+    "kind": "prose"
+    "reason": 
+  - "heading": "TARGET POPULATION AND TARGET AUDIENCE"
+    "page": 299
+    "kind": "prose"
+    "reason": 
+  - "heading": "BACKGROUND: DEFINITIONS AND TERMINOLOGY"
+    "page": 299
+    "kind": "sub"
+    "reason": 
+  - "heading": "METHODS"
+    "page": 301
+    "kind": "exclude"
+    "reason": "methods (decision 6)"
+  - "heading": "CONFLICT OF INTEREST STATEMENT"
+    "page": 302
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "FUTURE RESEARCH"
+    "page": 323
+    "kind": "prose"
+    "reason": 
+  - "heading": "CONCLUDING REMARKS"
+    "page": 324
+    "kind": "prose"
+    "reason": 
+  - "heading": "ACKNOWLEDGEMENTS"
+    "page": 325
+    "kind": "exclude"
+    "reason": "acknowledgements (decision 6)"
+  - "heading": "CONFLICT OF INTERESTS"
+    "page": 325
+    "kind": "exclude"
+    "reason": "administrative (decision 14)"
+  - "heading": "REFERENCES"
+    "page": 326
+    "kind": "exclude"
+    "reason": "references (decision 6)"

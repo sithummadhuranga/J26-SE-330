@@ -1,6 +1,6 @@
-// PyText, the WordPiece counter and A1's percentile, on a tiny made-up vocabulary so they run everywhere.
+// WhitespaceText, the WordPiece counter and the structure check's percentile, on a tiny made-up vocabulary so they run everywhere.
 
-using IngestionPipeline.Steps;
+using IngestionPipeline.Pdf;
 using WoundRag.Shared.Text;
 using WoundRag.Shared.Tokenization;
 
@@ -39,11 +39,11 @@ public class TokenizationTests
     }
 
     [Fact]
-    public void PyText_treats_U001C_to_U001F_as_whitespace_like_Python()
+    public void WhitespaceText_treats_U001C_to_U001F_as_whitespace_like_Python()
     {
-        Assert.Equal(["a", "b", "c"], PyText.Split("a\u001Cb\u001Fc"));
-        Assert.Equal("a b", PyText.NormalizeSpaces("  a \t\n b\u001D "));
-        Assert.Equal("x", PyText.Strip("\u001E x  "));
+        Assert.Equal(["a", "b", "c"], WhitespaceText.Split("a\u001Cb\u001Fc"));
+        Assert.Equal("a b", WhitespaceText.NormalizeSpaces("  a \t\n b\u001D "));
+        Assert.Equal("x", WhitespaceText.Strip("\u001E x  "));
     }
 
     [Theory]
@@ -53,5 +53,5 @@ public class TokenizationTests
     [InlineData(100, 10)]
     [InlineData(1, 1)]
     public void Percentile_is_nearest_rank(double pct, int expected) =>
-        Assert.Equal(expected, A1Recon.Percentile([10, 9, 8, 7, 6, 5, 4, 3, 2, 1], pct));
+        Assert.Equal(expected, PdfStructure.Percentile([10, 9, 8, 7, 6, 5, 4, 3, 2, 1], pct));
 }

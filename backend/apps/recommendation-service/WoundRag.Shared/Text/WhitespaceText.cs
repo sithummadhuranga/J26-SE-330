@@ -1,9 +1,9 @@
 // Whitespace split, join and strip that behave exactly like Python's str.split() and str.strip(),
-// so text normalises the same way it did when the A1 numbers were measured.
+// so text normalises the same way it did when the structure numbers were measured.
 
 namespace WoundRag.Shared.Text;
 
-public static class PyText
+public static class WhitespaceText
 {
     // Python also treats U+001C..U+001F as whitespace; .NET's char.IsWhiteSpace does not.
     public static bool IsWhiteSpace(char c) =>

@@ -1,5 +1,5 @@
 // Reads the structure of the IWGDF 2023 PDF: the sub-guideline of each page, the recommendation
-// list and body sections, and the items, recommendations and rationales in them. A1 and the chunker share it.
+// list and body sections, and the items, recommendations and rationales in them. The structure check and the chunker share it.
 
 using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
@@ -44,7 +44,7 @@ public sealed class GuidelineDocument
         new(RawLines.Select((lines, i) => lines
             .Where(l => !zones.Any(z => z.Page == i + 1 && l.Y0 >= z.Top && l.Y0 < z.Bottom)).ToList()).ToList());
 
-    /// <summary>Reads every page. A1 passes superscriptUnits false so its text matches the oracle (decision 29).</summary>
+    /// <summary>Reads every page. The structure check passes superscriptUnits false so its text matches the oracle (decision 29).</summary>
     public static GuidelineDocument Load(PdfDocument pdf, bool superscriptUnits = true) =>
         new(pdf.GetPages().Select(p => PdfLines.BuildRawLines(p, superscriptUnits)).ToList());
 
@@ -54,7 +54,7 @@ public sealed class GuidelineDocument
     {
         var heads = raw.Select(r =>
         {
-            var h = PyText.Strip(string.Join(' ', PdfLines.Lines(r, Band.Header)));
+            var h = WhitespaceText.Strip(string.Join(' ', PdfLines.Lines(r, Band.Header)));
             return h.Length == 0 || h == "2023" ? "" : h;
         }).ToList();
         var labels = new string[heads.Count];
@@ -80,15 +80,15 @@ public sealed class GuidelineDocument
     {
         int? start = null;
         for (int pos = after; pos < idxs.Count; pos++)
-            if (PyText.Strip(Flat[idxs[pos]].Line) == heading) { start = pos + 1; break; }
+            if (WhitespaceText.Strip(Flat[idxs[pos]].Line) == heading) { start = pos + 1; break; }
         if (start is null) return null;
         for (int pos = start.Value; pos < idxs.Count; pos++)
-            if (terminators.Contains(PyText.Strip(Flat[idxs[pos]].Line))) return (start.Value, pos);
+            if (terminators.Contains(WhitespaceText.Strip(Flat[idxs[pos]].Line))) return (start.Value, pos);
         return (start.Value, idxs.Count);
     }
 
     // An ALL-CAPS heading closes the current item: PAD and Charcot group their lists under
-    // DIAGNOSIS / PROGNOSIS / TREATMENT. The chunker passes its own join (decision 11); A1 joins with a space.
+    // DIAGNOSIS / PROGNOSIS / TREATMENT. The chunker passes its own join (decision 11); the structure check joins with a space.
     public List<ListItem> ParseItems(List<int> idxs, int lo, int hi, Func<string, string, string>? join = null)
     {
         join ??= static (text, line) => text + " " + line;
@@ -98,7 +98,7 @@ public sealed class GuidelineDocument
         for (int pos = lo; pos < hi; pos++)
         {
             var (page, raw) = Flat[idxs[pos]];
-            var line = PyText.Strip(raw);
+            var line = WhitespaceText.Strip(raw);
             var m = Patterns.Item.Match(line);
             if (m.Success)
             {
@@ -113,7 +113,7 @@ public sealed class GuidelineDocument
                 {
                     label = (top ?? "?") + m.Groups[3].Value;
                 }
-                cur = (label, top, page + 1, section, PyText.Strip(line[(m.Index + m.Length)..]));
+                cur = (label, top, page + 1, section, WhitespaceText.Strip(line[(m.Index + m.Length)..]));
             }
             else if (Patterns.Heading.IsMatch(line))
             {
@@ -129,7 +129,7 @@ public sealed class GuidelineDocument
 
         return items.Select(it =>
         {
-            var text = PyText.NormalizeSpaces(it.Text);
+            var text = WhitespaceText.NormalizeSpaces(it.Text);
             string? marker = Patterns.Grade.IsMatch(text) ? "GRADE" : Patterns.Bps.IsMatch(text) ? "BPS" : null;
             return new ListItem(it.Label, it.Top, it.Page, it.Section, text, marker);
         }).ToList();
@@ -149,14 +149,14 @@ public sealed class GuidelineDocument
         {
             if (label is null) return;
             recs.Add(new BodyRecommendation(label, curPage, curSection,
-                PyText.NormalizeSpaces(statement.ToString()), PyText.NormalizeSpaces(rationale.ToString())));
+                WhitespaceText.NormalizeSpaces(statement.ToString()), WhitespaceText.NormalizeSpaces(rationale.ToString())));
             label = null;
         }
 
         for (int pos = lo; pos < hi; pos++)
         {
             var (page, raw) = Flat[idxs[pos]];
-            var line = PyText.Strip(raw);
+            var line = WhitespaceText.Strip(raw);
             var m = Patterns.RecHeading.Match(line);
             if (m.Success)
             {
@@ -164,7 +164,7 @@ public sealed class GuidelineDocument
                 label = m.Groups[1].Value;
                 curPage = page + 1;
                 curSection = section;
-                statement.Clear().Append(PyText.Strip(line[(m.Index + m.Length)..]));
+                statement.Clear().Append(WhitespaceText.Strip(line[(m.Index + m.Length)..]));
                 rationale.Clear();
                 inRationale = false;
             }
@@ -179,7 +179,7 @@ public sealed class GuidelineDocument
                 {
                     inRationale = true;
                     // The oracle cuts a fixed 10 characters, len("Rationale:"), whatever the spacing.
-                    rationale.Append(PyText.Strip(line.Length > 10 ? line[10..] : "")).Append(' ');
+                    rationale.Append(WhitespaceText.Strip(line.Length > 10 ? line[10..] : "")).Append(' ');
                 }
                 else if (inRationale)
                 {
@@ -200,14 +200,14 @@ public sealed class GuidelineDocument
     {
         var ends = new[] { Patterns.Grade.Match(text), Patterns.Bps.Match(text) }
             .Where(m => m.Success).Select(m => m.Index + m.Length).ToList();
-        return ends.Count == 0 ? null : PyText.NormalizeSpaces(text[..ends.Min()]);
+        return ends.Count == 0 ? null : WhitespaceText.NormalizeSpaces(text[..ends.Min()]);
     }
 
     public static string StripMarker(string text)
     {
         var output = Patterns.Grade.Replace(text, "");
         output = Patterns.Bps.Replace(output, "");
-        return PyText.RStrip(PyText.NormalizeSpaces(output.Replace("()", " ")), " .;,");
+        return WhitespaceText.RStrip(WhitespaceText.NormalizeSpaces(output.Replace("()", " ")), " .;,");
     }
 
     /// <summary>True when a Figure/Table match starts a caption ("Figure 1:") rather than referring to one.</summary>

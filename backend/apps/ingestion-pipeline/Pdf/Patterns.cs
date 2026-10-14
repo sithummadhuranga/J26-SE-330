@@ -1,5 +1,5 @@
 // The regular expressions and section terminators that read the structure of the IWGDF 2023 PDF.
-// Grade, Bps, Heading, Item and the cross-reference patterns are A1's own; the parity counts depend on them.
+// Grade, Bps, Heading, Item and the cross-reference patterns are the structure check's own; the parity counts depend on them.
 
 using System.Text.RegularExpressions;
 
@@ -41,7 +41,7 @@ public static class Patterns
     // PAD's tables are "Table 1A:" to "Table 1E:", so the sub-letter can be upper case.
     public static readonly Regex Caption = new(@"^((?:Figure|Table)\s+\d+[A-Za-z]?)\s*[.:–-]?\s*(.+)$");
 
-    // "Fig." and "Figures N and M" never occur; A1 keeps them to report that.
+    // "Fig." and "Figures N and M" never occur; the structure check keeps them to report that.
     public static readonly Regex FigXref = new(
         @"(\(?\s*(?:see\s+|See\s+|in\s+|shown\s+in\s+|presented\s+in\s+|listed\s+in\s+)?" +
         @"(?:Figure|Figures|Fig\.?|figure|figures)\s*\d+[a-z]?" +

@@ -1,5 +1,5 @@
 // Builds text lines from a PdfPig page and splits them into header, body and footer bands by position.
-// PdfPig measures y from the bottom of the page; the A1 bands are top-down, so every y is flipped first.
+// PdfPig measures y from the bottom of the page; the structure bands are top-down, so every y is flipped first.
 
 using UglyToad.PdfPig.Content;
 using WoundRag.Shared.Text;
@@ -24,7 +24,7 @@ public static class PdfLines
     public const double FooterY = 760.0;
 
     // Gap thresholds as fractions of font size, the way MuPDF groups letters into lines.
-    // Calibrated against the A1 oracle's 13,193 body lines.
+    // Calibrated against the oracle's 13,193 body lines.
     internal const double BaseMaxDist = 0.8;
     internal const double SpaceDist = 0.15;
     internal const double SpaceMaxDist = 0.8;
@@ -128,7 +128,7 @@ public static class PdfLines
                 Band.Footer => ln.Y0 > FooterY,
                 _ => false,
             };
-            if (keep && PyText.Strip(ln.Text).Length > 0)
+            if (keep && WhitespaceText.Strip(ln.Text).Length > 0)
                 rows.Add((PyRound1(ln.Y0), ln.X0, ln.Text));
         }
         rows.Sort((a, b) =>

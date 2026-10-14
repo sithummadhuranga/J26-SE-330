@@ -9,7 +9,10 @@ public sealed class RepoPaths
 
     public string Corpus => Path.Combine(Root, "research", "IT23294202", "guideline-corpus");
 
-    public string SourcePdf => Path.Combine(Corpus, "source", "IWGDF-Guidelines-2023.pdf");
+    /// <summary>The author-confirmed pattern files; committed, they hold IDs and settings only.</summary>
+    public string Patterns => Path.Combine(Corpus, "patterns");
+
+    public string SourcePdf =>Path.Combine(Corpus, "source", "IWGDF-Guidelines-2023.pdf");
 
     public string Vocabulary => Path.Combine(Cache, "vocab-nomic-embed-text.json");
 

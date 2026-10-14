@@ -1,19 +1,18 @@
-// A1: measures the structure of the IWGDF 2023 PDF so the numbers can be checked against A1Expected.
+// Measures the structure of the IWGDF 2023 PDF (plan step A1) so the numbers can be checked against StructureBaseline.
 // Image duplicates are found by hashing the raw image stream, so the hashes differ from the oracle's.
 
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
-using IngestionPipeline.Pdf;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Tokens;
 using WoundRag.Shared.Text;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Pdf;
 
 public sealed record TokenStats(int P50, int P90, int P95, int Max, int Min, int Mean, int N);
 
-public sealed class A1Result
+public sealed class PdfStructureCounts
 {
     public required string SourceSha256 { get; init; }
     public required int Pages { get; init; }
@@ -53,9 +52,9 @@ public sealed class A1Result
     public required IReadOnlyList<(string Guideline, string Label, string Text)> GradeableStatements { get; init; }
 }
 
-public static class A1Recon
+public static class PdfStructure
 {
-    public static A1Result Measure(string pdfPath, WordPieceCounter counter)
+    public static PdfStructureCounts Measure(string pdfPath, WordPieceCounter counter)
     {
         string sha;
         using (var fs = File.OpenRead(pdfPath)) sha = Convert.ToHexStringLower(SHA256.HashData(fs));
@@ -114,10 +113,10 @@ public static class A1Recon
         for (int i = 0; i < doc.PageCount; i++)
             foreach (var ln in doc.Body[i])
             {
-                var m = Patterns.Caption.Match(PyText.Strip(ln));
-                if (m.Success && PyText.Strip(m.Groups[2].Value).Length > 0)
+                var m = Patterns.Caption.Match(WhitespaceText.Strip(ln));
+                if (m.Success && WhitespaceText.Strip(m.Groups[2].Value).Length > 0)
                     captions.Add((m.Groups[1].Value.Split(' ')[0], m.Groups[1].Value, i + 1,
-                        PyText.NormalizeSpaces(m.Groups[2].Value)));
+                        WhitespaceText.NormalizeSpaces(m.Groups[2].Value)));
             }
         var figs = captions.Where(c => c.Kind == "Figure").ToList();
         var tabs = captions.Where(c => c.Kind == "Table").ToList();
@@ -134,7 +133,7 @@ public static class A1Recon
                     foreach (Match m in Patterns.FigXref.Matches(field))
                     {
                         if (GuidelineDocument.IsCaptionOccurrence(field, m)) continue;
-                        links.Add((g, r.Label, PyText.NormalizeSpaces(m.Groups[1].Value)));
+                        links.Add((g, r.Label, WhitespaceText.NormalizeSpaces(m.Groups[1].Value)));
                         if (isStatement) inStmt++;
                     }
         int unanchorable = figs.Count(f =>
@@ -148,7 +147,7 @@ public static class A1Recon
         int footerDigits = doc.RawLines.Count(page =>
             digits.IsMatch(string.Join(' ', page.Where(l => l.Y0 > PdfLines.FooterY).Select(l => l.Text))));
 
-        return new A1Result
+        return new PdfStructureCounts
         {
             SourceSha256 = sha,
             Pages = doc.PageCount,
@@ -199,7 +198,7 @@ public static class A1Recon
 
     private static (int Distinct, int Total) XrefForms(Regex pattern, string text)
     {
-        var forms = pattern.Matches(text).Select(m => PyText.NormalizeSpaces(m.Groups[1].Value)).ToList();
+        var forms = pattern.Matches(text).Select(m => WhitespaceText.NormalizeSpaces(m.Groups[1].Value)).ToList();
         return (forms.Distinct(StringComparer.Ordinal).Count(), forms.Count);
     }
 
@@ -243,8 +242,8 @@ public static class A1Recon
         foreach (var pg in tabs.Select(t => t.Page).Distinct().Order())
         {
             var bodyRows = doc.RawLines[pg - 1]
-                .Where(l => l.Y0 >= PdfLines.HeaderY && l.Y0 <= PdfLines.FooterY && PyText.Strip(l.Text).Length > 0)
-                .Select(l => (Y: l.Y0, Text: PyText.Strip(l.Text)))
+                .Where(l => l.Y0 >= PdfLines.HeaderY && l.Y0 <= PdfLines.FooterY && WhitespaceText.Strip(l.Text).Length > 0)
+                .Select(l => (Y: l.Y0, Text: WhitespaceText.Strip(l.Text)))
                 .OrderBy(r => r.Y).ThenBy(r => r.Text, StringComparer.Ordinal).ToList();
             var capsHere = bodyRows
                 .Select(r => (r.Y, M: Patterns.Caption.Match(r.Text), r.Text))

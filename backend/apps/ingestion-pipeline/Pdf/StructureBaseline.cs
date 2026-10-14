@@ -1,7 +1,7 @@
-// The A1 numbers the C# extractor must reproduce exactly; a mismatch is investigated, never edited away.
+// The structure numbers (plan step A1) the C# extractor must reproduce exactly; a mismatch is investigated, never edited away.
 // Measured by the earlier Phase A prototype (old repo commit aad7ab4) on the PDF with SHA-256 81d8626c…a3f36.
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Pdf;
 
 /// <summary>Per-sub-guideline counts: list items, GRADE, BPS, parent stems, body recommendations, with rationale.</summary>
 public sealed record GuidelineRow(string Name, int FirstPage, int LastPage, int ListItems, int Grade,
@@ -10,7 +10,7 @@ public sealed record GuidelineRow(string Name, int FirstPage, int LastPage, int 
     public int Pages => LastPage - FirstPage + 1;
 }
 
-public static class A1Expected
+public static class StructureBaseline
 {
     public const string SourcePdfSha256 = "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36";
 

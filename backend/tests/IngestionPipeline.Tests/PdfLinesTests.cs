@@ -14,7 +14,7 @@ public class PdfLinesTests
     // The IWGDF PDF's page size.
     private const double PageWidth = 595.28, PageHeight = 841.89, Size = 10;
 
-    // `top` is a top-down baseline, the way A1's bands are defined.
+    // `top` is a top-down baseline, the way the structure bands are defined.
     private static Page BuildPage(Action<Func<string, double, double, IReadOnlyList<Letter>>> draw)
     {
         var builder = new PdfDocumentBuilder();
@@ -46,7 +46,7 @@ public class PdfLinesTests
 
         string[] Text(bool units) => [.. PdfLines.Lines(PdfLines.BuildRawLines(p.Letters, p.Height, superscriptUnits: units), Band.Body)];
         Assert.Equal(["ulcer 5 cm²", "per 1.73m²", "cells/mm³", "the program2", "studies12"], Text(units: true));
-        Assert.Equal(["ulcer 5 cm2", "per 1.73m2", "cells/mm3", "the program2", "studies12"], Text(units: false));   // the A1 stream
+        Assert.Equal(["ulcer 5 cm2", "per 1.73m2", "cells/mm3", "the program2", "studies12"], Text(units: false));   // the structure-check stream
     }
 
     [Fact]

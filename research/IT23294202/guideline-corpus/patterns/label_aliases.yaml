@@ -1,0 +1,672 @@
+# label_aliases.yaml — which LIST item is which BODY recommendation.
+#
+# Written by `ingestion-pipeline -- propose-aliases` (status: proposed). The author reviews
+# every entry against corpus/.cache/label_pairing_review.md (side-by-side text, gitignored),
+# edits where needed, then sets:
+#     status: confirmed
+#     confirmed_by: <name>
+#     confirmed_on: <yyyy-mm-dd>
+# From then on the build reads ONLY this confirmed file, and propose-aliases refuses to
+# overwrite it. A pair you add by hand gets basis: author.
+#
+# Rules (docs/decisions/2026-09-28-m4-corpus-decisions.md, decisions 1, 2, 5):
+#   * body labels are identity: chunk_id = {code}-R{body label}, e.g. OFF-R07a;
+#   * list labels are aliases; every label must resolve to exactly one recommendation;
+#   * list_only items are ingested from the list (canonical source: list);
+#   * excluded list labels are not recommendations; each carries its reason;
+#   * no guideline text belongs in this file — labels, scores and codes only.
+#
+# Author review, 28 Sep 2026 — see decisions doc §0.2 and decision 9:
+#   * PRE 8b, 8c, 10b and INF 1b added by hand (basis: author). Their body blocks print
+#     several graded sub-items under one "Recommendation N:" heading; the proposal compared
+#     only up to the FIRST marker, so it could not see them. Measured afterwards: each list
+#     item's words appear in its body block's statement (containment 1.000, 1.000, 1.000,
+#     0.941). These pairs carry no proposal-time similarity.
+#   * INF list 15 excluded: misprint, not a recommendation (decision 9).
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-09-28"
+"source_pdf_sha256": "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36"
+"generated": "2026-09-28"
+"method": "Statements compared up to the grade/BPS marker as lowercase words; similarity = 2*LCS/(|a|+|b|). Identical word sequences paired first, then repeated mutual-best matches at or above proposal_floor."
+"proposal_floor": 0.5
+"sub_guidelines":
+- "name": "IWGDF Prevention Guideline"
+  "code": "PRE"
+  "pairs":
+  - "list": "1"
+    "body": "1"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 0.987
+    "basis": "similar"
+  - "list": "3"
+    "body": "3"
+    "similarity": 0.98
+    "basis": "similar"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5"
+    "body": "5"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7"
+    "similarity": 0.99
+    "basis": "similar"
+  - "list": "8a"
+    "body": "8"
+    "similarity": 0.828
+    "basis": "similar"
+  - "list": "9"
+    "body": "9"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "10a"
+    "body": "10"
+    "similarity": 0.519
+    "basis": "similar"
+  - "list": "11"
+    "body": "11"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12"
+    "body": "12"
+    "similarity": 0.984
+    "basis": "similar"
+  - "list": "13"
+    "body": "13"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "14"
+    "body": "14"
+    "similarity": 0.966
+    "basis": "similar"
+  - "list": "8b"
+    "body": "8"
+    "basis": "author"
+  - "list": "8c"
+    "body": "8"
+    "basis": "author"
+  - "list": "10b"
+    "body": "10"
+    "basis": "author"
+  "list_only": []
+  "body_only": []
+  "excluded": []
+- "name": "IWGDF Classification Guideline"
+  "code": "CLA"
+  "pairs":
+  - "list": "1a"
+    "body": "1a"
+    "similarity": 0.911
+    "basis": "similar"
+  - "list": "1b"
+    "body": "1b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "3a"
+    "body": "3a"
+    "similarity": 0.95
+    "basis": "similar"
+  - "list": "3b"
+    "body": "3b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5"
+    "body": "5"
+    "similarity": 0.929
+    "basis": "similar"
+  "list_only": []
+  "body_only": []
+- "name": "IWGDF Infection Guideline"
+  "code": "INF"
+  "pairs":
+  - "list": "1a"
+    "body": "1"
+    "similarity": 0.885
+    "basis": "similar"
+  - "list": "2"
+    "body": "2"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "3"
+    "body": "3"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5"
+    "body": "5"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "8"
+    "body": "8"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "9"
+    "body": "9"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "10"
+    "body": "10"
+    "similarity": 0.971
+    "basis": "similar"
+  - "list": "11"
+    "body": "11"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12a"
+    "body": "12a"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12b"
+    "body": "12b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12c"
+    "body": "12c"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12d"
+    "body": "12d"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "13"
+    "body": "13"
+    "similarity": 1
+    "basis": "similar"
+  - "list": "14"
+    "body": "14"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "16"
+    "body": "15"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "17"
+    "body": "16"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "18"
+    "body": "17"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "19"
+    "body": "18"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "20"
+    "body": "19"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "21"
+    "body": "20"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "22"
+    "body": "21"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "23"
+    "body": "22"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "24"
+    "body": "23"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "25"
+    "body": "24"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "26"
+    "body": "25"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "1b"
+    "body": "1"
+    "basis": "author"
+  "list_only": []
+  "body_only": []
+  "excluded":
+  - "label": "15"
+    "reason": "Misprint on pdf_index 107: list items 13 and 14 printed again as one run-on item (both markers present, no space between them). The real recommendation 15 is list 16 = body 15. Decision 9."
+- "name": "Intersocietal PAD Guideline"
+  "code": "PAD"
+  "pairs":
+  - "list": "1"
+    "body": "1"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 0.994
+    "basis": "similar"
+  - "list": "3"
+    "body": "3"
+    "similarity": 0.97
+    "basis": "similar"
+  - "list": "4"
+    "body": "4"
+    "similarity": 0.983
+    "basis": "similar"
+  - "list": "5"
+    "body": "5"
+    "similarity": 0.978
+    "basis": "similar"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7"
+    "similarity": 0.957
+    "basis": "similar"
+  - "list": "8"
+    "body": "8"
+    "similarity": 0.952
+    "basis": "similar"
+  - "list": "9"
+    "body": "9"
+    "similarity": 0.991
+    "basis": "similar"
+  - "list": "10"
+    "body": "10"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "11"
+    "body": "11"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12"
+    "body": "12"
+    "similarity": 0.948
+    "basis": "similar"
+  - "list": "13"
+    "body": "13"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "14"
+    "body": "14"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "15"
+    "body": "15"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "16"
+    "body": "16"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "17"
+    "body": "17"
+    "similarity": 0.933
+    "basis": "similar"
+  - "list": "18"
+    "body": "18"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "19"
+    "body": "19"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "20"
+    "body": "20"
+    "similarity": 0.963
+    "basis": "similar"
+  - "list": "21"
+    "body": "21"
+    "similarity": 0.984
+    "basis": "similar"
+  - "list": "22"
+    "body": "22"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "23"
+    "body": "23"
+    "similarity": 0.971
+    "basis": "similar"
+  - "list": "24"
+    "body": "24"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "25"
+    "body": "25"
+    "similarity": 0.989
+    "basis": "similar"
+  "list_only": []
+  "body_only": []
+- "name": "IWGDF Offloading Guideline"
+  "code": "OFF"
+  "pairs":
+  - "list": "1a"
+    "body": "1a"
+    "similarity": 0.95
+    "basis": "similar"
+  - "list": "1b"
+    "body": "1b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 0.985
+    "basis": "similar"
+  - "list": "3"
+    "body": "3"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5a"
+    "body": "5a"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5b"
+    "body": "5b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5c"
+    "body": "5c"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5d"
+    "body": "5d"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7a"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "8"
+    "body": "7b"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "9"
+    "body": "7c"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "10"
+    "body": "8"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "11"
+    "body": "9"
+    "similarity": 0.977
+    "basis": "similar"
+  - "list": "12"
+    "body": "10"
+    "similarity": 0.979
+    "basis": "similar"
+  "list_only": []
+  "body_only": []
+- "name": "IWGDF Wound Healing Guideline"
+  "code": "WHL"
+  "pairs":
+  - "list": "1"
+    "body": "1"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2a"
+    "body": "2a"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "3"
+    "body": "3"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5"
+    "body": "5"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "8"
+    "body": "8"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "9"
+    "body": "9"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "10"
+    "body": "10"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "11"
+    "body": "11"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12"
+    "body": "12"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "13"
+    "body": "13"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "14"
+    "body": "14"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "15"
+    "body": "15"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "16"
+    "body": "16"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "17"
+    "body": "17"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "18"
+    "body": "18"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "19"
+    "body": "19"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "20"
+    "body": "20"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "21"
+    "body": "21"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "22"
+    "body": "22"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "23"
+    "body": "23"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "24"
+    "body": "24"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "25"
+    "body": "25"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "26"
+    "body": "26"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "27"
+    "body": "27"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "28"
+    "body": "28"
+    "similarity": 0.902
+    "basis": "similar"
+  - "list": "28a"
+    "body": "28a"
+    "similarity": 0.902
+    "basis": "similar"
+  - "list": "29"
+    "body": "29"
+    "similarity": 1
+    "basis": "identical"
+  "list_only": []
+  "body_only": []
+- "name": "IWGDF Charcot Guideline"
+  "code": "CHA"
+  "pairs":
+  - "list": "1"
+    "body": "1"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "2"
+    "body": "2"
+    "similarity": 0.936
+    "basis": "similar"
+  - "list": "3"
+    "body": "3"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "4"
+    "body": "4"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "5"
+    "body": "5"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "6"
+    "body": "6"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "7"
+    "body": "7"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "8"
+    "body": "8"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "9"
+    "body": "9"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "10"
+    "body": "10"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "11"
+    "body": "11"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "12"
+    "body": "12"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "13"
+    "body": "13"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "14"
+    "body": "14"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "15"
+    "body": "15"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "16"
+    "body": "16"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "17"
+    "body": "17"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "18"
+    "body": "18"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "19"
+    "body": "19"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "20"
+    "body": "20"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "21"
+    "body": "21"
+    "similarity": 0.947
+    "basis": "similar"
+  - "list": "22"
+    "body": "22"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "23"
+    "body": "23"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "24"
+    "body": "24"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "25"
+    "body": "25"
+    "similarity": 1
+    "basis": "identical"
+  - "list": "26"
+    "body": "26"
+    "similarity": 1
+    "basis": "identical"
+  "list_only": []
+  "body_only": []
