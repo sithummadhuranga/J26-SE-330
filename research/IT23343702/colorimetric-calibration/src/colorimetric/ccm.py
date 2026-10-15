@@ -42,6 +42,24 @@ def _rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
 DEFAULT_MAX_KMEANS_PIXELS = 20_000
 DEFAULT_L_CEILING = 95.0  # relative CCM: keep the brightest 1% of the image below this L*
 
+# FST-stratified correction (SO3): fraction of the gap to the light-skin prior that is
+# closed, from the guide's per-type strength (ita.CORRECTION_STRENGTH: none / light /
+# moderate / strong / maximum). Starting values, to be tuned in the ablation.
+CORRECTION_FRACTION: dict[FitzpatrickType, float] = {
+    FitzpatrickType.I: 0.0,
+    FitzpatrickType.II: 0.0,
+    FitzpatrickType.III: 0.25,
+    FitzpatrickType.IV: 0.5,
+    FitzpatrickType.V: 0.75,
+    FitzpatrickType.VI: 1.0,
+}
+
+# L* variance normalisation target: median per-image skin L* std dev of Fitzpatrick17k
+# FST I-III images after Step 1 + MSR (8.9 / 8.4 / 8.3, n=298). FST IV-VI were similar
+# (8.5 / 9.3 / 9.1), so this mainly undoes the spread the CCM gain adds.
+REFERENCE_SKIN_L_STD = 8.5
+L_STD_GAIN_RANGE = (0.8, 1.25)
+
 for _name in REFERENCE_PRIORS:
     REFERENCE_PRIORS[_name]["lab"] = _rgb_to_lab(REFERENCE_PRIORS[_name]["rgb"])
 
@@ -124,6 +142,7 @@ def estimate_adaptive_ccm(
     correct: bool | None = None,
     shift: str = "relative",
     l_ceiling: float | None = DEFAULT_L_CEILING,
+    stratified: bool = True,
 ) -> np.ndarray | None:
     """Estimate a per-image 3x3 CCM for FST IV-VI images; None for FST I-III (no correction).
 
@@ -142,6 +161,8 @@ def estimate_adaptive_ccm(
         therefore capped so the image's 99th-percentile L* lands at or below `l_ceiling`
         (None = no cap). Without the cap FST VI images in Fitzpatrick17k had 7% of pixels
         pushed past L*=95, i.e. wound/lesion detail lost on exactly the darkest skin.
+        With `stratified` (SO3) only `CORRECTION_FRACTION[fitzpatrick_type]` of the gap is
+        closed (IV half, V three quarters, VI all of it); False closes the whole gap.
     "fixed" (v1): add the full ColorChecker dark->light LAB offset (+27.8 L*, +2 a*,
         +3 b*) to every image. Kept for the ablation. On 8 ISIC images that took the
         CCM path after Step 1 + MSR it pushed L* to 85-93, flagged 51-89% of the frame
@@ -160,6 +181,8 @@ def estimate_adaptive_ccm(
     else:
         skin_L = float(np.average(source_colors[:, 0], weights=counts))
         gap = max(0.0, REFERENCE_PRIORS["light_skin"]["lab"][0] - skin_L)
+        if stratified:
+            gap *= CORRECTION_FRACTION[fitzpatrick_type]
         if l_ceiling is not None and gap > 0:
             L_img = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB)[..., 0]
             p99 = float(np.percentile(L_img, 99)) * 100.0 / 255.0
@@ -189,3 +212,36 @@ def apply_adaptive_ccm(rgb_image: np.ndarray, M: np.ndarray) -> np.ndarray:
 
     corrected_rgb = cv2.cvtColor(corrected_lab.astype(np.uint8), cv2.COLOR_LAB2RGB)
     return corrected_rgb
+
+
+def normalise_skin_L_variance(
+    rgb_image: np.ndarray,
+    skin_mask: np.ndarray,
+    target_std: float = REFERENCE_SKIN_L_STD,
+    gain_range: tuple[float, float] = L_STD_GAIN_RANGE,
+    l_ceiling: float | None = DEFAULT_L_CEILING,
+) -> np.ndarray:
+    """Scale L* about the skin's mean L* so the skin's L* std dev becomes `target_std`.
+
+    The second half of Step 4 ("normalise L* variance"). The CCM sets the skin's mean L*;
+    a 3x3 can only do that by scaling L*, which also scales skin texture and noise, so this
+    puts the spread back to the light-skin reference. The mean of the skin is unchanged and
+    a*/b* are not touched (FR12). The gain is limited to `gain_range` and, when above 1,
+    also so the image's 99th-percentile L* stays at or below `l_ceiling`.
+    `skin_mask` is passed in (taken before the CCM) because the HSV skin test can change
+    once the image has been lightened. Returns the input unchanged if fewer than 50 skin pixels.
+    """
+    if skin_mask.sum() < 50:
+        return rgb_image.copy()
+    lab = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB).astype(np.float32)
+    L = lab[..., 0] * (100.0 / 255.0)
+    mean, std = float(L[skin_mask].mean()), float(L[skin_mask].std())
+    if std < 1e-6:
+        return rgb_image.copy()
+    gain = float(np.clip(target_std / std, *gain_range))
+    if gain > 1.0 and l_ceiling is not None:
+        p99 = float(np.percentile(L, 99))
+        if p99 > mean:
+            gain = max(1.0, min(gain, (l_ceiling - mean) / (p99 - mean)))
+    lab[..., 0] = np.clip((mean + (L - mean) * gain) * (255.0 / 100.0), 0, 255)
+    return cv2.cvtColor(np.round(lab).astype(np.uint8), cv2.COLOR_LAB2RGB)

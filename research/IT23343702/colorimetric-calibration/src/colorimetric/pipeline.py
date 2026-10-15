@@ -4,7 +4,8 @@ Order (research guide, adjusted where measurement showed a problem):
     1  raw input processing     intensity stretch + artefact smoothing
     2  illumination correction  multi-scale Retinex on L* (optional white balance)
     3  skin tone (ITA) + gate   read from the RAW input, see `classify_on`
-    4  adaptive 3x3 CCM         only if the gate says IV-VI
+    4  adaptive 3x3 CCM         only if the gate says IV-VI; FST-stratified lift of L*,
+                                then skin L* variance normalised (a*/b* untouched)
     5  specular removal         inpaint V>240 & S<30
     6  CLAHE on L* + median     contrast
 Step 7 (model normalisation) and the resize are model-side, not part of calibration.
@@ -25,10 +26,10 @@ from dataclasses import dataclass, field, replace
 import cv2
 import numpy as np
 
-from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm
+from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm, normalise_skin_L_variance
 from .enhance import clahe_median, remove_specular
 from .illumination import gray_world, multi_scale_retinex_L, white_balance
-from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image, needs_ccm
+from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image, needs_ccm, skin_mask_hsv
 from .preprocess import _check_rgb, process_raw_input
 
 
@@ -45,6 +46,8 @@ class PipelineConfig:
     use_clahe: bool = True             # step 6
     ccm_k: int = 6
     ccm_shift: str = "relative"        # "relative" (v2) | "fixed" (v1 ColorChecker offset), see ccm.py
+    ccm_stratified: bool = True        # close a per-FST fraction of the gap (SO3)
+    ccm_l_variance: bool = True        # step 4b: normalise skin L* std dev after the CCM
     seed: int = 0                      # k-means seeding, for repeatable output
 
 
@@ -66,7 +69,8 @@ ABLATION_VARIANTS: dict[str, PipelineConfig] = {
     "retinex_ccm": PipelineConfig(illumination="msr", use_ccm=True, use_specular=False, use_clahe=False),
     "full": PipelineConfig(),
     "full_fitted_gate": PipelineConfig(gate_cutoff=GATE_CUTOFF_FITTED),
-    "full_ccm_v1": PipelineConfig(ccm_shift="fixed"),
+    "full_ccm_v1": PipelineConfig(ccm_shift="fixed", ccm_stratified=False, ccm_l_variance=False),
+    "full_ccm_unstratified": PipelineConfig(ccm_stratified=False, ccm_l_variance=False),
 }
 
 
@@ -127,8 +131,11 @@ def process_image(
             try:
                 M = timed("4_ccm_fit", estimate_adaptive_ccm, img, ita.fitzpatrick_type,
                           wound_bbox=wound_bbox, k=cfg.ccm_k, correct=True,
-                          shift=cfg.ccm_shift)
+                          shift=cfg.ccm_shift, stratified=cfg.ccm_stratified)
+                skin = skin_mask_hsv(img, wound_bbox=wound_bbox) if cfg.ccm_l_variance else None
                 img = timed("4_ccm_apply", apply_adaptive_ccm, img, M)
+                if skin is not None:
+                    img = timed("4_l_variance", normalise_skin_L_variance, img, skin)
                 ccm_applied = True
             except ValueError as e:
                 notes.append(f"CCM skipped: {e}")

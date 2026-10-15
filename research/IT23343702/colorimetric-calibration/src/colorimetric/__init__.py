@@ -13,6 +13,7 @@ from .ccm import (
     sample_skin_lab_colors,
     estimate_adaptive_ccm,
     apply_adaptive_ccm,
+    normalise_skin_L_variance,
 )
 from .preprocess import rgb_to_lab, lab_to_rgb, process_raw_input, final_normalise, letterbox, unletterbox, LetterboxInfo
 from .illumination import gray_world, single_scale_retinex_L, multi_scale_retinex_L, white_balance
@@ -33,6 +34,7 @@ __all__ = [
     "sample_skin_lab_colors",
     "estimate_adaptive_ccm",
     "apply_adaptive_ccm",
+    "normalise_skin_L_variance",
     "rgb_to_lab",
     "lab_to_rgb",
     "process_raw_input",

@@ -10,6 +10,7 @@ from colorimetric.ccm import (
     apply_ccm,
     compute_ccm,
     estimate_adaptive_ccm,
+    normalise_skin_L_variance,
     sample_skin_lab_colors,
 )
 from colorimetric.ita import FitzpatrickType
@@ -132,3 +133,36 @@ def test_relative_ccm_does_not_blow_out_bright_regions():
 def test_unknown_shift_raises():
     with pytest.raises(ValueError):
         estimate_adaptive_ccm(_dark_skin_patch(), FitzpatrickType.VI, k=4, shift="nope")
+
+
+def _textured_dark_skin(seed=3, spread=14):
+    rng = np.random.default_rng(seed)
+    return np.clip(np.array([110, 75, 60]) + rng.integers(-spread, spread + 1, size=(120, 120, 1)), 0, 255).astype(np.uint8)
+
+
+def test_stratified_ccm_lifts_darker_types_more():
+    img = _textured_dark_skin()
+    lifts = []
+    for fst in (FitzpatrickType.IV, FitzpatrickType.V, FitzpatrickType.VI):
+        cv2.setRNGSeed(0)
+        out = apply_adaptive_ccm(img, estimate_adaptive_ccm(img, fst, k=4))
+        lifts.append(_lab(out)[0].mean() - _lab(img)[0].mean())
+    assert 0 < lifts[0] < lifts[1] < lifts[2]
+
+
+def test_l_variance_normalisation_hits_target_and_keeps_mean_and_a():
+    img = _textured_dark_skin(spread=30)
+    mask = np.ones(img.shape[:2], bool)
+    out = normalise_skin_L_variance(img, mask, target_std=6.0, gain_range=(0.5, 2.0))
+    L0, a0, _ = _lab(img)
+    L1, a1, _ = _lab(out)
+    assert abs(L1.std() - 6.0) < 0.6
+    assert abs(L1.mean() - L0.mean()) < 0.5
+    assert np.abs(a1 - a0).mean() < 1.0                 # FR12: a* kept (up to uint8 rounding)
+
+
+def test_l_variance_gain_is_limited_and_needs_skin():
+    img = _textured_dark_skin(spread=30)
+    out = normalise_skin_L_variance(img, np.ones(img.shape[:2], bool), target_std=0.1)
+    assert _lab(out)[0].std() >= 0.79 * _lab(img)[0].std()   # floor of the default gain range
+    assert np.array_equal(normalise_skin_L_variance(img, np.zeros(img.shape[:2], bool)), img)
