@@ -36,6 +36,7 @@ from .preprocess import _check_rgb, process_raw_input
 class PipelineConfig:
     stretch: bool = True               # step 1
     illumination: str = "msr"          # step 2: "msr" | "gray_world" | "none"
+    retinex_work_size: int | None = 512  # blur on a copy this big (long side); None = exact full size
     use_white_balance: bool = False    # step 2 extra; off by default (see module docstring)
     use_ccm: bool = True               # step 4
     gate_cutoff: float = GATE_CUTOFF_STANDARD
@@ -106,7 +107,7 @@ def process_image(
     if cfg.stretch:
         img = timed("1_raw_input", process_raw_input, img)
     if cfg.illumination == "msr":
-        img = timed("2_msr", multi_scale_retinex_L, img)
+        img = timed("2_msr", multi_scale_retinex_L, img, work_size=cfg.retinex_work_size)
     elif cfg.illumination == "gray_world":
         img = timed("2_gray_world", gray_world, img)
     if cfg.use_white_balance:

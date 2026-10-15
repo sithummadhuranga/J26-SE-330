@@ -6,6 +6,7 @@ import pytest
 
 from colorimetric.enhance import clahe_median, remove_specular, specular_mask
 from colorimetric.illumination import (
+    DEFAULT_SIGMAS,
     gray_world,
     multi_scale_retinex_L,
     single_scale_retinex_L,
@@ -191,3 +192,21 @@ def test_final_normalise_imagenet_and_zscore():
     assert np.allclose(z.std(axis=(0, 1)), 1, atol=1e-3)
     with pytest.raises(ValueError):
         final_normalise(img, "nope")
+
+
+# --- Retinex on a downscaled copy (speed) --------------------------------------
+
+def test_retinex_small_images_are_unchanged_by_work_size():
+    img = with_shadow(skin_image(h=200, w=300, noise=3), sigma=40)
+    assert np.array_equal(multi_scale_retinex_L(img), multi_scale_retinex_L(img, work_size=None))
+
+
+def test_retinex_downscaled_blur_matches_exact_filter_at_equivalent_scale():
+    """Above work_size, blurring a copy equals blurring full size with sigmas scaled up."""
+    img = with_shadow(skin_image(h=480, w=640, noise=3), sigma=90)
+    factor = 640 / 512
+    exact = multi_scale_retinex_L(img, sigmas=tuple(s * factor for s in DEFAULT_SIGMAS), work_size=None)
+    fast = multi_scale_retinex_L(img)
+    diff = np.abs(rgb_to_lab(exact)[..., 0] - rgb_to_lab(fast)[..., 0])
+    assert diff.mean() < 0.5 and np.percentile(diff, 99) < 3.0
+    assert fast.shape == img.shape

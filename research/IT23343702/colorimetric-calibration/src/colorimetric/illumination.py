@@ -14,6 +14,10 @@ import numpy as np
 from .preprocess import _check_rgb, lab_to_rgb, rgb_to_lab
 
 DEFAULT_SIGMAS = (15, 80, 250)
+# The guide defines these sigmas for 512 px images. Larger photos are blurred on a
+# copy whose long side is WORK_SIZE and the smooth illumination estimate is scaled back
+# up, which gives nearly the same result in a fraction of the time. None = exact full size.
+DEFAULT_WORK_SIZE = 512
 
 
 def gray_world(rgb: np.ndarray) -> np.ndarray:
@@ -25,9 +29,27 @@ def gray_world(rgb: np.ndarray) -> np.ndarray:
     return np.clip(x * gains, 0, 255).astype(np.uint8)
 
 
-def _retinex_log(L: np.ndarray, sigma: float) -> np.ndarray:
-    blur = cv2.GaussianBlur(L, (0, 0), sigma)
-    return np.log(L + 1.0) - np.log(blur + 1.0)
+def _retinex_log(L: np.ndarray, sigmas: tuple[float, ...], work_size: int | None = DEFAULT_WORK_SIZE) -> np.ndarray:
+    """Mean over `sigmas` of log(L+1) - log(illumination+1), at the full size of L.
+
+    Illumination is a Gaussian blur of L. When the image is larger than `work_size`
+    the blur is done on a downscaled copy (sigmas apply at that size) and the result
+    is resized back up (bilinear): illumination is smooth, so little is lost.
+    """
+    h, w = L.shape
+    L32 = L.astype(np.float32)
+    scale = 1.0 if work_size is None else min(1.0, work_size / max(h, w))
+    small = L32 if scale == 1.0 else cv2.resize(
+        L32, (max(1, round(w * scale)), max(1, round(h * scale))), interpolation=cv2.INTER_AREA
+    )
+    log_l = np.log(L32 + 1.0)
+    acc = np.zeros_like(L32)
+    for sigma in sigmas:
+        blur = cv2.GaussianBlur(small, (0, 0), sigma)
+        if scale != 1.0:
+            blur = cv2.resize(blur, (w, h), interpolation=cv2.INTER_LINEAR)
+        acc += log_l - np.log(blur + 1.0)
+    return (acc / len(sigmas)).astype(np.float64)
 
 
 def _anchor_to_mean(R: np.ndarray, L: np.ndarray) -> np.ndarray:
@@ -47,16 +69,20 @@ def _apply_to_L(rgb: np.ndarray, retinex_fn) -> np.ndarray:
     return lab_to_rgb(lab)  # a*/b* untouched so colour (erythema) fidelity is kept
 
 
-def single_scale_retinex_L(rgb: np.ndarray, sigma: float = 80.0) -> np.ndarray:
+def single_scale_retinex_L(rgb: np.ndarray, sigma: float = 80.0, work_size: int | None = DEFAULT_WORK_SIZE) -> np.ndarray:
     """SSR on the L* channel only."""
     _check_rgb(rgb)
-    return _apply_to_L(rgb, lambda L: _retinex_log(L, sigma))
+    return _apply_to_L(rgb, lambda L: _retinex_log(L, (sigma,), work_size))
 
 
-def multi_scale_retinex_L(rgb: np.ndarray, sigmas: tuple[float, ...] = DEFAULT_SIGMAS) -> np.ndarray:
-    """MSR (equal-weight sum over sigmas, default 15/80/250) on the L* channel only."""
+def multi_scale_retinex_L(
+    rgb: np.ndarray,
+    sigmas: tuple[float, ...] = DEFAULT_SIGMAS,
+    work_size: int | None = DEFAULT_WORK_SIZE,
+) -> np.ndarray:
+    """MSR (equal-weight mean over sigmas, default 15/80/250) on the L* channel only."""
     _check_rgb(rgb)
-    return _apply_to_L(rgb, lambda L: sum(_retinex_log(L, s) for s in sigmas) / len(sigmas))
+    return _apply_to_L(rgb, lambda L: _retinex_log(L, tuple(sigmas), work_size))
 
 
 def white_balance(rgb: np.ndarray, percentile: float = 99.0, max_gain: float = 1.4) -> np.ndarray:
