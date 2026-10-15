@@ -39,6 +39,8 @@ def _rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
     return np.array([lab[0] * (100.0 / 255.0), lab[1] - 128.0, lab[2] - 128.0])
 
 
+DEFAULT_MAX_KMEANS_PIXELS = 20_000
+
 for _name in REFERENCE_PRIORS:
     REFERENCE_PRIORS[_name]["lab"] = _rgb_to_lab(REFERENCE_PRIORS[_name]["rgb"])
 
@@ -72,12 +74,16 @@ def sample_skin_lab_colors(
     rgb_image: np.ndarray,
     wound_bbox: tuple[int, int, int, int] | None = None,
     k: int = 6,
+    max_pixels: int | None = DEFAULT_MAX_KMEANS_PIXELS,
 ) -> np.ndarray:
     """Cluster non-wound skin pixels (LAB space) into k representative colors via k-means.
 
     Multiple representative colors (rather than one mean color) give the
     least-squares CCM solve something to actually fit against, instead of
     being underdetermined from a single point.
+
+    k-means runs on a fixed-seed random sample of at most `max_pixels` skin pixels
+    (None = all of them); k=6 centres are stable with far fewer pixels than a photo has.
     """
     mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox)
     lab = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB).astype(np.float32)
@@ -88,6 +94,9 @@ def sample_skin_lab_colors(
     pixels = lab[mask]
     if len(pixels) < k:
         raise ValueError(f"Only {len(pixels)} skin pixels found, need >= k={k} for clustering")
+    if max_pixels is not None and len(pixels) > max_pixels:
+        idx = np.random.default_rng(0).choice(len(pixels), max_pixels, replace=False)
+        pixels = pixels[np.sort(idx)]
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
     _, _, centers = cv2.kmeans(pixels, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)

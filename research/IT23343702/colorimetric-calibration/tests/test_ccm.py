@@ -87,3 +87,14 @@ def test_gate_override_forces_or_skips_correction():
     assert estimate_adaptive_ccm(patch, FitzpatrickType.I, k=4, correct=True) is not None
     # default (None) keeps the FST rule
     assert estimate_adaptive_ccm(patch, FitzpatrickType.I, k=4) is None
+
+
+def test_kmeans_subsample_gives_nearly_the_same_centres():
+    rng = np.random.default_rng(1)
+    base = np.array([115, 82, 68], dtype=np.int16)
+    img = np.clip(base + rng.integers(-12, 13, size=(400, 400, 3)), 0, 255).astype(np.uint8)
+    cv2.setRNGSeed(0)
+    full = sample_skin_lab_colors(img, k=3, max_pixels=None)
+    cv2.setRNGSeed(0)
+    sub = sample_skin_lab_colors(img, k=3, max_pixels=5_000)
+    assert np.abs(full.mean(axis=0) - sub.mean(axis=0)).max() < 0.5
