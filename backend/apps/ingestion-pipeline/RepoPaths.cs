@@ -19,6 +19,9 @@ public sealed class RepoPaths
     /// <summary>One committed manifest per frozen corpus version; no guideline text.</summary>
     public string Manifests => Path.Combine(Corpus, "manifests");
 
+    /// <summary>Gitignored database exports; they hold guideline text.</summary>
+    public string Exports => Path.Combine(Corpus, "exports");
+
     /// <summary>Gitignored scratch output; may hold guideline text.</summary>
     public string Cache => Path.Combine(Corpus, ".cache");
 

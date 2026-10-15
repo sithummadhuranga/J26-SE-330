@@ -92,7 +92,10 @@ switch (command)
     case "verify":
         return await IngestionPipeline.Steps.VerifyCommand.RunAsync(paths, args[1..]);
 
+    case "export":
+        return await IngestionPipeline.Steps.ExportCommand.RunAsync(paths, args[1..]);
+
     default:
-        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run] | embed [--dry-run] | load [--dry-run] [--replace] | rerank [--dry-run] | verify [--dry-run] [--canary-runs N] [--freeze]>");
+        Console.Error.WriteLine("usage: ingestion-pipeline <check-structure | propose-aliases | propose-sections | propose-tables | hash-transcription FILE | chunk | annotate | propose-figures | divergence-report | smoke [--dry-run] | embed [--dry-run] | load [--dry-run] [--replace] | rerank [--dry-run] | verify [--dry-run] [--canary-runs N] [--freeze] | export [--verify-into DATABASE]>");
         return 2;
 }
