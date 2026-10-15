@@ -27,6 +27,8 @@ public class CorpusManifestTests
         Assert.Equal("git:abc", (string?)m["chunker_version"]);
         Assert.Equal("git:def", (string?)m["verified_at_commit"]);
         Assert.Equal(RerankInstruction.Text, (string?)m["reranker"]!["instruction"]);
+        Assert.StartsWith("scored fresh in this repository for test-1.r1,", (string?)m["reranker"]!["scores"]);
+        Assert.True((bool)m["figures_served"]!);
         Assert.Equal(40, (long)m["rows"]!["rerank_scores"]!);
         Assert.Equal((2, 1, 1), ((long)m["recommendation_count"]!["total"]!, (long)m["recommendation_count"]!["grade"]!, (long)m["recommendation_count"]!["best_practice"]!));
         Assert.Equal(new string('c', 64), (string?)m["pattern_files_sha256"]!["queries.yaml"]);

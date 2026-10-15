@@ -88,7 +88,7 @@ public static class CorpusManifest
             ["reranker"] = new JsonObject
             {
                 ["model"] = v.Reranker, ["instruction"] = RerankInstruction.Text, ["instruct_hash"] = v.Instruct,
-                ["scores"] = "scored once per corpus version, never re-scored (decision 28)",
+                ["scores"] = $"scored fresh in this repository for {version}, not carried over from an earlier version; never re-scored (decisions 28, 65)",
             },
             ["retrieval"] = new JsonObject
             {
@@ -112,7 +112,7 @@ public static class CorpusManifest
             ["database"] = new JsonObject { ["postgres"] = v.Pg, ["pgvector"] = v.Pgvector },
             ["rows"] = ToObject(facts.Rows),
             ["chunks_by_type"] = ToObject(facts.ChunkTypes),
-            ["figures_served"] = false,   // decision 22 addendum
+            ["figures_served"] = true,   // decision 67
         };
     }
 
