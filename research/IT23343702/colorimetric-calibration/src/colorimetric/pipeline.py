@@ -39,6 +39,7 @@ class PipelineConfig:
     illumination: str = "msr"          # step 2: "msr" | "ssr" | "gray_world" | "none"
     retinex_work_size: int | None = 512  # blur on a copy this big (long side); None = exact full size
     use_white_balance: bool = False    # step 2 extra; off by default (see module docstring)
+    classify_skin: bool = True         # step 3; off = no ITA/FST, so no CCM either
     use_ccm: bool = True               # step 4
     gate_cutoff: float = GATE_CUTOFF_STANDARD
     classify_on: str = "raw"           # "raw" | "processed"
@@ -108,7 +109,7 @@ def process_image(
             notes.append(f"skin tone not estimated: {e}")
             return None
 
-    ita = timed("ita", classify, rgb) if cfg.classify_on == "raw" else None
+    ita = timed("ita", classify, rgb) if cfg.classify_skin and cfg.classify_on == "raw" else None
 
     img = rgb
     if cfg.stretch:
@@ -122,7 +123,7 @@ def process_image(
     if cfg.use_white_balance:
         img = timed("2_white_balance", white_balance, img)
 
-    if cfg.classify_on == "processed":
+    if cfg.classify_skin and cfg.classify_on == "processed":
         ita = timed("ita", classify, img)
 
     ccm_applied = False

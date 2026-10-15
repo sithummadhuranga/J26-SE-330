@@ -20,6 +20,7 @@ from .illumination import gray_world, single_scale_retinex_L, multi_scale_retine
 from .enhance import specular_mask, remove_specular, clahe_median
 from .evaluation import evaluate_fairness, auroc, colour_consistency, cci_reduction, fst_to_group
 from .pipeline import ABLATION_VARIANTS, PipelineConfig, ProcessResult, process_image
+from .api import ALL_STAGES, CalibrationPipeline, CalibrationResult, PipelineStage
 
 __all__ = [
     "FitzpatrickType",
@@ -58,4 +59,8 @@ __all__ = [
     "PipelineConfig",
     "ProcessResult",
     "process_image",
+    "ALL_STAGES",
+    "CalibrationPipeline",
+    "CalibrationResult",
+    "PipelineStage",
 ]
