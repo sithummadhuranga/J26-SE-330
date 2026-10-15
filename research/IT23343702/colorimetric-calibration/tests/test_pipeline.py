@@ -82,3 +82,10 @@ def test_bad_config_values_raise():
         process_image(img, PipelineConfig(illumination="x"))
     with pytest.raises(ValueError):
         process_image(img, PipelineConfig(classify_on="x"))
+
+
+def test_ablation_has_proposal_table1_configurations():
+    for name in ("none", "gray_world", "ssr", "retinex", "retinex_ccm", "full"):
+        assert name in ABLATION_VARIANTS
+    res = process_image(skin(64, 64, DARK), ABLATION_VARIANTS["ssr"])
+    assert "2_ssr" in res.timings_ms and "2_msr" not in res.timings_ms

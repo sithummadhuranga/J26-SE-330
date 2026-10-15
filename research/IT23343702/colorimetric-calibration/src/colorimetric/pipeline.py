@@ -28,7 +28,7 @@ import numpy as np
 
 from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm, normalise_skin_L_variance
 from .enhance import clahe_median, remove_specular
-from .illumination import gray_world, multi_scale_retinex_L, white_balance
+from .illumination import gray_world, multi_scale_retinex_L, single_scale_retinex_L, white_balance
 from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image, needs_ccm, skin_mask_hsv
 from .preprocess import _check_rgb, process_raw_input
 
@@ -36,7 +36,7 @@ from .preprocess import _check_rgb, process_raw_input
 @dataclass(frozen=True)
 class PipelineConfig:
     stretch: bool = True               # step 1
-    illumination: str = "msr"          # step 2: "msr" | "gray_world" | "none"
+    illumination: str = "msr"          # step 2: "msr" | "ssr" | "gray_world" | "none"
     retinex_work_size: int | None = 512  # blur on a copy this big (long side); None = exact full size
     use_white_balance: bool = False    # step 2 extra; off by default (see module docstring)
     use_ccm: bool = True               # step 4
@@ -61,10 +61,11 @@ class ProcessResult:
     notes: list[str] = field(default_factory=list)
 
 
-# Ablation variants for T62: none > Gray World > Retinex > Retinex+CCM > full.
+# Ablation variants for T62 (proposal Table 1): none > Gray World > SSR > MSR > MSR+CCM > full.
 ABLATION_VARIANTS: dict[str, PipelineConfig] = {
     "none": PipelineConfig(stretch=False, illumination="none", use_ccm=False, use_specular=False, use_clahe=False),
     "gray_world": PipelineConfig(stretch=False, illumination="gray_world", use_ccm=False, use_specular=False, use_clahe=False),
+    "ssr": PipelineConfig(illumination="ssr", use_ccm=False, use_specular=False, use_clahe=False),
     "retinex": PipelineConfig(illumination="msr", use_ccm=False, use_specular=False, use_clahe=False),
     "retinex_ccm": PipelineConfig(illumination="msr", use_ccm=True, use_specular=False, use_clahe=False),
     "full": PipelineConfig(),
@@ -86,7 +87,7 @@ def process_image(
     """
     _check_rgb(rgb)
     cfg = config or PipelineConfig()
-    if cfg.illumination not in ("msr", "gray_world", "none"):
+    if cfg.illumination not in ("msr", "ssr", "gray_world", "none"):
         raise ValueError(f"unknown illumination {cfg.illumination!r}")
     if cfg.classify_on not in ("raw", "processed"):
         raise ValueError(f"unknown classify_on {cfg.classify_on!r}")
@@ -114,6 +115,8 @@ def process_image(
         img = timed("1_raw_input", process_raw_input, img)
     if cfg.illumination == "msr":
         img = timed("2_msr", multi_scale_retinex_L, img, work_size=cfg.retinex_work_size)
+    elif cfg.illumination == "ssr":
+        img = timed("2_ssr", single_scale_retinex_L, img, work_size=cfg.retinex_work_size)
     elif cfg.illumination == "gray_world":
         img = timed("2_gray_world", gray_world, img)
     if cfg.use_white_balance:
