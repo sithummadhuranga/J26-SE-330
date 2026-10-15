@@ -40,6 +40,7 @@ def _rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
 
 
 DEFAULT_MAX_KMEANS_PIXELS = 20_000
+DEFAULT_L_CEILING = 95.0  # relative CCM: keep the brightest 1% of the image below this L*
 
 for _name in REFERENCE_PRIORS:
     REFERENCE_PRIORS[_name]["lab"] = _rgb_to_lab(REFERENCE_PRIORS[_name]["rgb"])
@@ -76,6 +77,16 @@ def sample_skin_lab_colors(
     k: int = 6,
     max_pixels: int | None = DEFAULT_MAX_KMEANS_PIXELS,
 ) -> np.ndarray:
+    """k representative skin colours (LAB), see `_cluster_skin`."""
+    return _cluster_skin(rgb_image, wound_bbox, k, max_pixels)[0]
+
+
+def _cluster_skin(
+    rgb_image: np.ndarray,
+    wound_bbox: tuple[int, int, int, int] | None,
+    k: int,
+    max_pixels: int | None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Cluster non-wound skin pixels (LAB space) into k representative colors via k-means.
 
     Multiple representative colors (rather than one mean color) give the
@@ -84,6 +95,7 @@ def sample_skin_lab_colors(
 
     k-means runs on a fixed-seed random sample of at most `max_pixels` skin pixels
     (None = all of them); k=6 centres are stable with far fewer pixels than a photo has.
+    Returns (centres (k, 3), pixel count per centre).
     """
     mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox)
     lab = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB).astype(np.float32)
@@ -99,8 +111,9 @@ def sample_skin_lab_colors(
         pixels = pixels[np.sort(idx)]
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
-    _, _, centers = cv2.kmeans(pixels, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
-    return centers.astype(np.float64)
+    _, labels, centers = cv2.kmeans(pixels, k, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
+    counts = np.bincount(labels.ravel(), minlength=k).astype(np.float64)
+    return centers.astype(np.float64), counts
 
 
 def estimate_adaptive_ccm(
@@ -109,6 +122,8 @@ def estimate_adaptive_ccm(
     wound_bbox: tuple[int, int, int, int] | None = None,
     k: int = 6,
     correct: bool | None = None,
+    shift: str = "relative",
+    l_ceiling: float | None = DEFAULT_L_CEILING,
 ) -> np.ndarray | None:
     """Estimate a per-image 3x3 CCM for FST IV-VI images; None for FST I-III (no correction).
 
@@ -116,25 +131,47 @@ def estimate_adaptive_ccm(
     evaluate other gates, e.g. `needs_ccm(ita, GATE_CUTOFF_FITTED)`); None keeps the
     default FST IV-VI rule.
 
-    v1 approach (documented approximation, revisit during Phase 4
-    evaluation): sample k representative skin colors from the image, then
-    build synthetic target correspondences by applying the fixed LAB
-    offset between the ColorChecker's dark-skin and light-skin reference
-    patches to each sampled color. This assumes the same additive
-    lighting/tone shift applies uniformly across the sampled skin tones,
-    which is a simplification — validate against real annotated
-    before/after pairs once available, per the Phase 4 ablation study.
+    Sample k representative skin colours, build target colours, solve the 3x3 by least
+    squares. `shift` chooses the targets:
+
+    "relative" (default, v2): raise L* only, by the gap between the skin's measured
+        mean L* and the light-skin prior's L* (never below 0, so skin already at or above
+        the prior is left alone). a*/b* targets equal the sources, so the fitted a*/b*
+        columns are exactly identity and redness (erythema) is kept.
+        A 3x3 can only lift L* by scaling it, which also scales bright pixels; the gap is
+        therefore capped so the image's 99th-percentile L* lands at or below `l_ceiling`
+        (None = no cap). Without the cap FST VI images in Fitzpatrick17k had 7% of pixels
+        pushed past L*=95, i.e. wound/lesion detail lost on exactly the darkest skin.
+    "fixed" (v1): add the full ColorChecker dark->light LAB offset (+27.8 L*, +2 a*,
+        +3 b*) to every image. Kept for the ablation. On 8 ISIC images that took the
+        CCM path after Step 1 + MSR it pushed L* to 85-93, flagged 51-89% of the frame
+        as specular, and cut mean a* by up to half.
     """
+    if shift not in ("relative", "fixed"):
+        raise ValueError(f"unknown shift {shift!r}")
     if correct is None:
         correct = fitzpatrick_type not in (FitzpatrickType.I, FitzpatrickType.II, FitzpatrickType.III)
     if not correct:
         return None
 
-    source_colors = sample_skin_lab_colors(rgb_image, wound_bbox=wound_bbox, k=k)
-    lab_shift = REFERENCE_PRIORS["light_skin"]["lab"] - REFERENCE_PRIORS["dark_skin"]["lab"]
+    source_colors, counts = _cluster_skin(rgb_image, wound_bbox, k, DEFAULT_MAX_KMEANS_PIXELS)
+    if shift == "fixed":
+        lab_shift = REFERENCE_PRIORS["light_skin"]["lab"] - REFERENCE_PRIORS["dark_skin"]["lab"]
+    else:
+        skin_L = float(np.average(source_colors[:, 0], weights=counts))
+        gap = max(0.0, REFERENCE_PRIORS["light_skin"]["lab"][0] - skin_L)
+        if l_ceiling is not None and gap > 0:
+            L_img = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB)[..., 0]
+            p99 = float(np.percentile(L_img, 99)) * 100.0 / 255.0
+            max_gain = max(1.0, l_ceiling / max(p99, 1e-6))
+            gap = min(gap, (max_gain - 1.0) * skin_L)
+        lab_shift = np.array([gap, 0.0, 0.0])
     target_colors = source_colors + lab_shift
 
-    return compute_ccm(source_colors, target_colors)
+    # Fit the change from identity, not M itself: identical when the sampled colours span
+    # all three LAB axes, but when they don't (near-uniform skin) the minimum-norm solution
+    # is then "leave that direction alone" instead of an arbitrary matrix mixing a*/b*.
+    return np.eye(3) + compute_ccm(source_colors, target_colors - source_colors)
 
 
 def apply_adaptive_ccm(rgb_image: np.ndarray, M: np.ndarray) -> np.ndarray:

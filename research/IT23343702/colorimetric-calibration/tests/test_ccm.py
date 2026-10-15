@@ -98,3 +98,37 @@ def test_kmeans_subsample_gives_nearly_the_same_centres():
     cv2.setRNGSeed(0)
     sub = sample_skin_lab_colors(img, k=3, max_pixels=5_000)
     assert np.abs(full.mean(axis=0) - sub.mean(axis=0)).max() < 0.5
+
+
+def _lab(img):
+    lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB).astype(np.float64)
+    return lab[..., 0] * 100.0 / 255.0, lab[..., 1] - 128.0, lab[..., 2] - 128.0
+
+
+def test_relative_ccm_keeps_a_and_b_columns_identity():
+    M = estimate_adaptive_ccm(_dark_skin_patch(), FitzpatrickType.VI, k=4)
+    assert np.allclose(M[:, 1:], np.eye(3)[:, 1:], atol=1e-6)  # a*, b* (erythema) unchanged
+
+
+def test_relative_ccm_leaves_skin_already_at_prior_alone():
+    light = np.full((64, 64, 3), REFERENCE_PRIORS["light_skin"]["rgb"] + 15, dtype=np.uint8)
+    M = estimate_adaptive_ccm(light, FitzpatrickType.VI, k=2, correct=True)
+    assert np.allclose(M, np.eye(3), atol=1e-6)
+
+
+def test_relative_ccm_does_not_blow_out_bright_regions():
+    rng = np.random.default_rng(2)
+    img = np.clip(np.array([90, 62, 50]) + rng.integers(-8, 9, size=(200, 200, 3)), 0, 255).astype(np.uint8)
+    img[:20, :20] = (235, 225, 220)                    # bright patch (e.g. wound bed / dressing edge)
+    cv2.setRNGSeed(0)
+    v2 = apply_adaptive_ccm(img, estimate_adaptive_ccm(img, FitzpatrickType.VI, k=4))
+    cv2.setRNGSeed(0)
+    v1 = apply_adaptive_ccm(img, estimate_adaptive_ccm(img, FitzpatrickType.VI, k=4, shift="fixed"))
+    assert (_lab(v1)[0] > 95).mean() > 0.005            # v1 clips the bright patch
+    assert (_lab(v2)[0] > 95).mean() <= 0.011           # v2: at most ~1% above the ceiling
+    assert _lab(v2)[0][20:, 20:].mean() > _lab(img)[0][20:, 20:].mean()  # skin still lifted
+
+
+def test_unknown_shift_raises():
+    with pytest.raises(ValueError):
+        estimate_adaptive_ccm(_dark_skin_patch(), FitzpatrickType.VI, k=4, shift="nope")

@@ -44,6 +44,7 @@ class PipelineConfig:
     use_specular: bool = True          # step 5
     use_clahe: bool = True             # step 6
     ccm_k: int = 6
+    ccm_shift: str = "relative"        # "relative" (v2) | "fixed" (v1 ColorChecker offset), see ccm.py
     seed: int = 0                      # k-means seeding, for repeatable output
 
 
@@ -65,6 +66,7 @@ ABLATION_VARIANTS: dict[str, PipelineConfig] = {
     "retinex_ccm": PipelineConfig(illumination="msr", use_ccm=True, use_specular=False, use_clahe=False),
     "full": PipelineConfig(),
     "full_fitted_gate": PipelineConfig(gate_cutoff=GATE_CUTOFF_FITTED),
+    "full_ccm_v1": PipelineConfig(ccm_shift="fixed"),
 }
 
 
@@ -124,7 +126,8 @@ def process_image(
             cv2.setRNGSeed(cfg.seed)
             try:
                 M = timed("4_ccm_fit", estimate_adaptive_ccm, img, ita.fitzpatrick_type,
-                          wound_bbox=wound_bbox, k=cfg.ccm_k, correct=True)
+                          wound_bbox=wound_bbox, k=cfg.ccm_k, correct=True,
+                          shift=cfg.ccm_shift)
                 img = timed("4_ccm_apply", apply_adaptive_ccm, img, M)
                 ccm_applied = True
             except ValueError as e:
