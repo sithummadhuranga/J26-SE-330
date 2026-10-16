@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:melanin_wound_cdss/features/sync/api/sync_api.dart';
 import 'package:melanin_wound_cdss/features/sync/api/sync_models.dart';
+import 'package:melanin_wound_cdss/features/sync/auth/browser_sign_in.dart';
 import 'package:uuid/uuid.dart';
 
 /// A valid Wound Event (contracts/wound-event.schema.json). [woundId] lets tests build history and revisions.
@@ -55,11 +56,8 @@ enum PushFault {
 /// In-memory fake gateway that dedups, records changes and pages pulls like the real one.
 class FakeGateway implements SyncApi {
   FakeGateway({this.autoRecommend = true, this.maxBatchBeforeSplit = 50, Random? random, this.faultRate = 0,
-      this.requireMfa = false, this.recommendationFigures = const []})
+      this.recommendationFigures = const []})
       : _random = random ?? Random(1);
-
-  /// When set, login needs the code 123456 (§7.3: MFA_REQUIRED, then INVALID_TOTP for a wrong one).
-  final bool requireMfa;
 
   final bool autoRecommend;
 
@@ -100,12 +98,9 @@ class FakeGateway implements SyncApi {
   @override
   Future<bool> health() async => reachable;
 
-  @override
-  Future<TokenPair> login({required String username, required String password, required String deviceId, String? totp}) async {
+  /// What the identity service's login page hands back once the clinician has signed in there.
+  Future<TokenPair> signInOnPage() async {
     if (!reachable) throw TransportException('unreachable');
-    if (password != 'correct-password') throw ApiException(401, 'INVALID_CREDENTIALS');
-    if (requireMfa && (totp == null || totp.isEmpty)) throw ApiException(401, 'MFA_REQUIRED');
-    if (requireMfa && totp != '123456') throw ApiException(401, 'INVALID_TOTP');
     sessionRevoked = false;
     return _issue();
   }
@@ -118,7 +113,7 @@ class FakeGateway implements SyncApi {
       refreshError = null;
       throw e;
     }
-    if (sessionRevoked || refreshToken != _validRefresh) throw ApiException(401, 'INVALID_REFRESH_TOKEN');
+    if (sessionRevoked || refreshToken != _validRefresh) throw ApiException(400, 'invalid_grant');
     return _issue();
   }
 
@@ -137,7 +132,8 @@ class FakeGateway implements SyncApi {
       'client_id': 'mobile',
     });
     _validRefresh = 'refresh-${const Uuid().v4()}';
-    return TokenPair(_validAccess, _validRefresh, const Duration(minutes: 15));
+    return TokenPair(_validAccess, _validRefresh, const Duration(minutes: 15),
+        idToken: _jwt({'sub': 'c0ffee00-0000-4000-8000-000000000001', 'preferred_username': 'n.silva'}));
   }
 
   /// The next request with the current access token is refused, as when it expired.
@@ -251,5 +247,24 @@ class FakeGateway implements SyncApi {
     if (accessToken != _validAccess) throw ApiException(401);
     if (!RegExp(r'^p-[0-9a-f]{6,32}$').hasMatch(patientRef)) throw ApiException(400, 'INVALID_PATIENT_REF');
     patientAliases[patientRef] = alias;
+  }
+}
+
+/// Stands in for the system browser and the identity service's login page: the clinician signs in there, or closes
+/// it when [cancel] is set.
+class FakeBrowserSignIn implements BrowserSignIn {
+  FakeBrowserSignIn(this.gateway);
+
+  final FakeGateway gateway;
+  bool cancel = false;
+
+  /// The device ids the app sent with each sign-in (the device_id authorize parameter).
+  final List<String> deviceIds = [];
+
+  @override
+  Future<TokenPair> signIn({required String deviceId}) async {
+    deviceIds.add(deviceId);
+    if (cancel) throw SignInCancelled();
+    return gateway.signInOnPage();
   }
 }

@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from client import Checks, create_clinician, http, login, sql, totp_code
+from client import Checks, create_clinician, http, login, logout, refresh, sql, totp_code
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "evaluation"))
 import metrics  # noqa: E402
@@ -46,16 +46,16 @@ print("Known traffic: 2 logins, 5 failed attempts (the 5th locks), 1 MFA prompt,
 started = datetime.now(timezone.utc)
 _, first = login(NURSE, PASSWORD, DEVICE)
 time.sleep(1.5)
-status, refreshed = http("POST", "/v1/auth/refresh", {"refreshToken": first["refreshToken"]})
+status, refreshed = refresh(first["refreshToken"])
 check("refresh works", status == 200, status)
 time.sleep(1.5)
-status, _ = http("POST", "/v1/auth/logout", {"refreshToken": refreshed["refreshToken"]})
+status = logout(refreshed["refreshToken"])
 check("logout works", status in (200, 204), status)
 _, second = login(NURSE, PASSWORD, DEVICE)
 for _ in range(5):
     login(LOCKED, "wrong-password", DEVICE)
 status, body = login(MFA_USER, PASSWORD, DEVICE)
-check("the MFA user is asked for a code", status == 401 and body["code"] == "MFA_REQUIRED", f"{status} {body}")
+check("the MFA user is asked for a code", status == 400 and body["code"] == "MFA_REQUIRED", f"{status} {body}")
 time.sleep(1.1)
 finished = datetime.now(timezone.utc)
 

@@ -36,19 +36,35 @@ export class AdminApi {
     this.fetchFn = fetchFn;
   }
 
-  // ---- auth ----
+  // ---- auth: OpenID Connect (ADR 0006) ----
 
-  /** Throws ApiError 401 with MFA_REQUIRED, INVALID_TOTP, INVALID_CREDENTIALS, CREDENTIAL_LOCKED or CLIENT_NOT_ALLOWED. */
-  login(username: string, password: string, totp?: string): Promise<TokenPair> {
-    return this.post('v1/auth/login', { username, password, clientId, ...(totp ? { totp } : {}) }) as Promise<TokenPair>;
+  /** The identity service's sign-in page for this request; the browser goes there, never this code. */
+  authorizeUrl(params: { redirectUri: string; state: string; codeChallenge: string }): string {
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: params.redirectUri,
+      scope: 'openid profile offline_access',
+      state: params.state,
+      code_challenge: params.codeChallenge,
+      code_challenge_method: 'S256',
+    });
+    return `${this.base}/connect/authorize?${query.toString()}`;
   }
 
+  /** Swaps the code from /callback for tokens. Throws ApiError with the OAuth error, e.g. invalid_grant. */
+  exchangeCode(code: string, codeVerifier: string, redirectUri: string): Promise<TokenPair> {
+    return this.token({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: redirectUri });
+  }
+
+  /** Rotates both tokens; the old refresh token stops working. Throws ApiError invalid_grant once the session is over. */
   refresh(refreshToken: string): Promise<TokenPair> {
-    return this.post('v1/auth/refresh', { refreshToken }) as Promise<TokenPair>;
+    return this.token({ grant_type: 'refresh_token', refresh_token: refreshToken });
   }
 
+  /** Ends the session on the server. */
   async logout(refreshToken: string): Promise<void> {
-    await this.post('v1/auth/logout', { refreshToken });
+    await this.form('connect/revocation', { token: refreshToken, token_type_hint: 'refresh_token' });
   }
 
   // ---- clinicians ----
@@ -97,6 +113,27 @@ export class AdminApi {
 
   // ---- plumbing ----
 
+  private async token(fields: Record<string, string>): Promise<TokenPair> {
+    const body = await this.form('connect/token', fields);
+    if (!isRecord(body) || typeof body.access_token !== 'string' || typeof body.refresh_token !== 'string')
+      throw new ApiError(502, 'invalid_token_response');
+    return {
+      accessToken: body.access_token,
+      refreshToken: body.refresh_token,
+      expiresIn: typeof body.expires_in === 'number' ? body.expires_in : 0,
+      idToken: typeof body.id_token === 'string' ? body.id_token : null,
+    };
+  }
+
+  /** OAuth endpoints take form fields and answer {error, error_description}. */
+  private form(path: string, fields: Record<string, string>): Promise<unknown> {
+    return this.send(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, ...fields }).toString(),
+    });
+  }
+
   private get(path: string, token: string): Promise<unknown> {
     return this.send(path, { method: 'GET', headers: { Authorization: `Bearer ${token}` } });
   }
@@ -119,7 +156,8 @@ export class AdminApi {
     }
     const body = text ? tryParse(text) : null;
     if (response.ok) return body;
-    const code = isRecord(body) && typeof body.code === 'string' ? body.code : null;
+    // Our API sends {code}; OAuth endpoints send {error}.
+    const code = !isRecord(body) ? null : typeof body.code === 'string' ? body.code : typeof body.error === 'string' ? body.error : null;
     throw new ApiError(response.status, code);
   }
 }

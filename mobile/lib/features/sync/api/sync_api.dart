@@ -50,8 +50,10 @@ class FigureResponse {
 /// The device's side of the sync protocol (§7), always through the API gateway (ADR 0004).
 abstract class SyncApi {
   Future<bool> health();
-  Future<TokenPair> login({required String username, required String password, required String deviceId, String? totp});
+  /// Rotates both tokens (/connect/token). Throws [ApiException] 400 invalid_grant once the session is over.
   Future<TokenPair> refresh(String refreshToken);
+
+  /// Ends the session on the server (/connect/revocation). Signing in goes through [BrowserSignIn] instead.
   Future<void> logout(String refreshToken);
   Future<PushResponse> push(String accessToken, String deviceId, List<String> eventJson);
   Future<PullPage> pull(String accessToken, int cursor, {int limit});
@@ -102,31 +104,22 @@ class HttpSyncApi implements SyncApi {
     }
   }
 
-  @override
-  Future<TokenPair> login({required String username, required String password, required String deviceId, String? totp}) =>
-      _tokens(_uri('v1/auth/login'), {
-        'username': username,
-        'password': password,
-        'deviceId': deviceId,
-        if (totp != null && totp.isNotEmpty) 'totp': totp,
-      });
+  /// The OAuth endpoints take form fields, not JSON.
+  Future<http.Response> _form(String path, Map<String, String> fields) => _send(
+      _http.post(_uri(path),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: {'client_id': 'mobile', ...fields}),
+      requestTimeout);
 
   @override
-  Future<TokenPair> refresh(String refreshToken) => _tokens(_uri('v1/auth/refresh'), {'refreshToken': refreshToken});
-
-  Future<TokenPair> _tokens(Uri uri, Map<String, Object> body) async {
-    final r = await _send(
-        _http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body)), requestTimeout);
+  Future<TokenPair> refresh(String refreshToken) async {
+    final r = await _form('connect/token', {'grant_type': 'refresh_token', 'refresh_token': refreshToken});
     if (r.statusCode == 200) return TokenPair.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
     throw ApiException(r.statusCode, _code(r), _retryAfter(r));
   }
 
   @override
   Future<void> logout(String refreshToken) async {
-    await _send(
-        _http.post(_uri('v1/auth/logout'),
-            headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refreshToken': refreshToken})),
-        requestTimeout);
+    await _form('connect/revocation', {'token': refreshToken, 'token_type_hint': 'refresh_token'});
   }
 
   @override
@@ -191,9 +184,11 @@ class HttpSyncApi implements SyncApi {
     if (r.statusCode != 200) throw ApiException(r.statusCode, _code(r), _retryAfter(r));
   }
 
+  /// Our API answers {"code"}; the OAuth endpoints answer {"error"}.
   static String? _code(http.Response r) {
     try {
-      return (jsonDecode(r.body) as Map<String, dynamic>)['code'] as String?;
+      final body = jsonDecode(r.body) as Map<String, dynamic>;
+      return (body['code'] ?? body['error']) as String?;
     } catch (_) {
       return null;
     }

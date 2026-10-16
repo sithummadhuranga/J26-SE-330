@@ -27,8 +27,9 @@ describe('devices (real identity service, Sync Gateway and database)', () => {
     await registerClinician(admin, nurse);
     expect((await mobileLogin(nurse, strongPassword, deviceId)).status).toBe(200); // registers the phone
 
-    const user = renderDashboard(newSession(), '/devices');
-    await signInOnScreen(user, demoAdmin.username, demoAdmin.password);
+    const session = newSession();
+    const user = renderDashboard(session, '/devices');
+    await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
     const cell = await screen.findByText(deviceId, {}, slow);
     const row = cell.closest('tr')!;
     expect(within(row).getByText('Active')).toBeInTheDocument();
@@ -41,7 +42,7 @@ describe('devices (real identity service, Sync Gateway and database)', () => {
     await waitFor(() => expect(within(screen.getByText(deviceId).closest('tr')!).getByText('Revoked')).toBeInTheDocument(), slow);
     const saved = (await admin.authorized((t) => admin.api.devices(t))).find((d) => d.deviceId === deviceId);
     expect(saved?.revokedAt).not.toBeNull();
-    expect(await mobileLogin(nurse, strongPassword, deviceId)).toMatchObject({ status: 401, code: 'DEVICE_NOT_ALLOWED' });
+    expect(await mobileLogin(nurse, strongPassword, deviceId)).toMatchObject({ status: 400, code: 'DEVICE_NOT_ALLOWED' });
 
     // Revoking twice is refused by the server.
     await expect(admin.authorized((t) => admin.api.revokeDevice(t, deviceId))).rejects.toMatchObject({

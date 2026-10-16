@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>@ViewData["Title"] · Wound CDSS</title>
+    <style>
+        :root { --bg: #f4f6f8; --card: #fff; --text: #1d2733; --muted: #5b6875; --accent: #0f6e6a; --error: #b3261e; --line: #d5dbe1; }
+        @@media (prefers-color-scheme: dark) {
+            :root { --bg: #11161b; --card: #1a2128; --text: #e6ebf0; --muted: #9aa7b3; --accent: #4fb3ad; --error: #f2b8b5; --line: #2e3842; }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+               background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; }
+        h1 { font-size: 1.35rem; margin: 0 0 4px; }
+        .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+        label { display: block; font-weight: 600; font-size: .9rem; margin: 14px 0 6px; }
+        input { width: 100%; padding: 11px 12px; font-size: 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+        input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+        button { width: 100%; margin-top: 22px; padding: 12px; font-size: 1rem; font-weight: 600; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+        .error { color: var(--error); background: color-mix(in srgb, var(--error) 10%, transparent); border-radius: 8px; padding: 10px 12px; margin: 0 0 8px; font-size: .95rem; }
+    </style>
+</head>
+<body>
+<main>
+    @RenderBody()
+</main>
+</body>
+</html>

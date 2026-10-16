@@ -32,9 +32,10 @@ void main() {
       db: AppDatabase.inMemory(),
       secrets: MemorySecretStore(),
       api: gateway,
+      browser: FakeBrowserSignIn(gateway),
       online: const Stream.empty(),
     );
-    if (signIn) await services.signIn(username: 'n.silva', password: 'correct-password');
+    if (signIn) await services.signIn();
     await tester.pumpWidget(
       MaterialApp(
         theme: woundTheme(),
@@ -176,9 +177,7 @@ void main() {
 
     await tapAndSettle(tester, find.byKey(const Key('offlineBanner')));
     expect(find.byKey(const Key('signInAgainNote')), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('username')), 'n.silva');
-    await tester.enterText(find.byKey(const Key('password')), 'correct-password');
-    await tapAndSettle(tester, find.byKey(const Key('signInButton')));
+    await tapAndSettle(tester, find.byKey(const Key('signInButton'))); // the login page opens and they sign in there
     await settle(tester);
 
     expect(find.byKey(const Key('signInAgainNote')), findsNothing, reason: 'back on the app, not a new start');

@@ -1,10 +1,12 @@
-// Shapes of the identity service's auth and admin answers (contracts/auth.schema.json, /v1/admin/*).
+// Shapes of the identity service's auth and admin answers (contracts/auth.schema.json 2.0, /v1/admin/*).
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   /** Seconds until the access token expires. */
   expiresIn: number;
+  /** Who signed in, for display only (preferred_username); null if the server sent none. */
+  idToken: string | null;
 }
 
 /** The roles a clinician can be registered with. */

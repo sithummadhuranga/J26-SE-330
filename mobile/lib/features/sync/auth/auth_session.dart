@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/sync_api.dart';
 import '../api/sync_models.dart';
+import 'browser_sign_in.dart';
 
 /// Where secrets live: Android Keystore on the phone, [MemorySecretStore] in tests.
 abstract class SecretStore {
@@ -76,8 +77,11 @@ class Clinician {
 }
 
 /// Device login session: access token in memory, refresh token in the keystore, never in the database.
+/// Signing in happens on the identity service's own page ([BrowserSignIn]); refresh and sign-out go through [SyncApi].
 class AuthSession {
-  AuthSession(this._api, this._secrets, {DateTime Function()? clock}) : _now = clock ?? DateTime.now;
+  AuthSession(this._api, this._secrets, {BrowserSignIn? browser, DateTime Function()? clock})
+      : _browser = browser,
+        _now = clock ?? DateTime.now;
 
   static const _refreshKey = 'refresh_token_v1';
   static const _usernameKey = 'username_v1';
@@ -87,6 +91,7 @@ class AuthSession {
 
   final SyncApi _api;
   final SecretStore _secrets;
+  final BrowserSignIn? _browser;
   final DateTime Function() _now;
 
   String? _accessToken;
@@ -97,9 +102,17 @@ class AuthSession {
 
   Future<bool> hasSession() async => await _secrets.read(_refreshKey) != null;
 
-  /// Throws [ApiException] with the backend's reason code on failure (e.g. 401 MFA_REQUIRED: ask for a code).
-  Future<Clinician> signIn({required String username, required String password, required String deviceId, String? totp}) async {
-    final tokens = await _api.login(username: username, password: password, deviceId: deviceId, totp: totp);
+  /// Opens the identity service's sign-in page for this phone. The page itself explains wrong passwords, codes and
+  /// locked accounts; throws [SignInCancelled] if the clinician closes it, [TransportException] when offline.
+  Future<Clinician> signIn({required String deviceId}) async {
+    final browser = _browser;
+    if (browser == null) throw StateError('AuthSession has no BrowserSignIn');
+    return signedIn(await browser.signIn(deviceId: deviceId));
+  }
+
+  /// Keeps tokens obtained from a sign-in (also used by tests that sign in without a browser).
+  Future<Clinician> signedIn(TokenPair tokens) async {
+    final username = _claims(tokens.idToken ?? '')['preferred_username'] as String? ?? '';
     await _secrets.write(_usernameKey, username);
     return await _store(tokens, username);
   }
@@ -120,7 +133,8 @@ class AuthSession {
       await _store(tokens, await _secrets.read(_usernameKey) ?? '');
       return tokens.accessToken;
     } on ApiException catch (e) {
-      if (e.status == 401) {
+      // /connect/token answers 400 invalid_grant once the session is over.
+      if (e.status == 401 || e.code == 'invalid_grant') {
         // Expired, revoked (logout elsewhere, deactivated) or already rotated: only a new sign-in helps.
         await _clear();
         throw NeedsSignIn(e.code ?? 'INVALID_REFRESH_TOKEN');

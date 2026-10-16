@@ -44,6 +44,9 @@ public static class Totp
         return null;
     }
 
+    /// <summary>The name authenticator apps show next to the code. Not the token issuer, which is now a URL.</summary>
+    public const string AppName = "melanin-wound-cdss";
+
     public static string OtpAuthUri(byte[] secret, string username, string issuer) =>
         $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(username)}" +
         $"?secret={Base32(secret)}&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits={Digits}&period={StepSeconds}";

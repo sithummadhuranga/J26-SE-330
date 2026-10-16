@@ -18,6 +18,7 @@ import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../test/sync/support/fakes.dart';
+import '../test/sync/support/password_grant_sign_in.dart';
 
 /// End-to-end offline sync test on an emulator via Toxiproxy; start the stack with `docker compose up -d` first.
 const proxyUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://10.0.2.2:18080');
@@ -54,6 +55,8 @@ void main() {
         db: AppDatabase.encrypted(dbFile, await DatabaseKeyStore.getOrCreate(secrets)),
         secrets: secrets,
         api: api ?? HttpSyncApi(Uri.parse(proxyUrl)),
+        // There's no browser in a test run, so sign in with the password grant the local stack allows for tests.
+        browser: PasswordGrantSignIn(Uri.parse(proxyUrl), 'n.silva', 'Demo-Pass-2026!'),
         online: const Stream.empty(),
       );
 
@@ -85,7 +88,7 @@ void main() {
 
   testWidgets('saved offline, app killed, back online: every assessment arrives once, with its advice', (_) async {
     var app = await openApp();
-    await app.signIn(username: 'n.silva', password: 'Demo-Pass-2026!');
+    await app.signIn();
 
     await network(up: false);
     await enqueue(app, 3);
@@ -112,7 +115,7 @@ void main() {
   testWidgets('the network drops in the middle of a sync: nothing lost, nothing stuck, nothing rejected', (_) async {
     final api = _CutAfterFirstPush(Uri.parse(proxyUrl));
     final app = await openApp(api: api);
-    await app.signIn(username: 'n.silva', password: 'Demo-Pass-2026!');
+    await app.signIn();
     await enqueue(app, 120);
 
     final cut = await app.engine.sync();
@@ -130,7 +133,7 @@ void main() {
 
   testWidgets('§13 mobile responsiveness: no frame over 200 ms while 1,000 assessments sync', (tester) async {
     final app = await openApp();
-    await app.signIn(username: 'n.silva', password: 'Demo-Pass-2026!');
+    await app.signIn();
     await enqueue(app, 1000);
 
     await tester.pumpWidget(MaterialApp(theme: woundTheme(), home: AppShell(services: app, onSignedOut: () {})));

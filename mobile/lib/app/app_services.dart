@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
+import '../features/sync/auth/browser_sign_in.dart';
 import '../features/sync/data/app_database.dart';
 import '../features/sync/data/figure_repository.dart';
 import '../features/sync/data/patient_repository.dart';
@@ -35,6 +36,7 @@ class AppServices {
     AppDatabase? db,
     SecretStore? secrets,
     SyncApi? api,
+    BrowserSignIn? browser,
     Stream<bool>? online,
     DateTime Function()? clock,
   }) async {
@@ -49,7 +51,7 @@ class AppServices {
     await queue.releaseExpiredLeases();
 
     final client = api ?? HttpSyncApi(Uri.parse(syncBaseUrl));
-    final auth = AuthSession(client, store, clock: clock);
+    final auth = AuthSession(client, store, browser: browser ?? AppAuthSignIn(Uri.parse(syncBaseUrl)), clock: clock);
     final figures = FigureRepository(database, client, auth, clock: clock);
     final patients = PatientRepository(database, client, clock: clock);
     final engine =
@@ -69,10 +71,10 @@ class AppServices {
         scheduler: scheduler);
   }
 
-  /// Signs in with this phone's device id and caches who's signed in for offline display.
-  Future<Clinician> signIn({required String username, required String password, String? totp}) async {
-    final clinician =
-        await auth.signIn(username: username, password: password, deviceId: await queue.deviceId(), totp: totp);
+  /// Signs in on the identity service's page with this phone's device id, and caches who's signed in for offline
+  /// display. Throws [SignInCancelled] if the clinician closes the page.
+  Future<Clinician> signIn() async {
+    final clinician = await auth.signIn(deviceId: await queue.deviceId());
     await db.delete(db.authLocal).go();
     await db.into(db.authLocal).insert(AuthLocalCompanion.insert(
           clinicianId: clinician.id,

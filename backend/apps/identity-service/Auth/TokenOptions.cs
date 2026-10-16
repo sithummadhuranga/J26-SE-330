@@ -1,10 +1,7 @@
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using Sync.Common.Auth;
 
 namespace IdentityService.Auth;
 
@@ -19,7 +16,8 @@ public static class Clients
 
 public sealed class JwtOptions
 {
-    public string Issuer { get; set; } = "melanin-wound-cdss";
+    /// <summary>OpenID Connect needs the issuer to be a URL. Every service checks tokens against this exact value.</summary>
+    public string Issuer { get; set; } = "https://identity.melanin-wound-cdss/";
     public string Audience { get; set; } = "melanin-wound-cdss-devices";
     public int AccessTokenMinutes { get; set; } = 15;
     public int RefreshTokenDays { get; set; } = 30;
@@ -30,11 +28,16 @@ public sealed class JwtOptions
     /// <summary>A browser session is shorter-lived than a device's.</summary>
     public int DashboardRefreshTokenHours { get; set; } = 12;
 
+    /// <summary>How long a client's session lasts without a refresh (the refresh token's sliding lifetime).</summary>
+    public TimeSpan RefreshTokenLifetime(string client) => client == Clients.AdminDashboard
+        ? TimeSpan.FromHours(DashboardRefreshTokenHours)
+        : TimeSpan.FromDays(RefreshTokenDays);
+
     /// <summary>PEM key for signing tokens; generated at start-up if empty (local dev only).</summary>
     public string SigningKeyPem { get; set; } = "";
 }
 
-/// <summary>RS256 signing key; only this service holds the private half, others fetch the public half from JWKS.</summary>
+/// <summary>RS256 signing key. Only this service has the private half; other services fetch the public half from the JWKS.</summary>
 public sealed class SigningKey
 {
     public RsaSecurityKey PrivateKey { get; }
@@ -94,63 +97,4 @@ public sealed class SigningKey
             .Select(i => body.Substring(i * 64, Math.Min(64, body.Length - i * 64)));
         return $"-----BEGIN {label}-----\n{string.Join('\n', lines)}\n-----END {label}-----\n";
     }
-
-    /// <summary>The public key as a JWK, as published in the JWKS.</summary>
-    public object ToJwk()
-    {
-        var p = PublicKey.Parameters;
-        return new
-        {
-            kty = "RSA",
-            use = "sig",
-            alg = SecurityAlgorithms.RsaSha256,
-            kid = PublicKey.KeyId,
-            n = Base64UrlEncoder.Encode(p.Modulus),
-            e = Base64UrlEncoder.Encode(p.Exponent),
-        };
-    }
-}
-
-/// <summary>Issues the short-lived access JWT and the opaque refresh token (architecture §7.3).</summary>
-public sealed class JwtTokenService(JwtOptions options, SigningKey key)
-{
-    private readonly JsonWebTokenHandler _handler = new();
-
-    public int AccessTokenSeconds => options.AccessTokenMinutes * 60;
-
-    public TimeSpan RefreshTokenLifetime(string client) => client == Clients.AdminDashboard
-        ? TimeSpan.FromHours(options.DashboardRefreshTokenHours)
-        : TimeSpan.FromDays(options.RefreshTokenDays);
-
-    /// <param name="deviceId">The device for a mobile session; null for the admin dashboard.</param>
-    public string CreateAccessToken(Guid clinicianId, string? deviceId, string facilityId, string role,
-        string client = Clients.Mobile)
-    {
-        var claims = new ClaimsIdentity(
-        [
-            new Claim(ClaimNames.Subject, clinicianId.ToString()),
-            new Claim(ClaimNames.FacilityId, facilityId),
-            new Claim(ClaimNames.Role, role),
-            new Claim(ClaimNames.ClientId, client),
-        ]);
-        if (deviceId is not null) claims.AddClaim(new Claim(ClaimNames.DeviceId, deviceId));
-
-        return _handler.CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = options.Issuer,
-            Audience = client == Clients.AdminDashboard ? options.DashboardAudience : options.Audience,
-            Expires = DateTime.UtcNow.AddMinutes(options.AccessTokenMinutes),
-            SigningCredentials = new SigningCredentials(key.PrivateKey, SecurityAlgorithms.RsaSha256),
-            Subject = claims,
-        });
-    }
-
-    /// <summary>Returns the raw token for the device and the SHA-256 hash that is the only thing stored.</summary>
-    public static (string Raw, byte[] Hash) CreateRefreshToken()
-    {
-        var raw = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
-        return (raw, HashRefreshToken(raw));
-    }
-
-    public static byte[] HashRefreshToken(string raw) => SHA256.HashData(Encoding.UTF8.GetBytes(raw));
 }

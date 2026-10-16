@@ -25,17 +25,19 @@ void main() {
   });
 
   Future<AppServices> open() =>
-      AppServices.open(db: db, secrets: secrets, api: gateway, online: const Stream.empty());
+      AppServices.open(
+          db: db, secrets: secrets, api: gateway, browser: FakeBrowserSignIn(gateway), online: const Stream.empty());
 
   test('a background run sends what is waiting', () async {
     final app = await open();
-    await app.signIn(username: 'n.silva', password: 'correct-password');
+    await app.signIn();
     final e = await app.queue.enqueue(sampleEvent());
     // The task opens its own services: same keystore (session) and database, as on the phone.
     var opened = 0;
     expect(await BackgroundSync.run(open: () async {
       opened++;
-      return AppServices.open(db: db, secrets: secrets, api: gateway, online: const Stream.empty());
+      return AppServices.open(
+          db: db, secrets: secrets, api: gateway, browser: FakeBrowserSignIn(gateway), online: const Stream.empty());
     }), isTrue);
     expect(opened, 1);
     expect(gateway.storedEvents.keys, [e.eventId]);
@@ -50,7 +52,7 @@ void main() {
 
   test('the app holding the sync lease: the background run leaves it to the app', () async {
     final app = await open();
-    await app.signIn(username: 'n.silva', password: 'correct-password');
+    await app.signIn();
     await app.queue.enqueue(sampleEvent());
     await app.queue.tryAcquireSyncLease(SyncEngine.syncLease, owner: 'the-open-app');
     expect(await BackgroundSync.run(open: open), isTrue);
@@ -63,7 +65,7 @@ void main() {
 
   test('a finished background run tells the open app', () async {
     final app = await open();
-    await app.signIn(username: 'n.silva', password: 'correct-password');
+    await app.signIn();
     final port = ReceivePort();
     IsolateNameServer.registerPortWithName(port.sendPort, BackgroundSync.portName);
     addTearDown(() {

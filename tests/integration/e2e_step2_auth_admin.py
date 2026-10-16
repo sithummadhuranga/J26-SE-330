@@ -3,7 +3,7 @@ import secrets
 import sys
 import time
 
-from client import Checks, create_clinician, http, login, sql, totp_code, uuid7, wait_for, wound_event
+from client import Checks, create_clinician, http, login, refresh, sql, totp_code, uuid7, wait_for, wound_event
 
 FAC_A, FAC_B = "fac-001", "fac-002"
 DEVICE_A, DEVICE_B = "dev-a41c", "dev-b-" + secrets.token_hex(3)
@@ -75,14 +75,14 @@ check("stored secret is encrypted, not plain", sql(
         join clinical.clinician c using (clinician_id) where c.username='{NURSE}'""") == "t")
 
 status, body = login(NURSE, PASSWORD, DEVICE_A)
-check("login without a code now asks for one", status == 401 and body["code"] == "MFA_REQUIRED", f"{status} {body}")
+check("login without a code now asks for one", status == 400 and body["code"] == "MFA_REQUIRED", f"{status} {body}")
 status, body = login(NURSE, PASSWORD, DEVICE_A, totp_code(secret, step))
-check("the code used to confirm cannot be replayed", status == 401 and body["code"] == "INVALID_TOTP", f"{status} {body}")
+check("the code used to confirm cannot be replayed", status == 400 and body["code"] == "INVALID_TOTP", f"{status} {body}")
 status, body = login(NURSE, PASSWORD, DEVICE_A, totp_code(secret, step + 1))
 check("next valid code logs in", status == 200, f"{status} {body}")
 nurse = body["accessToken"] if status == 200 else nurse
 status, body = login(NURSE, PASSWORD, DEVICE_A, totp_code(secret, step + 1))
-check("that code cannot be used twice", status == 401 and body["code"] == "INVALID_TOTP", f"{status} {body}")
+check("that code cannot be used twice", status == 400 and body["code"] == "INVALID_TOTP", f"{status} {body}")
 status, body = http("POST", "/v1/auth/mfa/enroll", token=nurse)
 check("re-enrolling while enabled is 409", status == 409 and body["code"] == "MFA_ALREADY_ENABLED", f"{status} {body}")
 
@@ -118,7 +118,7 @@ print("Lockout, unlock and deactivation")
 for _ in range(5):
     login(NURSE, "wrong-password", DEVICE_A)
 status, body = login(NURSE, PASSWORD, DEVICE_A)
-check("5 failures lock the account", status == 401 and body["code"] == "CREDENTIAL_LOCKED", f"{status} {body}")
+check("5 failures lock the account", status == 400 and body["code"] == "CREDENTIAL_LOCKED", f"{status} {body}")
 status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/unlock", token=admin_a)
 check("admin unlocks (204)", status == 204, f"{status}")
 status, _ = login(NURSE, PASSWORD, DEVICE_A)
@@ -129,9 +129,9 @@ check("admin cannot deactivate themselves", status == 409 and body["code"] == "C
 status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/deactivate", token=admin_a)
 check("admin deactivates the nurse (204)", status == 204, f"{status}")
 status, _ = login(NURSE, PASSWORD, DEVICE_A)
-check("deactivated nurse cannot log in", status == 401, f"{status}")
-status, _ = http("POST", "/v1/auth/refresh", {"refreshToken": nurse_refresh})
-check("... and cannot refresh an existing session", status == 401, f"{status}")
+check("deactivated nurse cannot log in", status == 400, f"{status}")
+status, _ = refresh(nurse_refresh)
+check("... and cannot refresh an existing session", status == 400, f"{status}")
 
 print("Audit trail")
 status, body = http("GET", "/v1/admin/auth-audit?limit=500", token=admin_a)

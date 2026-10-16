@@ -2,7 +2,7 @@
 import os
 import sys
 
-from client import Checks, http, login, pull_all, sql, uuid7, wait_for, wound_event
+from client import Checks, http, login, logout, pull_all, refresh as refresh_tokens, sql, uuid7, wait_for, wound_event
 
 USERNAME = os.environ.get("E2E_USER", "n.silva")
 PASSWORD = os.environ.get("E2E_PASSWORD", "Demo-Pass-2026!")
@@ -24,11 +24,11 @@ if status != 200:
     sys.exit(f"Cannot continue without a login ({status} {body}). Is the clinician created?")
 token, refresh = body["accessToken"], body["refreshToken"]
 
-status, body = http("POST", "/v1/auth/refresh", {"refreshToken": refresh})
+status, body = refresh_tokens(refresh)
 check("refresh rotates tokens", status == 200 and body["refreshToken"] != refresh, f"{status}")
 old_refresh, refresh, token = refresh, body["refreshToken"], body["accessToken"]
-status, _ = http("POST", "/v1/auth/refresh", {"refreshToken": old_refresh})
-check("old refresh token is rejected after rotation", status == 401, f"{status}")
+status, _ = refresh_tokens(old_refresh)
+check("old refresh token is rejected after rotation", status == 400, f"{status}")
 
 status, _ = http("POST", "/v1/sync/push", {"deviceId": DEVICE, "events": [event(uuid7(), uuid7())]})
 check("push without token is 401", status == 401, f"{status}")
@@ -77,12 +77,12 @@ if lock_user:
     for _ in range(5):
         login(lock_user, "wrong", DEVICE)
     status, body = login(lock_user, "wrong", DEVICE)
-    check("5 failures lock the credential", status == 401 and body["code"] == "CREDENTIAL_LOCKED", body)
+    check("5 failures lock the credential", status == 400 and body["code"] == "CREDENTIAL_LOCKED", body)
 else:
     print("  skip  set E2E_LOCKOUT_USER to a throwaway clinician to test lockout")
 
-status, _ = http("POST", "/v1/auth/logout", {"refreshToken": refresh})
-status2, _ = http("POST", "/v1/auth/refresh", {"refreshToken": refresh})
-check("logout revokes the session", status == 204 and status2 == 401, f"{status} {status2}")
+status = logout(refresh)
+status2, _ = refresh_tokens(refresh)
+check("logout revokes the session", status == 200 and status2 == 400, f"{status} {status2}")
 
 sys.exit(t.finish())

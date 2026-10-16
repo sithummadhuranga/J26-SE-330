@@ -21,12 +21,12 @@ void main() {
     gateway = fake ?? FakeGateway();
     gateway.figures['iwgdf-2023.r1/F1'] = png;
     gateway.figures['iwgdf-2023.r1/F2'] = png;
-    auth = AuthSession(gateway, MemorySecretStore(), clock: () => now);
+    auth = AuthSession(gateway, MemorySecretStore(), browser: FakeBrowserSignIn(gateway), clock: () => now);
     figures = FigureRepository(db, gateway, auth, clock: () => now);
   }
 
   Future<void> signedIn() async =>
-      auth.signIn(username: 'n.silva', password: 'correct-password', deviceId: await queue.deviceId());
+      auth.signIn(deviceId: await queue.deviceId());
 
   setUp(() {
     db = AppDatabase.inMemory();

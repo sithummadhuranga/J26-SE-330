@@ -59,7 +59,7 @@ builder.Services
         o.MapInboundClaims = false;
         o.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = jwt["Issuer"] ?? "melanin-wound-cdss",
+            ValidIssuer = jwt["Issuer"] ?? "https://identity.melanin-wound-cdss/",
             ValidAudience = jwt["Audience"] ?? "melanin-wound-cdss-devices",
             ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
             ClockSkew = TimeSpan.FromSeconds(30),

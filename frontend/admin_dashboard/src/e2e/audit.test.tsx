@@ -26,8 +26,9 @@ describe('audit log (real audit trail)', () => {
     await mobileLogin(nurse, 'wrong-password-1', `dev-${nurse}`);
     await mobileLogin(nurse, strongPassword, `dev-${nurse}`);
 
-    const user = renderDashboard(newSession(), '/audit');
-    await signInOnScreen(user, demoAdmin.username, demoAdmin.password);
+    const session = newSession();
+    const user = renderDashboard(session, '/audit');
+    await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
     await screen.findByRole('table', {}, slow);
 
     // Search for this run's clinician: created by the admin, one wrong password, one sign-in.

@@ -21,11 +21,11 @@ void main() {
   late DateTime now;
 
   Future<void> signedIn() async =>
-      auth.signIn(username: 'n.silva', password: 'correct-password', deviceId: await queue.deviceId());
+      auth.signIn(deviceId: await queue.deviceId());
 
   void build({FakeGateway? fake, int seed = 1}) {
     gateway = fake ?? FakeGateway();
-    auth = AuthSession(gateway, MemorySecretStore(), clock: () => now);
+    auth = AuthSession(gateway, MemorySecretStore(), browser: FakeBrowserSignIn(gateway), clock: () => now);
     engine = SyncEngine(queue: queue, api: gateway, auth: auth, clock: () => now, random: Random(seed));
   }
 

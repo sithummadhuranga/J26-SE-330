@@ -21,8 +21,9 @@ beforeAll(requireBackend);
 afterAll(cleanUp);
 
 async function openClinicians() {
-  const user = renderDashboard(newSession());
-  await signInOnScreen(user, demoAdmin.username, demoAdmin.password);
+  const session = newSession();
+  const user = renderDashboard(session);
+  await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
   await screen.findByText(`${demoAdmin.username} (you)`, {}, slow);
   return user;
 }
@@ -93,7 +94,7 @@ describe('clinicians (real identity service and database)', () => {
     expect(await findToast(`Deactivated ${name}.`)).toBeInTheDocument();
     await waitFor(() => expect(within(rowOf(name)).getByText('Deactivated')).toBeInTheDocument(), slow);
     expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.active).toBe(false);
-    expect((await mobileLogin(name, strongPassword, `dev-${name}`)).status).toBe(401);
+    expect(await mobileLogin(name, strongPassword, `dev-${name}`)).toMatchObject({ status: 400, code: 'INVALID_CREDENTIALS' });
   });
 
   it('an admin cannot deactivate themselves: the option is not offered, and the server refuses it too', async () => {

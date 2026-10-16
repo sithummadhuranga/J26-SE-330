@@ -3,7 +3,7 @@ import secrets
 import subprocess
 import sys
 
-from client import REPO_ROOT, Checks, create_clinician, http, login, pull_all, sql, uuid7
+from client import REPO_ROOT, Checks, create_clinician, dashboard_login, http, login, pull_all, sql, uuid7
 
 suffix = secrets.token_hex(3)
 FAC = f"fac-hk-{suffix}"
@@ -54,7 +54,7 @@ phone_a = login(NURSE, PASSWORD, PHONE_A)[1]["accessToken"]
 phone_b = login(NURSE, PASSWORD, PHONE_B)[1]["accessToken"]
 login(NURSE, PASSWORD, LOST)
 # The admin dashboard has no device, so it holds nothing back.
-status, body = http("POST", "/v1/auth/login", {"username": ADMIN, "password": PASSWORD, "clientId": "admin-dashboard"})
+status, body = dashboard_login(ADMIN, PASSWORD)
 admin = body["accessToken"]
 
 old = [change_row() for _ in range(6)]

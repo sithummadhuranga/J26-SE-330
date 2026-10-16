@@ -23,6 +23,8 @@ android {
         // Version code comes from pubspec.yaml; pass -P force-version-code-ignoring-abi=true to override.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // After sign-in the identity service sends the browser to lk.sliit.cdss:/oauth2redirect, which opens the app.
+        manifestPlaceholders["appAuthRedirectScheme"] = "lk.sliit.cdss"
     }
 
     buildTypes {

@@ -32,7 +32,7 @@ builder.Services
         o.MapInboundClaims = false;
         o.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = jwt["Issuer"] ?? "melanin-wound-cdss",
+            ValidIssuer = jwt["Issuer"] ?? "https://identity.melanin-wound-cdss/",
             // Device and admin-dashboard tokens; the Sync Gateway itself accepts only the device audience.
             ValidAudiences = jwt.GetSection("Audiences").Get<string[]>()
                 ?? ["melanin-wound-cdss-devices", "melanin-wound-cdss-admin"],
@@ -51,6 +51,8 @@ builder.Services.AddCors(o => o.AddPolicy("dashboard", p => p
     .AllowAnyMethod()));
 
 // Rate limits: "auth" per client IP, "api" per signed-in device; rejected requests get 429 with Retry-After.
+// "auth" covers the login form, where people type passwords, so a sign-in costs one request. The OIDC redirects and
+// /connect/token use "api": codes and refresh tokens can't be guessed, and lockout already protects passwords.
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

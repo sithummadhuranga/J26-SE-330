@@ -202,6 +202,12 @@ services:
       # Local development values. Without Jwt__SigningKeyPem a key is generated at start-up (restart = devices refresh).
       Jwt__SigningKeyPem: ${Jwt__SigningKeyPem:-}
       Secrets__EncryptionKey: ${Secrets__EncryptionKey:-local-dev-only-encryption-key-change-me-0123456}
+      # OpenID Connect (ADR 0006). These local values allow plain HTTP and the password grant, which the device
+      # simulator and tests use. Anywhere beyond a laptop demo, set OIDC_REQUIRE_HTTPS=true and OIDC_ALLOW_PASSWORD_GRANT=false.
+      Oidc__RequireHttps: ${OIDC_REQUIRE_HTTPS:-false}
+      Oidc__AllowPasswordGrant: ${OIDC_ALLOW_PASSWORD_GRANT:-true}
+      Oidc__DashboardRedirectUris__0: ${DASHBOARD_ORIGIN:-http://localhost:3001}/callback
+      Oidc__DashboardPostLogoutRedirectUris__0: ${DASHBOARD_ORIGIN:-http://localhost:3001}/
     depends_on:
       db-migrate:
         condition: service_completed_successfully

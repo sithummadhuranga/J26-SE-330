@@ -3,7 +3,7 @@ import secrets
 import sys
 import time
 
-from client import Checks, create_clinician, http, login, sql, uuid7, wound_event
+from client import Checks, create_clinician, http, login, refresh, sql, uuid7, wound_event
 
 FAC_A, FAC_B = "fac-001", "fac-002"
 suffix = secrets.token_hex(3)
@@ -52,10 +52,10 @@ check("revoking again is 409", status == 409 and body["code"] == "DEVICE_ALREADY
 check("every session on the phone is ended",
       sql(f"select count(*) from clinical.clinician_session where device_id='{LOST}' and revoked_at is null") == "0")
 
-status, _ = http("POST", "/v1/auth/refresh", {"refreshToken": lost["refreshToken"]})
-check("its refresh token stops working at once", status == 401, status)
+status, _ = refresh(lost["refreshToken"])
+check("its refresh token stops working at once", status == 400, status)
 status, body = login(NURSE, PASSWORD, LOST)
-check("nobody can log in on it", status == 401 and body["code"] == "DEVICE_NOT_ALLOWED", f"{status} {body}")
+check("nobody can log in on it", status == 400 and body["code"] == "DEVICE_NOT_ALLOWED", f"{status} {body}")
 
 # The access token is still validly signed; the gateway refuses it once its cached answer expires.
 refused_after = None
@@ -74,7 +74,7 @@ check("... and for push", status == 401, status)
 print("Nothing else is affected")
 status, _ = http("GET", "/v1/sync/changes?cursor=0&limit=1", token=kept["accessToken"])
 check("the nurse's other phone still pulls", status == 200, status)
-status, _ = http("POST", "/v1/auth/refresh", {"refreshToken": kept["refreshToken"]})
+status, _ = refresh(kept["refreshToken"])
 check("... and refreshes", status == 200, status)
 status, _ = login(NURSE, PASSWORD, KEPT)
 check("the nurse can still log in on another phone", status == 200, status)

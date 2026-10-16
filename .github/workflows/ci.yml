@@ -37,10 +37,12 @@ jobs:
         run: |
           npx ajv test --spec=draft2020 -c ajv-formats -s contracts/wound-event.schema.json -d "contracts/examples/wound-event.*.valid.json" --valid
           npx ajv test --spec=draft2020 -c ajv-formats -s contracts/wound-event.schema.json -d "contracts/examples/wound-event.*.invalid.json" --invalid
-      - name: Auth login examples (§7.3, ADR 0005)
+      - name: Auth OpenID Connect examples (ADR 0006)
         run: |
-          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-login-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.login.*.valid.json" --valid
-          npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-login-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.login.*.invalid.json" --invalid
+          for op in authorize token; do
+            npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-$op-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.$op.*.valid.json" --valid
+            npx ajv test --spec=draft2020 -c ajv-formats -s contracts/tests/auth-$op-request.schema.json -r contracts/auth.schema.json -d "contracts/examples/auth.$op.*.invalid.json" --invalid
+          done
 
   # Dev tooling checks: compose file, Python scripts, VS Code config and the generated Grafana dashboard.
   tooling:

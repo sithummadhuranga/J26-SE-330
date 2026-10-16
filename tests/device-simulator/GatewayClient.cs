@@ -19,11 +19,23 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
     private string? _accessToken;
     private string? _refreshToken;
 
+    /// <summary>
+    /// Signs in with the OpenID Connect password grant, which the local stack allows for the simulator
+    /// (Oidc:AllowPasswordGrant). The real app uses the login page instead, but gets the same kind of token.
+    /// </summary>
     public async Task LoginAsync(CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
         {
-            using var response = await http.PostAsJsonAsync("v1/auth/login", new { username, password, deviceId }, ct);
+            using var response = await http.PostAsync("connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = "mobile",
+                ["username"] = username,
+                ["password"] = password,
+                ["device_id"] = deviceId,
+                ["scope"] = "offline_access",
+            }), ct);
             // Login is rate-limited per IP and all simulated phones share one; on 5xx the caller backs off and retries.
             if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < 5)
             {
@@ -53,7 +65,12 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
     {
         if (_refreshToken is not null)
         {
-            using var response = await http.PostAsJsonAsync("v1/auth/refresh", new { refreshToken = _refreshToken }, ct);
+            using var response = await http.PostAsync("connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "refresh_token",
+                ["client_id"] = "mobile",
+                ["refresh_token"] = _refreshToken,
+            }), ct);
             if (response.IsSuccessStatusCode)
             {
                 await StoreTokensAsync(response, ct);
@@ -186,7 +203,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
             throw new InvalidOperationException($"Login failed for {username} on {deviceId}: HTTP {(int)response.StatusCode} " +
                                                 await response.Content.ReadAsStringAsync(ct));
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-        _accessToken = doc.RootElement.GetProperty("accessToken").GetString();
-        _refreshToken = doc.RootElement.GetProperty("refreshToken").GetString();
+        _accessToken = doc.RootElement.GetProperty("access_token").GetString();
+        _refreshToken = doc.RootElement.GetProperty("refresh_token").GetString();
     }
 }

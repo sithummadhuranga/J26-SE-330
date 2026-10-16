@@ -7,7 +7,7 @@ import time
 import urllib.error
 import urllib.request
 
-from client import GATEWAY, REPO_ROOT, Checks, http, login
+from client import GATEWAY, REPO_ROOT, Checks, dashboard_login, http, login
 
 sys.stdout.reconfigure(encoding="utf-8")
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -67,8 +67,7 @@ check("encoded '..' never reaches the proxy (no route)", status == 404 and b"FIG
       f"{status} {data[:60]!r}")
 status, _, _ = get("/v1/figures/stub-0/F1")
 check("no token: 401", status == 401, status)
-dash_status, dash = http("POST", "/v1/auth/login",
-                         {"username": "admin.demo", "password": "Demo-Admin-2026!", "clientId": "admin-dashboard"})
+dash_status, dash = dashboard_login("admin.demo", "Demo-Admin-2026!")
 status, _, _ = get("/v1/figures/stub-0/F1", dash["accessToken"])
 check("admin-dashboard token: 401 (devices only)", status == 401, status)
 

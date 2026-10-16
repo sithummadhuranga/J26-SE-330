@@ -14,6 +14,7 @@ import 'package:melanin_wound_cdss/features/sync/data/tables.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 
 import '../sync/support/fakes.dart';
+import '../sync/support/password_grant_sign_in.dart';
 
 /// Real engine against the real backend; runs only with SYNC_BACKEND_URL set (flutter test --tags integration).
 void main() {
@@ -25,11 +26,11 @@ void main() {
     final db = AppDatabase.encrypted(File('${dir.path}/it.db'), await DatabaseKeyStore.getOrCreate(secrets));
     final queue = QueueRepository(db);
     final api = _SmallPagesApi(Uri.parse(url!));
-    final auth = AuthSession(api, secrets);
+    final auth = AuthSession(api, secrets, browser: PasswordGrantSignIn(Uri.parse(url), 'n.silva', 'Demo-Pass-2026!'));
     final engine = SyncEngine(queue: queue, api: api, auth: auth);
 
     final deviceId = await queue.deviceId();
-    final clinician = await auth.signIn(username: 'n.silva', password: 'Demo-Pass-2026!', deviceId: deviceId);
+    final clinician = await auth.signIn(deviceId: deviceId);
     expect(clinician.facilityId, 'fac-001');
 
     // Fresh phone at cursor 0 with tiny pages so the paging path always runs.

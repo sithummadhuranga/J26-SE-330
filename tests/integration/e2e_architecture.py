@@ -362,7 +362,8 @@ compose("up", "-d", "--no-deps", "--scale", "outbox-relay=1", "outbox-relay")
 section("Edge rate limit (ADR 0004), last because it blocks logins from this IP for a minute")
 codes = []
 for _ in range(130):
-    s, _ = http("POST", "/v1/auth/login", {"username": "nobody", "password": "x", "deviceId": "d"})
+    # The strict per-IP limit guards the login form, since that's where passwords are typed.
+    s, _ = http("POST", "/account/login", {"username": "nobody", "password": "x"})
     codes.append(s)
     if s == 429:
         break

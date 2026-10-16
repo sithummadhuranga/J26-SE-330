@@ -11,13 +11,16 @@ import 'support/fakes.dart';
 void main() {
   late AppServices services;
   late FakeGateway gateway;
+  late FakeBrowserSignIn browser;
 
-  Future<void> open(WidgetTester tester, {bool requireMfa = false}) async {
-    gateway = FakeGateway(requireMfa: requireMfa);
+  Future<void> open(WidgetTester tester) async {
+    gateway = FakeGateway();
+    browser = FakeBrowserSignIn(gateway);
     services = await tester.runAsync(() => AppServices.open(
           db: AppDatabase.inMemory(),
           secrets: MemorySecretStore(),
           api: gateway,
+          browser: browser,
           online: const Stream.empty(),
         )) as AppServices;
   }
@@ -27,38 +30,44 @@ void main() {
     await tester.runAsync(services.close);
   }
 
-  testWidgets('sign-in: wrong password, then the MFA code is asked for and accepted', (tester) async {
-    await open(tester, requireMfa: true);
-    var signedIn = false;
-    await tester.pumpWidget(MaterialApp(home: SignInScreen(services: services, onSignedIn: () => signedIn = true)));
-
-    await tester.enterText(find.byKey(const Key('username')), 'n.silva');
-    await tester.enterText(find.byKey(const Key('password')), 'wrong');
-    await tester.runAsync(() => tester.tap(find.byKey(const Key('signInButton'))));
-    await tester.pump();
-    expect(find.text(SignInScreen.message('INVALID_CREDENTIALS')), findsOneWidget);
-    expect(find.byKey(const Key('totp')), findsNothing);
-
-    await tester.enterText(find.byKey(const Key('password')), 'correct-password');
-    await tester.runAsync(() => tester.tap(find.byKey(const Key('signInButton'))));
-    await tester.pump();
-    expect(find.byKey(const Key('totp')), findsOneWidget, reason: 'MFA_REQUIRED shows the code field');
-    expect(signedIn, isFalse);
-
-    await tester.enterText(find.byKey(const Key('totp')), '000000');
-    await tester.runAsync(() => tester.tap(find.byKey(const Key('signInButton'))));
-    await tester.pump();
-    expect(find.text(SignInScreen.message('INVALID_TOTP')), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('totp')), '123456');
+  Future<void> tapSignIn(WidgetTester tester) async {
     await tester.runAsync(() async {
       await tester.tap(find.byKey(const Key('signInButton')));
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     await tester.pump();
+  }
+
+  testWidgets('sign-in: the app asks for no password; closing the login page, then signing in there', (tester) async {
+    await open(tester);
+    var signedIn = false;
+    await tester.pumpWidget(MaterialApp(home: SignInScreen(services: services, onSignedIn: () => signedIn = true)));
+
+    expect(find.byType(TextField), findsNothing, reason: 'the password and MFA code are entered on the login page');
+    expect(find.byKey(const Key('signInHint')), findsOneWidget);
+
+    browser.cancel = true;
+    await tapSignIn(tester);
+    expect(signedIn, isFalse);
+    expect(find.byKey(const Key('signInError')), findsNothing, reason: 'closing the page is not an error');
+
+    browser.cancel = false;
+    await tapSignIn(tester);
     expect(signedIn, isTrue);
+    expect(browser.deviceIds.toSet(), {await tester.runAsync(services.queue.deviceId)},
+        reason: "the login page is told which phone this is (device_id)");
     final cached = await tester.runAsync(services.cachedClinician);
-    expect(cached, isNotNull, reason: 'who is signed in is cached for offline display, without the refresh token');
+    expect(cached?.username, 'n.silva', reason: 'who is signed in is cached for offline display, from the ID token');
+    await close(tester);
+  });
+
+  testWidgets('sign-in offline says the saved work is safe', (tester) async {
+    await open(tester);
+    gateway.reachable = false;
+    await tester.pumpWidget(MaterialApp(home: SignInScreen(services: services, onSignedIn: () {})));
+
+    await tapSignIn(tester);
+    expect(find.text(SignInScreen.offlineMessage), findsOneWidget);
     await close(tester);
   });
 }

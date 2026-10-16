@@ -64,12 +64,17 @@ class PullPage {
 
 /// §7.3: a 15-minute access JWT and a rotating opaque refresh token.
 class TokenPair {
-  const TokenPair(this.accessToken, this.refreshToken, this.expiresIn);
+  const TokenPair(this.accessToken, this.refreshToken, this.expiresIn, {this.idToken});
 
   final String accessToken;
   final String refreshToken;
   final Duration expiresIn;
 
-  factory TokenPair.fromJson(Map<String, dynamic> j) =>
-      TokenPair(j['accessToken'] as String, j['refreshToken'] as String, Duration(seconds: j['expiresIn'] as int));
+  /// Who signed in (preferred_username), for display only; null when the server sent none.
+  final String? idToken;
+
+  /// The OAuth token response of /connect/token (contracts/auth.schema.json 2.0).
+  factory TokenPair.fromJson(Map<String, dynamic> j) => TokenPair(
+      j['access_token'] as String, j['refresh_token'] as String, Duration(seconds: j['expires_in'] as int),
+      idToken: j['id_token'] as String?);
 }

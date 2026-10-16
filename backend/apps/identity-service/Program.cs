@@ -1,6 +1,7 @@
 using IdentityService.Admin;
 using IdentityService.Auth;
 using IdentityService.Endpoints;
+using IdentityService.Oidc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
@@ -12,7 +13,7 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using Sync.Common.Web;
 
-// Identity service: login, MFA and admin; the only service that signs tokens.
+// Identity service: the OpenID Connect provider (ADR 0006), plus MFA and admin. The only service that signs tokens.
 var builder = WebApplication.CreateBuilder(args);
 builder.AddSyncTelemetry("identity-service")
     .WithTracing(t => t.AddAspNetCoreInstrumentation())
@@ -28,14 +29,19 @@ if (args.FirstOrDefault() == "create-clinician")
 
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 var signingKey = new SigningKey(jwt.SigningKeyPem);
+var secrets = new SecretProtector(builder.Configuration["Secrets:EncryptionKey"] ?? "");
+var oidc = builder.Configuration.GetSection("Oidc").Get<OidcOptions>() ?? new OidcOptions();
 
 builder.Services.AddSingleton(dataSource);
 builder.Services.AddSingleton(jwt);
 builder.Services.AddSingleton(signingKey);
-builder.Services.AddSingleton(new SecretProtector(builder.Configuration["Secrets:EncryptionKey"] ?? ""));
-builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton(secrets);
+builder.Services.AddSingleton(oidc);
+builder.Services.AddSingleton<OidcClients>();
+builder.Services.AddSingleton<CodeRedemptions>();
 builder.Services.AddSingleton<PasswordHasher>();
-builder.Services.AddSingleton<AuthService>();
+builder.Services.AddSingleton<CredentialValidator>();
+builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<MfaService>();
 builder.Services.AddSingleton<ClinicianAdminService>();
 builder.Services.AddSingleton<DeviceAdminService>();
@@ -50,9 +56,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 });
 
 // MFA and admin endpoints need a signed-in clinician; this service checks its own bearer tokens.
+// In-memory keys are enough here: they only protect short-lived things (the 5-minute login cookie, the MFA step and
+// anti-forgery), so a restart just means signing in again. Codes and refresh tokens use a key from Secrets:EncryptionKey.
 builder.Services.AddInMemoryDataProtection();
+builder.Services.AddRazorPages();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddLoginCookie(oidc.RequireHttps)
     .AddJwtBearer(o =>
     {
         o.MapInboundClaims = false;
@@ -67,11 +77,14 @@ builder.Services
             RoleClaimType = ClaimNames.Role,
         };
     });
+builder.Services.AddOidcServer(jwt, oidc, signingKey, secrets);
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AdminEndpoints.AdminPolicy, p => p.RequireRole("admin"));
 
 var app = builder.Build();
 
+if (oidc.AllowPasswordGrant)
+    app.Logger.LogWarning("Oidc:AllowPasswordGrant is on: the mobile client accepts passwords directly (simulator and tests only).");
 if (signingKey.IsEphemeral)
     app.Logger.LogWarning("Jwt:SigningKeyPem is not set; using a key generated at start-up (local development only).");
 
@@ -83,7 +96,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.MapDiscoveryEndpoints();
+app.MapConnectEndpoints();
+app.MapRazorPages();
 
 var v1 = app.MapGroup("/v1");
 v1.MapAuthEndpoints();

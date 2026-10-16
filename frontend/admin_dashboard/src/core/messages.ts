@@ -18,7 +18,7 @@ export function describeError(error: unknown): string {
     return 'The request could not be completed. Please try again.';
   }
   if (error instanceof TransportError) return 'Cannot reach the server. Check your connection and try again.';
-  if (error instanceof NeedsSignIn) return 'Your session has ended. Please sign in again.';
+  if (error instanceof NeedsSignIn) return codes[error.reason] ?? 'Your session has ended. Please sign in again.';
   return 'Something went wrong. Please try again.';
 }
 
@@ -53,17 +53,14 @@ const reasonLabels: Record<string, string> = {
 export const auditReasonLabel = (reason: string | null): string => (reason && reasonLabels[reason]) || 'Failed';
 
 export const codes: Record<string, string> = {
-  // Sign-in
-  INVALID_CREDENTIALS: 'The username or password is incorrect.',
-  CREDENTIAL_LOCKED: 'This account is locked after too many failed attempts. Another admin can unlock it.',
-  MFA_REQUIRED: 'Enter the 6-digit code from your authenticator app.',
-  INVALID_TOTP: 'That code is not valid. Check your authenticator app and try again.',
-  CLIENT_NOT_ALLOWED: 'Only admins can sign in to the dashboard. Nurses and wound specialists use the mobile app.',
-  MISSING_FIELDS: 'Enter your username and password.',
-  DEVICE_NOT_EXPECTED: 'This sign-in is not allowed from the dashboard.',
-  DEVICE_NOT_ALLOWED: 'This device has been revoked and can no longer be used.',
-  UNKNOWN_CLIENT: 'This version of the dashboard is not recognized. Reload the page.',
+  // Sign-in. Wrong passwords, codes and locked accounts are explained on the identity service's login page.
+  invalid_grant: 'Your session has ended. Please sign in again.',
   INVALID_REFRESH_TOKEN: 'Your session has ended. Please sign in again.',
+  STATE_MISMATCH: 'That sign-in did not start in this tab. Please sign in again.',
+  access_denied: 'Sign-in was cancelled. Please try again.',
+  login_required: 'Please sign in again.',
+  CODE_REFUSED: 'Sign-in could not be completed. Please try again.',
+  NO_CODE: 'Sign-in could not be completed. Please try again.',
   // Clinicians
   USERNAME_TAKEN: 'That username is already in use. Choose another one.',
   INVALID_USERNAME:

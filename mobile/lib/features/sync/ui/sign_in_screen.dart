@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_services.dart';
 import '../../../core/theme.dart';
-import '../../../core/widgets.dart';
 import '../api/sync_api.dart';
+import '../auth/browser_sign_in.dart';
 
-/// Sign-in screen; the MFA code field appears only when the server asks for it.
+/// Sign-in screen: opens the identity service's sign-in page (ADR 0006), where the password and, if MFA is on, the
+/// authenticator code are entered. The app never sees them.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key, required this.services, required this.onSignedIn, this.onCancel});
 
@@ -29,25 +30,14 @@ class SignInScreen extends StatefulWidget {
         ),
       ));
 
-  /// The backend's reason codes (contracts/auth.schema.json), in words a clinician can act on.
-  static String message(String? code) => switch (code) {
-        'INVALID_CREDENTIALS' => 'Username or password is not right.',
-        'CREDENTIAL_LOCKED' => 'Too many failed attempts. The account is locked for 15 minutes; an admin can unlock it.',
-        'MFA_REQUIRED' => 'Enter the 6-digit code from your authenticator app.',
-        'INVALID_TOTP' => 'That code is not right or has expired. Try the current one.',
-        'DEVICE_NOT_ALLOWED' => 'This phone is not allowed for your facility. Ask an admin.',
-        _ => 'Could not sign in. Please try again.',
-      };
+  static const offlineMessage = 'Cannot reach the server. Your saved assessments are safe; sign in when online.';
+  static const failedMessage = 'Could not sign in. Please try again.';
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-  final _code = TextEditingController();
-  bool _needsCode = false;
   bool _busy = false;
   String? _error;
 
@@ -57,30 +47,17 @@ class _SignInScreenState extends State<SignInScreen> {
       _error = null;
     });
     try {
-      await widget.services.signIn(
-        username: _username.text.trim(),
-        password: _password.text,
-        totp: _needsCode ? _code.text.trim() : null,
-      );
+      await widget.services.signIn();
       widget.onSignedIn();
-    } on ApiException catch (e) {
-      setState(() {
-        _needsCode = _needsCode || e.code == 'MFA_REQUIRED' || e.code == 'INVALID_TOTP';
-        _error = SignInScreen.message(e.code);
-      });
+    } on SignInCancelled {
+      // They closed the sign-in page. Nothing to report.
     } on TransportException {
-      setState(() => _error = 'Cannot reach the server. Your saved assessments are safe; sign in when online.');
+      setState(() => _error = SignInScreen.offlineMessage);
+    } on ApiException {
+      setState(() => _error = SignInScreen.failedMessage);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _password.dispose();
-    _code.dispose();
-    super.dispose();
   }
 
   @override
@@ -114,34 +91,13 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ],
                   const SizedBox(height: 28),
-                  const FieldLabel('Username'),
-                  TextField(
-                    key: const Key('username'),
-                    controller: _username,
-                    decoration: const InputDecoration(hintText: 'e.g. n.silva'),
-                    autocorrect: false,
-                    textInputAction: TextInputAction.next,
+                  const Text(
+                    'You sign in on the hospital sign-in page, which opens in your browser. '
+                    'If your account uses an authenticator app, you will be asked for the code there.',
+                    key: Key('signInHint'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: WoundColors.textSecondary),
                   ),
-                  const SizedBox(height: 16),
-                  const FieldLabel('Password'),
-                  TextField(
-                    key: const Key('password'),
-                    controller: _password,
-                    decoration: const InputDecoration(hintText: '••••••••'),
-                    obscureText: true,
-                    onSubmitted: (_) => _busy ? null : _submit(),
-                  ),
-                  if (_needsCode) ...[
-                    const SizedBox(height: 16),
-                    const FieldLabel('Authenticator code'),
-                    TextField(
-                      key: const Key('totp'),
-                      controller: _code,
-                      decoration: const InputDecoration(hintText: '6-digit code', counterText: ''),
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                    ),
-                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 14),
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
