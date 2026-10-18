@@ -14,4 +14,8 @@
     <None Remove="WoundRag.*/**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="WoundRag.Infrastructure/WoundRag.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

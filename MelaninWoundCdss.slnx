@@ -40,6 +40,7 @@
     <Project Path="backend/tests/IdentityService.Tests/IdentityService.Tests.csproj" />
     <Project Path="backend/tests/Orchestrator.Tests/Orchestrator.Tests.csproj" />
     <Project Path="backend/tests/IngestionPipeline.Tests/IngestionPipeline.Tests.csproj" />
+    <Project Path="backend/tests/RecommendationService.Tests/RecommendationService.Tests.csproj" />
   </Folder>
   <Folder Name="/backend/tests/rag-stub/">
     <Project Path="backend/tests/rag-stub/RagStub.csproj" />
