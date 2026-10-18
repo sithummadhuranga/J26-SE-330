@@ -3,15 +3,78 @@
   "unit": "mm, origin top-left outer corner, x right, y down",
   "side_mm": 50,
   "frame_mm": 5,
-  "orientation_square": {"x": [5, 11], "y": [5, 11], "colour": "black"},
+  "orientation_square": {
+    "x": [
+      5,
+      11
+    ],
+    "y": [
+      5,
+      11
+    ],
+    "colour": "black"
+  },
   "patches": [
-    {"name": "grey", "centre": [12.5, 25], "size": 10, "aim_lab": [50, 0, 0]},
-    {"name": "skin_a", "centre": [25, 25], "size": 10, "aim_lab": [38, 14, 14]},
-    {"name": "skin_b", "centre": [37.5, 25], "size": 10, "aim_lab": [25, null, null], "note": "same hue as skin_a, lower chroma; aim only"}
+    {
+      "name": "grey",
+      "centre": [
+        12.5,
+        25
+      ],
+      "size": 10,
+      "aim_lab": [
+        50,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "skin_a",
+      "centre": [
+        25,
+        25
+      ],
+      "size": 10,
+      "aim_lab": [
+        38,
+        14,
+        14
+      ]
+    },
+    {
+      "name": "skin_b",
+      "centre": [
+        37.5,
+        25
+      ],
+      "size": 10,
+      "aim_lab": [
+        25,
+        null,
+        null
+      ],
+      "note": "same hue as skin_a, lower chroma; aim only"
+    }
   ],
-  "white_reference": {"x": [15, 35], "y": [33, 42]},
-  "crop": {"pixels_per_mm": 10, "width": 500, "height": 500, "format": "uint8 RGB, row-major"},
+  "white_reference": {
+    "x": [
+      15,
+      35
+    ],
+    "y": [
+      33,
+      42
+    ]
+  },
+  "crop": {
+    "pixels_per_mm": 10,
+    "width": 500,
+    "height": 500,
+    "format": "uint8 RGB, row-major"
+  },
   "use_central_fraction_of_patch": 0.6,
   "measured_lab": null,
-  "measured_lab_note": "null until the printed batch is measured; code must label results 'unmeasured' while it is null"
+  "measured_lab_note": "no spectrophotometer available; not needed for the area part",
+  "calibration_mode": "relative",
+  "calibration_mode_note": "targets come from reference photos of the printed sticker in steady light; results are labelled 'relative calibration', never 'accurate colour'. If Lab values are ever measured, set measured_lab and the mode becomes 'absolute'."
 }
