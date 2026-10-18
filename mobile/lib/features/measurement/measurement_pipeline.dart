@@ -112,51 +112,68 @@ class MeasurementPipeline {
   MeasurementResult analyze(Uint8List rgba, int width, int height, {PlaneScale? scale}) {
     final notes = <String>[];
     final timings = <String, double>{};
-    final clock = Stopwatch();
-    double lap() {
-      final ms = clock.elapsedMicroseconds / 1000;
-      clock
-        ..reset()
-        ..start();
-      return ms;
-    }
-
-    clock.start();
-    PreparedImage image;
+    final clock = Stopwatch()..start();
     CalibrationResult? calibration;
-    if (calibrator == null) {
-      image = prepareImage(rgba, width, height);
-      timings['prepare'] = lap();
-    } else if (calibrateOn == CalibrationInput.canvas) {
-      image = prepareImage(rgba, width, height);
-      timings['prepare'] = lap();
-      calibration = _calibrate(image.rgba, kInputW, kInputH, notes);
-      timings['calibration'] = lap();
+    PreparedImage image;
+    if (calibrator != null && calibrateOn == CalibrationInput.original) {
+      calibration = _calibrate(rgba, width, height, notes);
+      timings['calibration'] = _lap(clock);
+      image = prepareImage(calibration?.rgba ?? rgba, width, height);
+      timings['prepare'] = _lap(clock);
+      return _finish(image, calibration, scale, notes, timings, clock);
+    }
+    image = prepareImage(rgba, width, height);
+    timings['prepare'] = _lap(clock);
+    return _continueFrom(image, scale, notes, timings, clock);
+  }
+
+  /// Like [analyze] for a photo that was already fitted to the 640x480 input (for example in a background isolate,
+  /// because shrinking a 12-megapixel photo takes a moment). Calibration, if there is one, runs on this canvas.
+  MeasurementResult analyzePrepared(PreparedImage prepared, {PlaneScale? scale, double? prepareMs}) {
+    final timings = <String, double>{'prepare': ?prepareMs};
+    return _continueFrom(prepared, scale, <String>[], timings, Stopwatch()..start());
+  }
+
+  MeasurementResult _continueFrom(
+    PreparedImage prepared,
+    PlaneScale? scale,
+    List<String> notes,
+    Map<String, double> timings,
+    Stopwatch clock,
+  ) {
+    var image = prepared;
+    CalibrationResult? calibration;
+    if (calibrator != null) {
+      calibration = _calibrate(prepared.rgba, kInputW, kInputH, notes);
+      timings['calibration'] = _lap(clock);
       if (calibration != null) {
         image = PreparedImage(
           rgba: calibration.rgba,
-          scale: image.scale,
-          padLeft: image.padLeft,
-          padTop: image.padTop,
-          originalWidth: width,
-          originalHeight: height,
+          scale: prepared.scale,
+          padLeft: prepared.padLeft,
+          padTop: prepared.padTop,
+          originalWidth: prepared.originalWidth,
+          originalHeight: prepared.originalHeight,
         );
       }
-    } else {
-      calibration = _calibrate(rgba, width, height, notes);
-      timings['calibration'] = lap();
-      image = prepareImage(calibration?.rgba ?? rgba, width, height);
-      timings['prepare'] = lap();
     }
+    return _finish(image, calibration, scale, notes, timings, clock);
+  }
 
+  MeasurementResult _finish(
+    PreparedImage image,
+    CalibrationResult? calibration,
+    PlaneScale? scale,
+    List<String> notes,
+    Map<String, double> timings,
+    Stopwatch clock,
+  ) {
     final segmentation = segmenter.segment(rgbaToModelInput(image.rgba, kInputW, kInputH), conf: confidence);
-    timings['segmentation'] = lap();
-
+    timings['segmentation'] = _lap(clock);
     final regions = colourRegions(image.rgba, segmentation.mask);
-    timings['colour'] = lap();
+    timings['colour'] = _lap(clock);
     final area = scale?.areaMm2(segmentation.mask);
-    timings['area'] = lap();
-
+    timings['area'] = _lap(clock);
     return MeasurementResult(
       image: image,
       segmentation: segmentation,
@@ -168,6 +185,15 @@ class MeasurementPipeline {
       notes: notes,
       timingsMs: timings,
     );
+  }
+
+  /// Milliseconds since the last lap; the clock keeps running.
+  static double _lap(Stopwatch clock) {
+    final ms = clock.elapsedMicroseconds / 1000;
+    clock
+      ..reset()
+      ..start();
+    return ms;
   }
 
   CalibrationResult? _calibrate(Uint8List rgba, int width, int height, List<String> notes) {
