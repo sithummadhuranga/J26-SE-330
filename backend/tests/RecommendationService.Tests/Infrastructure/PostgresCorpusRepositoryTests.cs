@@ -85,4 +85,31 @@ public sealed class PostgresCorpusRepositoryTests : IDisposable
     [Fact]
     public void Core_and_the_phase_a_retriever_name_the_filters_alike() =>
         Assert.Equal((RetrievalFilters.Default, RetrievalFilters.VascularEscalation), (QueryFilters.Default, QueryFilters.VascularEscalation));
+
+    [DatabaseFact]
+    public async Task A_version_that_is_not_frozen_is_never_served()
+    {
+        // An exact copy of r2's settings without frozen_at, added and rolled back as rag_svc: nothing else differs.
+        await using var db = NpgsqlDataSource.Create(TestDatabase.RagConnectionString()!);
+        await using var conn = await db.OpenConnectionAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+        await using (var copy = new NpgsqlCommand("""
+            INSERT INTO rag.corpus_versions (corpus_version, source_pdf_sha256, chunker_version, embedding_model, embedding_dimensions,
+                reranker_model, instruct_hash, retrieval_k, postgres_version, pgvector_version, table_serializer, retrieve_prose,
+                retrieve_rationale, alias_file_sha256, manifest_sha256, frozen_at)
+            SELECT 'test-unfrozen.r0', source_pdf_sha256, chunker_version, embedding_model, embedding_dimensions, reranker_model,
+                instruct_hash, retrieval_k, postgres_version, pgvector_version, table_serializer, retrieve_prose, retrieve_rationale,
+                alias_file_sha256, manifest_sha256, NULL
+            FROM rag.corpus_versions WHERE corpus_version = $1
+            """, conn, tx))
+        {
+            copy.Parameters.AddWithValue(TestDatabase.CorpusVersion);
+            Assert.Equal(1, await copy.ExecuteNonQueryAsync());
+        }
+
+        var repository = new PostgresCorpusRepository(db);
+        Assert.Null(await repository.LoadFrozenAsync(conn, tx, "test-unfrozen.r0", CancellationToken.None));
+        Assert.NotNull(await repository.LoadFrozenAsync(conn, tx, TestDatabase.CorpusVersion, CancellationToken.None));
+        await tx.RollbackAsync();
+    }
 }

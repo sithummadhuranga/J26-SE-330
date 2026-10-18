@@ -5,15 +5,6 @@ using WoundRag.Core.Healing;
 
 namespace WoundRag.Core.Retrieval;
 
-public static class RetrievalModes
-{
-    public const string Hybrid = "hybrid";
-    public const string Lexical = "lexical";
-}
-
-// Scores holds the stored scores the order used; empty when the query fell back to RRF order.
-public sealed record QueryOutcome(QuerySearch Search, RerankResult Rerank, IReadOnlyDictionary<string, double> Scores);
-
 public sealed record CaseOutcome(TrajectoryResult Trajectory, IReadOnlySet<string> Observed, IReadOnlyList<QueryOutcome> Queries, GateResult Gate)
 {
     public string RetrievalMode => Queries.All(q => q.Search.VectorFound) ? RetrievalModes.Hybrid : RetrievalModes.Lexical;

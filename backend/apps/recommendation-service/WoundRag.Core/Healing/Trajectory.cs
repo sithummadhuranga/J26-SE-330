@@ -5,8 +5,6 @@ using WoundRag.Core.Cases;
 
 namespace WoundRag.Core.Healing;
 
-public sealed record TrajectoryResult(bool Computable, string? NotComputableReason, double? Par, double? ElapsedWeeks, bool Stalled);
-
 public static class Trajectory
 {
     public static TrajectoryResult Evaluate(Measurement current, DateTimeOffset receivedAt, IReadOnlyList<Measurement> history, StalledHealingRule rule)

@@ -17,7 +17,13 @@ public sealed class PostgresCorpusRepository(NpgsqlDataSource db) : ICorpusRepos
     public async Task<FrozenCorpus?> LoadFrozenAsync(string version, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
-        await using var results = await conn.QueryMultipleAsync(new CommandDefinition(FrozenCorpusSql, new { version }, cancellationToken: ct));
+        return await LoadFrozenAsync(conn, null, version, ct);
+    }
+
+    // On a caller's transaction, so a test can add an unfrozen version and roll it back.
+    public async Task<FrozenCorpus?> LoadFrozenAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string version, CancellationToken ct)
+    {
+        await using var results = await conn.QueryMultipleAsync(new CommandDefinition(FrozenCorpusSql, new { version }, tx, cancellationToken: ct));
         var row = await results.ReadSingleOrDefaultAsync<VersionRow>();
         var thresholds = (await results.ReadAsync<ThresholdRow>()).ToDictionary(t => t.Id, t => (t.Value, t.Unit));
         var words = (await results.ReadAsync<SlotWordsRow>()).ToDictionary(w => w.Slot, w => (IReadOnlyCollection<string>)w.Words);

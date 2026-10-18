@@ -1,12 +1,8 @@
 // What the service reads from the frozen corpus before it retrieves anything for a case.
 
-using WoundRag.Core.Healing;
 using WoundRag.Core.Retrieval;
 
 namespace WoundRag.Infrastructure.Corpus;
-
-public sealed record FrozenCorpus(CorpusInfo Info, string ManifestSha256, DateTimeOffset FrozenAt, StalledHealingRule StalledRule,
-    SlotVocabulary Vocabulary, IReadOnlyList<string> Templates);
 
 public interface ICorpusRepository
 {

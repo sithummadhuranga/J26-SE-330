@@ -3,14 +3,6 @@
 
 namespace WoundRag.Core.Retrieval;
 
-public static class QueryFilters
-{
-    public const string Default = "default";
-    public const string VascularEscalation = "vascular_escalation";
-}
-
-public sealed record StoredQuery(string TemplateId, string Text, string Filter);
-
 public static class QueryPlan
 {
     public static IReadOnlyList<StoredQuery> Choose(IReadOnlyList<string> templates, IReadOnlyList<StoredQuery> matching, bool stalled) =>

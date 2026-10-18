@@ -26,9 +26,9 @@ public class RequestTablesTests
     {
         await using var conn = await OpenAsync(TestDatabase.RagConnectionString()!);
         await using var tx = await conn.BeginTransactionAsync();
-        await SeedAllAsync(conn, tx);
+        var seeded = await SeedAllAsync(conn, tx);
         foreach (var table in AppendOnlyTables)
-            Assert.Equal(1L, await ScalarAsync<long>(conn, tx, $"SELECT count(*) FROM rag.{table} WHERE {KeyColumn(table)}"));
+            Assert.Equal(1L, await ScalarAsync<long>(conn, tx, $"SELECT count(*) FROM rag.{table} WHERE {KeyColumn(table, seeded)}"));
         await tx.RollbackAsync();
     }
 
@@ -40,8 +40,8 @@ public class RequestTablesTests
     {
         await using var conn = await OpenAsync(TestDatabase.RagConnectionString()!);
         await using var tx = await conn.BeginTransactionAsync();
-        await SeedAllAsync(conn, tx);
-        foreach (var change in new[] { $"UPDATE rag.{table} SET {AnyColumn(table)} = {AnyColumn(table)} WHERE {KeyColumn(table)}", $"DELETE FROM rag.{table} WHERE {KeyColumn(table)}" })
+        var seeded = await SeedAllAsync(conn, tx);
+        foreach (var change in new[] { $"UPDATE rag.{table} SET {AnyColumn(table)} = {AnyColumn(table)} WHERE {KeyColumn(table, seeded)}", $"DELETE FROM rag.{table} WHERE {KeyColumn(table, seeded)}" })
         {
             await tx.SaveAsync("before");
             var e = await Assert.ThrowsAsync<PostgresException>(() => ExecAsync(conn, tx, change));
@@ -123,7 +123,8 @@ public class RequestTablesTests
         await tx.RollbackAsync();
     }
 
-    private static string KeyColumn(string table) => table == "request_keys" ? "case_id IS NOT NULL" : "request_id IS NOT NULL";
+    // Only the rows this test seeded: the tables also hold real answers, which a test must never count or touch.
+    private static string KeyColumn(string table, Seeded s) => table == "request_keys" ? $"case_id = '{s.CaseId}'" : $"request_id = '{s.RequestId}'";
 
     private static string AnyColumn(string table) => table switch
     {
@@ -148,7 +149,7 @@ public class RequestTablesTests
         return new Seeded(requestId, caseId, chunkId, chunkHash);
     }
 
-    private static async Task SeedAllAsync(NpgsqlConnection conn, NpgsqlTransaction tx)
+    private static async Task<Seeded> SeedAllAsync(NpgsqlConnection conn, NpgsqlTransaction tx)
     {
         var s = await SeedRequestAsync(conn, tx);
         await InsertRetrievalAsync(conn, tx, s, admissible: true, missing: []);
@@ -159,6 +160,7 @@ public class RequestTablesTests
             INSERT INTO rag.audit (request_id, occurred_at, event_type, provider, requested_model, returned_model, attempt, outcome, latency_ms)
             VALUES (@r, @at, 'generation_attempt', 'test', 'model-a', 'model-a', 1, 'ok', 5)
             """, ("r", s.RequestId), ("at", DateTimeOffset.UtcNow));
+        return s;
     }
 
     private static Task InsertRequestAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid requestId, Guid caseId, string stableSha, string bodySha) =>

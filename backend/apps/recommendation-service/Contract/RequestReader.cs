@@ -10,10 +10,6 @@ using WoundRag.Core.Gating;
 
 namespace RecommendationService.Contract;
 
-public sealed record FieldProblem(string Path, string Problem);
-
-public sealed record ReadResult(CaseInput? Case, IReadOnlyList<FieldProblem> Problems);
-
 public sealed partial class RequestReader(JsonSchema schema)
 {
     private static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.Hierarchical, RequireFormatValidation = true };

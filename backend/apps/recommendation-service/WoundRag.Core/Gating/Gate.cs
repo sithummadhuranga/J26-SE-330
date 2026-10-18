@@ -4,23 +4,6 @@
 
 namespace WoundRag.Core.Gating;
 
-public sealed record Candidate(string ChunkId, IReadOnlyCollection<string> Required);
-
-public sealed record GateDecision(string ChunkId, bool Admissible, IReadOnlyList<string> MissingFields);
-
-public sealed record Refusal(string MissingField, IReadOnlyList<string> ChunkIds, string Message)
-{
-    public int BlockedCount => ChunkIds.Count;
-}
-
-// Recording this field alone would unlock this many blocked candidates.
-public sealed record NextBest(string Field, int Unlocks);
-
-public sealed record GateResult(IReadOnlyList<GateDecision> Decisions, IReadOnlyList<Refusal> Refusals, IReadOnlyList<NextBest> NextBest)
-{
-    public IReadOnlyList<string> Admissible => [.. Decisions.Where(d => d.Admissible).Select(d => d.ChunkId)];
-}
-
 public static class Gate
 {
     public static GateResult Evaluate(IReadOnlyList<Candidate> candidates, IReadOnlySet<string> observed, string? trajectoryReason)

@@ -3,8 +3,6 @@
 
 namespace WoundRag.Core.Retrieval;
 
-public sealed record RerankResult(string Mode, IReadOnlyList<string> ChunkIds);
-
 public static class RerankOrder
 {
     public const string Stored = "stored";
