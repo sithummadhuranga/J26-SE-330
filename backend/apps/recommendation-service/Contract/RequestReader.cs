@@ -18,8 +18,7 @@ public sealed partial class RequestReader(JsonSchema schema)
 {
     private static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.Hierarchical, RequireFormatValidation = true };
 
-    public static RequestReader FromOutputDirectory() =>
-        new(JsonSchema.FromText(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "contracts", "rag-request.schema.json"))));
+    public static RequestReader FromOutputDirectory() => new(ContractSchema.Load("rag-request.schema.json"));
 
     public ReadResult Read(string body)
     {

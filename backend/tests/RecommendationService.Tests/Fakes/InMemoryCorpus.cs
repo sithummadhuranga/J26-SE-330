@@ -26,7 +26,15 @@ public sealed class InMemoryCorpus : ICorpusRepository, IGuidelineRetrieval, IRe
 
     public List<(string Key, IReadOnlyCollection<string> ChunkIds)> ScoreRequests { get; } = [];
 
-    public Task<FrozenCorpus?> LoadFrozenAsync(string version, CancellationToken ct) => throw new NotSupportedException();
+    // What LoadFrozenAsync returns; null stands for a version that is not stored or not frozen.
+    public FrozenCorpus? Loaded { get; set; }
+    public int Loads { get; private set; }
+
+    public Task<FrozenCorpus?> LoadFrozenAsync(string version, CancellationToken ct)
+    {
+        Loads++;
+        return Task.FromResult(Loaded?.Info.Version == version ? Loaded : null);
+    }
 
     // Every stored query whose filter is known; the plan picks among them, as matching_queries.sql would allow.
     public Task<IReadOnlyList<StoredQuery>> MatchingQueriesAsync(string version, IReadOnlyDictionary<string, string> slots, CancellationToken ct) =>

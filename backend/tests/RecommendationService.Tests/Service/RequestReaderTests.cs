@@ -11,7 +11,7 @@ namespace RecommendationService.Tests.Service;
 
 public class RequestReaderTests
 {
-    // Shared by every test class: JsonSchema.Net registers the schema by its $id, and loading it twice throws.
+    // Shared by the test classes that read requests, as the service shares its one reader.
     internal static readonly RequestReader Reader = RequestReader.FromOutputDirectory();
 
     private static JsonObject Valid() => JsonNode.Parse("""

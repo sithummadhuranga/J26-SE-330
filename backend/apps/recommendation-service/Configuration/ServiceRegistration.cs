@@ -3,12 +3,14 @@
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using RecommendationService.Contract;
 using RecommendationService.Recommendations;
 using WoundRag.Core.Generation;
 using WoundRag.Infrastructure.Composition;
 using WoundRag.Infrastructure.Corpus;
 using WoundRag.Infrastructure.Figures;
 using WoundRag.Infrastructure.Generation;
+using WoundRag.Infrastructure.Requests;
 using WoundRag.Infrastructure.Retrieval;
 
 namespace RecommendationService.Configuration;
@@ -41,6 +43,12 @@ public static class ServiceRegistration
         services.AddSingleton<IPassageRepository, PostgresPassageRepository>();
         services.AddSingleton<IFigureRepository, PostgresFigureRepository>();
         services.AddSingleton<ProtocolService>();
+
+        // One reader and one check for the process: each holds its schema, loaded once at start-up.
+        services.AddSingleton(_ => RequestReader.FromOutputDirectory());
+        services.AddSingleton(_ => ResponseCheck.FromOutputDirectory());
+        services.AddSingleton<IRequestRepository, PostgresRequestRepository>();
+        services.AddSingleton<RecommendationUseCase>();
         return services;
     }
 

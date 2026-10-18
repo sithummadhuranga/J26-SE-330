@@ -3,11 +3,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RecommendationService.Configuration;
+using RecommendationService.Contract;
 using RecommendationService.Recommendations;
 using WoundRag.Core.Composition;
 using WoundRag.Core.Generation;
 using WoundRag.Infrastructure.Corpus;
 using WoundRag.Infrastructure.Generation;
+using WoundRag.Infrastructure.Requests;
 using WoundRag.Infrastructure.Retrieval;
 
 namespace RecommendationService.Tests.Service;
@@ -70,6 +72,16 @@ public class ServiceRegistrationTests
         using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
         Assert.NotNull(services.GetRequiredService<ProtocolService>());
         Assert.Equal(166, services.GetRequiredService<SectionPlacement>().Sections.Count);
+    }
+
+    [Fact]
+    public void The_use_case_resolves_with_one_reader_one_response_check_and_the_request_repository()
+    {
+        using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
+        Assert.NotNull(services.GetRequiredService<RecommendationUseCase>());
+        Assert.IsType<PostgresRequestRepository>(services.GetRequiredService<IRequestRepository>());
+        Assert.Same(services.GetRequiredService<RequestReader>(), services.GetRequiredService<RequestReader>());
+        Assert.Same(services.GetRequiredService<ResponseCheck>(), services.GetRequiredService<ResponseCheck>());
     }
 
     [Fact]
