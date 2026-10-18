@@ -4,16 +4,22 @@
 using IngestionPipeline.Pdf;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class StructureCheckCommand
+public sealed class StructureCheckCommand(RepoPaths paths) : ICommand
 {
+    public string Name => "check-structure";
+
+    public string Usage => "check-structure";
+
     public sealed record Check(string Group, string Quantity, string Expected, string Actual)
     {
         public bool Pass => Expected == Actual;
     }
 
-    public static int Run(RepoPaths paths, string[] args)
+    public Task<int> RunAsync(string[] args) => Task.FromResult(Run(args));
+
+    private int Run(string[] args)
     {
         if (!File.Exists(paths.SourcePdf))
         {

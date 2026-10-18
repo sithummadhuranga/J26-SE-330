@@ -8,13 +8,19 @@ using IngestionPipeline.Pdf;
 using UglyToad.PdfPig;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class AnnotateCommand
+public sealed class AnnotateCommand(RepoPaths paths) : ICommand
 {
+    public string Name => "annotate";
+
+    public string Usage => "annotate";
+
     private static string AnnotationPath(RepoPaths p) => Path.Combine(p.Patterns, "annotation.yaml");
 
-    public static int Annotate(RepoPaths paths)
+    public Task<int> RunAsync(string[] args) => Task.FromResult(Run());
+
+    private int Run()
     {
         var file = AnnotationFile.Read(AnnotationPath(paths)) ?? throw new FileNotFoundException(AnnotationPath(paths));
         var aliases = AliasFile.Read(Path.Combine(paths.Patterns, "label_aliases.yaml"))!;

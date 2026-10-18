@@ -3,15 +3,20 @@
 // the console shows counts, IDs and token numbers, never chunk text.
 
 using System.Globalization;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.ModelApi;
 using UglyToad.PdfPig;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class EmbedCommand
+public sealed class EmbedCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
+    public string Name => "embed";
+
+    public string Usage => "embed [--dry-run]";
+
     public const string Documents = "documents", Queries = "queries", Canaries = "canaries";
 
     private const int BatchSize = 20;
@@ -26,7 +31,7 @@ public static class EmbedCommand
 
     private sealed record Work(string Kind, string TextType, List<Item> All, List<Item> Pending);
 
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
         var dryRun = args.Contains("--dry-run");
         var queriesPath = CorpusBuild.PatternPath(paths, "queries.yaml");
@@ -57,12 +62,7 @@ public static class EmbedCommand
         var estimateUsd = work.Sum(w => Estimate(w.Pending)) * EmbeddingUsdPerMillion / 1_000_000m;
         Console.WriteLine($"estimated cost at list price US${estimateUsd.ToString("0.000000", CultureInfo.InvariantCulture)} (inside the free quota it is billed at 0)");
 
-        var ceiling = CostCeilingUsd();
-        if (ceiling is null)
-        {
-            Console.Error.WriteLine("WOUNDRAG_COST_CEILING_USD is not a number.");
-            return 2;
-        }
+        var ceiling = settings.CostCeilingUsd;
         if (estimateUsd > ceiling)
         {
             Console.Error.WriteLine($"Estimate is over the ceiling of US${ceiling}; nothing was sent.");
@@ -76,15 +76,13 @@ public static class EmbedCommand
 
         if (work.Any(w => w.Pending.Count > 0))
         {
-            var apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
-            var workspaceId = Environment.GetEnvironmentVariable("MODELSTUDIO_WORKSPACE_ID");
-            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(workspaceId))
+            if (!settings.HasModelApi)
             {
-                Console.Error.WriteLine("DASHSCOPE_API_KEY or MODELSTUDIO_WORKSPACE_ID is not set (load ~/.config/woundrag/secrets.env first).");
+                Console.Error.WriteLine(PipelineSettings.MissingModelApi);
                 return 2;
             }
             using var http = new HttpClient();
-            var client = new ModelStudioClient(http, apiKey, workspaceId);
+            var client = new ModelStudioClient(http, settings.ModelApiKey!, settings.ModelWorkspaceId!);
             try
             {
                 foreach (var w in work.Where(w => w.Pending.Count > 0))
@@ -153,11 +151,4 @@ public static class EmbedCommand
                           $"(ratio {(estimated == 0 ? 0 : (double)returned / estimated).ToString("0.000", CultureInfo.InvariantCulture)})");
     }
 
-    private static decimal? CostCeilingUsd()
-    {
-        var raw = Environment.GetEnvironmentVariable("WOUNDRAG_COST_CEILING_USD");
-        if (string.IsNullOrWhiteSpace(raw))
-            return 5.00m;
-        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
-    }
 }

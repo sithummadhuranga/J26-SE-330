@@ -3,14 +3,19 @@
 // Every text sent is a fixed synthetic sentence: no guideline text, nothing patient-derived.
 
 using System.Globalization;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.ModelApi;
 using WoundRag.Shared.Tokenization;
 using WoundRag.Shared.Vectors;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class SmokeTestCommand
+public sealed class SmokeTestCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
+    public string Name => "smoke";
+
+    public string Usage => "smoke [--dry-run]";
+
     private const int Dimensions = 256;
     private const double NormTolerance = 0.001;
 
@@ -40,7 +45,7 @@ public static class SmokeTestCommand
         "A probe-to-bone test is part of assessing a deep ulcer.",
     ];
 
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
         var dryRun = args.Contains("--dry-run");
 
@@ -58,12 +63,7 @@ public static class SmokeTestCommand
         Console.WriteLine($"  estimated cost at list price: US${estimateUsd:0.000000} (Model Studio calls inside the free quota are");
         Console.WriteLine("  billed at 0).");
 
-        var ceiling = CostCeilingUsd();
-        if (ceiling is null)
-        {
-            Console.Error.WriteLine("WOUNDRAG_COST_CEILING_USD is not a number.");
-            return 2;
-        }
+        var ceiling = settings.CostCeilingUsd;
         if (estimateUsd > ceiling)
         {
             Console.Error.WriteLine($"Estimate is over the ceiling of US${ceiling}; nothing was sent.");
@@ -75,16 +75,14 @@ public static class SmokeTestCommand
             return 0;
         }
 
-        var apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
-        var workspaceId = Environment.GetEnvironmentVariable("MODELSTUDIO_WORKSPACE_ID");
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(workspaceId))
+        if (!settings.HasModelApi)
         {
-            Console.Error.WriteLine("DASHSCOPE_API_KEY or MODELSTUDIO_WORKSPACE_ID is not set (load ~/.config/woundrag/secrets.env first).");
+            Console.Error.WriteLine(PipelineSettings.MissingModelApi);
             return 2;
         }
 
         using var http = new HttpClient();
-        var client = new ModelStudioClient(http, apiKey, workspaceId);
+        var client = new ModelStudioClient(http, settings.ModelApiKey!, settings.ModelWorkspaceId!);
         var ct = CancellationToken.None;
         try
         {
@@ -170,14 +168,6 @@ public static class SmokeTestCommand
     private static void Report(string what, EmbeddingResponse r) =>
         Console.WriteLine($"  {what}: model {r.Model ?? "(not returned)"}, total_tokens {r.TotalTokens}, request_id {r.RequestId ?? "(none)"}");
 
-    // SKILL.md §7: the ceiling defaults to US$5.00 when the variable is not set.
-    private static decimal? CostCeilingUsd()
-    {
-        var raw = Environment.GetEnvironmentVariable("WOUNDRAG_COST_CEILING_USD");
-        if (string.IsNullOrWhiteSpace(raw))
-            return 5.00m;
-        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
-    }
 
     private static string Fmt(double x) => x.ToString("0.0000", CultureInfo.InvariantCulture);
     private static string Verdict(bool ok) => ok ? "PASS" : "FAIL";

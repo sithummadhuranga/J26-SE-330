@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Dapper;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.Db;
 using IngestionPipeline.ModelApi;
@@ -13,10 +14,14 @@ using Npgsql;
 using WoundRag.Infrastructure;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class RerankCommand
+public sealed class RerankCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
+    public string Name => "rerank";
+
+    public string Usage => "rerank [--dry-run]";
+
     // qwen3-rerank, US$ per 1M input tokens, International (Singapore), model-pricing page dated 28 Sep 2026.
     private const decimal RerankUsdPerMillion = 0.1m;
 
@@ -24,13 +29,13 @@ public static class RerankCommand
     // overall, though 28 to 57 per key, so a single key's estimate can still be low.
     private const int AllowancePerText = 41;
 
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
         var dryRun = args.Contains("--dry-run");
-        var dsn = RagDatabase.ConnectionString(paths);
-        if (string.IsNullOrWhiteSpace(dsn))
+        var dsn = settings.RagConnectionString;
+        if (dsn is null)
         {
-            Console.Error.WriteLine($"{RagDatabase.Setting} is not set in the environment or the repository's .env (decision 47).");
+            Console.Error.WriteLine(PipelineSettings.MissingRagConnection);
             return 2;
         }
         await using var conn = new NpgsqlConnection(dsn);
@@ -80,12 +85,7 @@ public static class RerankCommand
         Console.WriteLine($"  instruction hash {RerankInstruction.Sha256[..16]}…; estimated tokens {estimatedTokens} (WordPiece + {AllowancePerText} per text); " +
                           $"estimated cost at list price US${estimateUsd.ToString("0.000000", CultureInfo.InvariantCulture)} (inside the free quota it is billed at 0)");
 
-        var ceiling = CostCeilingUsd();
-        if (ceiling is null)
-        {
-            Console.Error.WriteLine("WOUNDRAG_COST_CEILING_USD is not a number.");
-            return 2;
-        }
+        var ceiling = settings.CostCeilingUsd;
         if (estimateUsd > ceiling)
         {
             Console.Error.WriteLine($"Estimate is over the ceiling of US${ceiling}; nothing was sent.");
@@ -99,15 +99,13 @@ public static class RerankCommand
 
         if (work.Count > 0)
         {
-            var apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
-            var workspaceId = Environment.GetEnvironmentVariable("MODELSTUDIO_WORKSPACE_ID");
-            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(workspaceId))
+            if (!settings.HasModelApi)
             {
-                Console.Error.WriteLine("DASHSCOPE_API_KEY or MODELSTUDIO_WORKSPACE_ID is not set (load ~/.config/woundrag/secrets.env first).");
+                Console.Error.WriteLine(PipelineSettings.MissingModelApi);
                 return 2;
             }
             using var http = new HttpClient();
-            var client = new ModelStudioClient(http, apiKey, workspaceId);
+            var client = new ModelStudioClient(http, settings.ModelApiKey!, settings.ModelWorkspaceId!);
             int returned = 0, n = 0;
             try
             {
@@ -199,12 +197,4 @@ public static class RerankCommand
         return 0;
     }
 
-    // SKILL.md §7: the ceiling defaults to US$5.00 when the variable is not set.
-    private static decimal? CostCeilingUsd()
-    {
-        var raw = Environment.GetEnvironmentVariable("WOUNDRAG_COST_CEILING_USD");
-        if (string.IsNullOrWhiteSpace(raw))
-            return 5.00m;
-        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
-    }
 }

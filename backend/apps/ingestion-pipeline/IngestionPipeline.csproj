@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Npgsql" />
     <!-- The package id is "PdfPig"; "UglyToad.PdfPig" on nuget.org is an unrelated upload. -->
     <PackageReference Include="PdfPig" />

@@ -5,20 +5,25 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using Dapper;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.Db;
 using IngestionPipeline.ModelApi;
 using Npgsql;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class VerifyCommand
+public sealed class VerifyCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
+    public string Name => "verify";
+
+    public string Usage => "verify [--dry-run] [--canary-runs N] [--freeze]";
+
     // qwen3.7-text-embedding, US$ per 1M input tokens, as in `embed`.
     private const decimal EmbeddingUsdPerMillion = 0.07m;
 
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
         var dryRun = args.Contains("--dry-run");
         var freeze = args.Contains("--freeze");
@@ -40,10 +45,10 @@ public static class VerifyCommand
             Console.Error.WriteLine($"uncommitted changes in {string.Join(", ", dirty)}: commit before freezing, so the manifest names the code that verified it.");
             return 2;
         }
-        var dsn = RagDatabase.ConnectionString(paths);
-        if (string.IsNullOrWhiteSpace(dsn))
+        var dsn = settings.RagConnectionString;
+        if (dsn is null)
         {
-            Console.Error.WriteLine($"{RagDatabase.Setting} is not set in the environment or the repository's .env (decision 47).");
+            Console.Error.WriteLine(PipelineSettings.MissingRagConnection);
             return 2;
         }
 
@@ -62,8 +67,7 @@ public static class VerifyCommand
         var estimateUsd = estimatedTokens * EmbeddingUsdPerMillion / 1_000_000m;
         Console.WriteLine($"verify {version}: {canaries.Count} canaries x {canaryRuns} run(s), estimated {estimatedTokens} tokens, " +
                           $"US${estimateUsd.ToString("0.000000", CultureInfo.InvariantCulture)} at list price");
-        var ceiling = CostCeilingUsd();
-        if (ceiling is null) { Console.Error.WriteLine("WOUNDRAG_COST_CEILING_USD is not a number."); return 2; }
+        var ceiling = settings.CostCeilingUsd;
         if (estimateUsd > ceiling) { Console.Error.WriteLine($"Estimate is over the ceiling of US${ceiling}; nothing was sent."); return 2; }
 
         var checks = new List<CheckResult>
@@ -100,17 +104,15 @@ public static class VerifyCommand
     }
 
     // Null when the API settings are missing or the call fails; nothing is frozen then.
-    private static async Task<CheckResult?> CanaryCheckAsync(List<StoredCanary> canaries, int runs)
+    private async Task<CheckResult?> CanaryCheckAsync(List<StoredCanary> canaries, int runs)
     {
-        var apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
-        var workspaceId = Environment.GetEnvironmentVariable("MODELSTUDIO_WORKSPACE_ID");
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(workspaceId))
+        if (!settings.HasModelApi)
         {
-            Console.Error.WriteLine("DASHSCOPE_API_KEY or MODELSTUDIO_WORKSPACE_ID is not set (load ~/.config/woundrag/secrets.env first).");
+            Console.Error.WriteLine(PipelineSettings.MissingModelApi);
             return null;
         }
         using var http = new HttpClient();
-        var client = new ModelStudioClient(http, apiKey, workspaceId);
+        var client = new ModelStudioClient(http, settings.ModelApiKey!, settings.ModelWorkspaceId!);
         var vectors = new List<IReadOnlyList<double[]>>();
         var returned = 0;
         try
@@ -160,11 +162,4 @@ public static class VerifyCommand
         return 0;
     }
 
-    private static decimal? CostCeilingUsd()
-    {
-        var raw = Environment.GetEnvironmentVariable("WOUNDRAG_COST_CEILING_USD");
-        if (string.IsNullOrWhiteSpace(raw))
-            return 5.00m;
-        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ? value : null;
-    }
 }

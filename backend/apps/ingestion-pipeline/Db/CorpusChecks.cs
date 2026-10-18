@@ -6,7 +6,7 @@ using Dapper;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.ModelApi;
 using IngestionPipeline.Pdf;
-using IngestionPipeline.Steps;
+using IngestionPipeline.Commands;
 using Npgsql;
 using UglyToad.PdfPig;
 using WoundRag.Infrastructure;

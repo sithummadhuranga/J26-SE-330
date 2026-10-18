@@ -3,7 +3,7 @@
 
 using IngestionPipeline;
 using IngestionPipeline.Corpus;
-using IngestionPipeline.Steps;
+using IngestionPipeline.Commands;
 
 namespace IngestionPipeline.Tests;
 

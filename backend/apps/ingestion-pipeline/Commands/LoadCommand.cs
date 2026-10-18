@@ -4,24 +4,28 @@
 
 using System.Diagnostics;
 using System.Security.Cryptography;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.Corpus;
-using IngestionPipeline.Db;
 using IngestionPipeline.Load;
 using IngestionPipeline.ModelApi;
 using Npgsql;
 using UglyToad.PdfPig;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class LoadCommand
+public sealed class LoadCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
+    public string Name => "load";
+
+    public string Usage => "load [--dry-run] [--replace]";
+
     private const int RetrievalK = 20;
 
     private static readonly string[] BuildPaths =
         ["backend/apps/ingestion-pipeline", "backend/apps/recommendation-service/WoundRag.Shared", "research/IT23294202/guideline-corpus/patterns"];
 
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public async Task<int> RunAsync(string[] args)
     {
         var dryRun = args.Contains("--dry-run");
         var replace = args.Contains("--replace");
@@ -72,10 +76,10 @@ public static class LoadCommand
             return 0;
         }
 
-        var dsn = RagDatabase.ConnectionString(paths);
-        if (string.IsNullOrWhiteSpace(dsn))
+        var dsn = settings.RagConnectionString;
+        if (dsn is null)
         {
-            Console.Error.WriteLine($"{RagDatabase.Setting} is not set in the environment or the repository's .env (decision 47).");
+            Console.Error.WriteLine(PipelineSettings.MissingRagConnection);
             return 2;
         }
         try

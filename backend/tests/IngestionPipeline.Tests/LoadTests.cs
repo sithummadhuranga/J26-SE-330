@@ -5,7 +5,7 @@ using IngestionPipeline;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.Load;
 using IngestionPipeline.ModelApi;
-using IngestionPipeline.Steps;
+using IngestionPipeline.Commands;
 using Npgsql;
 
 namespace IngestionPipeline.Tests;

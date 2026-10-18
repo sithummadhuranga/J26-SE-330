@@ -7,15 +7,20 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Dapper;
+using IngestionPipeline.Configuration;
 using IngestionPipeline.Corpus;
 using IngestionPipeline.Db;
 using Npgsql;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class ExportCommand
+public sealed class ExportCommand(RepoPaths paths, PipelineSettings settings) : ICommand
 {
-    public static async Task<int> RunAsync(RepoPaths paths, string[] args)
+    public string Name => "export";
+
+    public string Usage => "export [--verify-into DATABASE]";
+
+    public async Task<int> RunAsync(string[] args)
     {
         var at = Array.IndexOf(args, "--verify-into");
         if (at >= 0 && at + 1 >= args.Length)
@@ -24,10 +29,10 @@ public static class ExportCommand
             return 2;
         }
         var scratch = at >= 0 ? args[at + 1] : null;
-        var dsn = RagDatabase.ConnectionString(paths);
-        if (string.IsNullOrWhiteSpace(dsn))
+        var dsn = settings.RagConnectionString;
+        if (dsn is null)
         {
-            Console.Error.WriteLine($"{RagDatabase.Setting} is not set in the environment or the repository's .env (decision 47).");
+            Console.Error.WriteLine(PipelineSettings.MissingRagConnection);
             return 2;
         }
         var source = new NpgsqlConnectionStringBuilder(dsn);

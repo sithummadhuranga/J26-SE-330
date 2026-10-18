@@ -2,7 +2,7 @@
 
 using IngestionPipeline;
 using IngestionPipeline.Pdf;
-using IngestionPipeline.Steps;
+using IngestionPipeline.Commands;
 using WoundRag.Shared.Tokenization;
 
 namespace IngestionPipeline.Tests;

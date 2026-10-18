@@ -9,13 +9,19 @@ using IngestionPipeline.Pdf;
 using UglyToad.PdfPig;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class FiguresCommand
+public sealed class FiguresCommand(RepoPaths paths) : ICommand
 {
+    public string Name => "propose-figures";
+
+    public string Usage => "propose-figures";
+
     private static string FiguresPath(RepoPaths p) => Path.Combine(p.Patterns, "figures.yaml");
 
-    public static int ProposeFigures(RepoPaths paths)
+    public Task<int> RunAsync(string[] args) => Task.FromResult(Run());
+
+    private int Run()
     {
         var aliases = AliasFile.Read(Path.Combine(paths.Patterns, "label_aliases.yaml"))!;
         var sections = SectionsFile.Read(Path.Combine(paths.Patterns, "sections.yaml"))!;

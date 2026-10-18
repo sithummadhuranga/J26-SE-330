@@ -7,11 +7,17 @@ using IngestionPipeline.Pdf;
 using UglyToad.PdfPig;
 using WoundRag.Shared.Tokenization;
 
-namespace IngestionPipeline.Steps;
+namespace IngestionPipeline.Commands;
 
-public static class DivergenceReportCommand
+public sealed class DivergenceReportCommand(RepoPaths paths) : ICommand
 {
-    public static int Write(RepoPaths paths)
+    public string Name => "divergence-report";
+
+    public string Usage => "divergence-report";
+
+    public Task<int> RunAsync(string[] args) => Task.FromResult(Run());
+
+    private int Run()
     {
         var aliases = AliasFile.Read(Path.Combine(paths.Patterns, "label_aliases.yaml"))!;
         var sections = SectionsFile.Read(Path.Combine(paths.Patterns, "sections.yaml"))!;
