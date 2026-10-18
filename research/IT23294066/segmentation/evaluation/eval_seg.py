@@ -110,6 +110,7 @@ def main():
     ap.add_argument("--conf", type=float, default=None)
     ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--imgsz", type=int, default=640)
+    ap.add_argument("--ext", default=".jpg", help="image file extension in --split-dir (.png for calibrated images)")
     ap.add_argument("--out")
     ap.add_argument("--device", default=None)
     args = ap.parse_args()
@@ -117,8 +118,8 @@ def main():
         ap.error("give --conf, or use --sweep on the validation split to choose it")
 
     mask_dir = os.path.join(args.dfuc_train, "DFUC2022_train_masks")
-    ids = sorted(f[:-4] for f in os.listdir(args.split_dir) if f.endswith(".jpg"))
-    paths = [dict(id=i, image=os.path.join(args.split_dir, i + ".jpg"), mask=os.path.join(mask_dir, i + ".png")) for i in ids]
+    ids = sorted(f[: -len(args.ext)] for f in os.listdir(args.split_dir) if f.endswith(args.ext))
+    paths = [dict(id=i, image=os.path.join(args.split_dir, i + args.ext), mask=os.path.join(mask_dir, i + ".png")) for i in ids]
     device = args.device if args.device is not None else pick_device()
     model = YOLO(args.weights)
     records = collect(model, paths, device, args.imgsz)
