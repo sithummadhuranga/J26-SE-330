@@ -50,4 +50,16 @@ public sealed class PassageAndFigureRepositoryTests : IDisposable
         Assert.Empty(await figures.LinkedAsync(TestDatabase.CorpusVersion, ["PAD-R01"], CancellationToken.None));
         Assert.Empty(await figures.LinkedAsync(TestDatabase.CorpusVersion, [], CancellationToken.None));
     }
+
+    [DatabaseFact]
+    public async Task A_figure_image_is_the_stored_bytes_with_their_hash_and_only_from_a_frozen_version()
+    {
+        var figures = new PostgresFigureRepository(_db);
+        var image = await figures.ImageAsync(TestDatabase.CorpusVersion, "PAD-F2", CancellationToken.None);
+        Assert.NotNull(image);
+        Assert.Equal(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(image.Bytes)), image.Sha256);
+        Assert.StartsWith("image/", image.MediaType);
+        Assert.Null(await figures.ImageAsync(TestDatabase.CorpusVersion, "PAD-F99", CancellationToken.None));
+        Assert.Null(await figures.ImageAsync("no-such-version", "PAD-F2", CancellationToken.None));
+    }
 }

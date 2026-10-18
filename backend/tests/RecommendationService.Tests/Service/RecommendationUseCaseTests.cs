@@ -19,7 +19,7 @@ public class RecommendationUseCaseTests
 {
     private const string CaseId = "6f1d3c9e-8a2b-4c5d-9e0f-1a2b3c4d5e6f";
 
-    private static JsonObject Request(string pedalPulses = "present") => JsonNode.Parse($$"""
+    internal static JsonObject Request(string pedalPulses = "present") => JsonNode.Parse($$"""
         {
           "contractVersion": "1.0", "caseId": "{{CaseId}}", "revision": 2,
           "capturedAt": "2026-10-01T09:00:00+05:30", "receivedAt": "2026-10-01T09:20:00+05:30",
