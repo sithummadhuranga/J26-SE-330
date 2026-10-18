@@ -29,8 +29,14 @@ class WoundSegmentation {
   final double postprocessMs;
 }
 
+/// Anything that can segment a wound in the model's 480x640 input. The real one is [WoundSegmenter]; tests use fakes.
+abstract class Segmenter {
+  /// [input]: the R plane, then G, then B, values 0..1, length 3 x 480 x 640.
+  WoundSegmentation segment(Float32List input, {double conf = 0.25});
+}
+
 /// Runs the exported YOLO11n-seg model (input 1x3x480x640 float32, RGB, 0..1) and post-processes the output.
-class WoundSegmenter {
+class WoundSegmenter implements Segmenter {
   WoundSegmenter._(this._interpreter, this._gpu);
 
   final Interpreter _interpreter;
@@ -46,7 +52,7 @@ class WoundSegmenter {
     return WoundSegmenter._(Interpreter.fromFile(modelFile, options: options), gpu);
   }
 
-  /// [input]: the R plane, then G, then B, values 0..1, length 3 x 480 x 640.
+  @override
   WoundSegmentation segment(Float32List input, {double conf = 0.25}) {
     assert(input.length == 3 * kInputH * kInputW, 'expected a 3x480x640 input');
     final t0 = Stopwatch()..start();
