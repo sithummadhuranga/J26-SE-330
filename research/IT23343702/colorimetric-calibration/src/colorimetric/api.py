@@ -83,6 +83,7 @@ class CalibrationResult:
     fitzpatrick_class: str | None           # "I".."VI"; None if skin tone was not estimated
     ita_angle: float | None
     ccm_applied: bool
+    marker_used: bool
     stage_timing: dict[str, float]          # ms; keys as in ProcessResult plus "7_final", "total"
     model_tensor: np.ndarray | None = None  # float32 (size, size, 3) when stage 7 is on
     letterbox_info: LetterboxInfo | None = None
@@ -94,6 +95,7 @@ class CalibrationResult:
             "fitzpatrick_class": self.fitzpatrick_class,
             "ita_angle": None if self.ita_angle is None else round(self.ita_angle, 2),
             "ccm_applied": self.ccm_applied,
+            "marker_used": self.marker_used,
             "stage_timing_ms": {k: round(v, 2) for k, v in self.stage_timing.items()},
             "notes": list(self.notes),
         }
@@ -121,13 +123,19 @@ class CalibrationPipeline:
         self.model_size = model_size
         self.normalise_mode = normalise_mode
 
-    def process(self, image: np.ndarray, wound_bbox: tuple[int, int, int, int] | None = None) -> CalibrationResult:
+    def process(
+        self,
+        image: np.ndarray,
+        wound_bbox: tuple[int, int, int, int] | None = None,
+        marker: np.ndarray | None = None,
+    ) -> CalibrationResult:
         """Run the enabled stages on one uint8 RGB image.
 
         `wound_bbox` is (x, y, w, h) in the input's pixel coordinates (FR1); it is kept out
         of the skin sample used for ITA and the CCM.
+        `marker` is the straightened sticker crop (marker.py); None or unusable = no marker.
         """
-        res = process_image(image, self.config, wound_bbox=wound_bbox)
+        res = process_image(image, self.config, wound_bbox=wound_bbox, marker=marker)
         timing = {k: v for k, v in res.timings_ms.items() if k != "total"}
         tensor, info = None, None
         if PipelineStage.FINAL_NORMALISATION in self.enabled_stages:
@@ -141,6 +149,7 @@ class CalibrationPipeline:
             fitzpatrick_class=res.fst,
             ita_angle=res.ita_angle,
             ccm_applied=res.ccm_applied,
+            marker_used=res.marker_used,
             stage_timing=timing,
             model_tensor=tensor,
             letterbox_info=info,

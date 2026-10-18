@@ -29,6 +29,7 @@ import numpy as np
 from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm, normalise_skin_L_variance
 from .enhance import clahe_median, remove_specular
 from .illumination import gray_world, multi_scale_retinex_L, single_scale_retinex_L, white_balance
+from .marker import correct_with_marker
 from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image, needs_ccm, skin_mask_hsv
 from .preprocess import _check_rgb, process_raw_input
 
@@ -38,6 +39,7 @@ class PipelineConfig:
     stretch: bool = True               # step 1
     illumination: str = "msr"          # step 2: "msr" | "ssr" | "gray_world" | "none"
     retinex_work_size: int | None = 512  # blur on a copy this big (long side); None = exact full size
+    use_marker: bool = True            # grey-patch exposure/WB correction when a sticker crop is passed
     use_white_balance: bool = False    # step 2 extra; off by default (see module docstring)
     classify_skin: bool = True         # step 3; off = no ITA/FST, so no CCM either
     use_ccm: bool = True               # step 4
@@ -58,6 +60,8 @@ class ProcessResult:
     ita_angle: float | None            # None if too few skin pixels
     fst: str | None
     ccm_applied: bool
+    marker_used: bool = False
+    marker_skin_delta_e: dict[str, float] = field(default_factory=dict)
     timings_ms: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
@@ -80,11 +84,16 @@ def process_image(
     rgb: np.ndarray,
     config: PipelineConfig | None = None,
     wound_bbox: tuple[int, int, int, int] | None = None,
+    marker: np.ndarray | None = None,
 ) -> ProcessResult:
     """Run the calibration pipeline on one uint8 RGB image; shape in == shape out.
 
     `wound_bbox` is (x, y, w, h) in the input's own pixel coordinates (unchanged
     geometry means the box stays valid), excluded when sampling skin.
+
+    `marker` is the straightened sticker crop (uint8 RGB, see marker.py). If it is usable,
+    the grey patch corrects exposure and white balance before anything else, so ITA is read
+    from the corrected photo; if not, the skin-pixel behaviour is unchanged and a note says why.
     """
     _check_rgb(rgb)
     cfg = config or PipelineConfig()
@@ -108,6 +117,13 @@ def process_image(
         except ValueError as e:
             notes.append(f"skin tone not estimated: {e}")
             return None
+
+    marker_used, marker_de = False, {}
+    if marker is not None and cfg.use_marker:
+        rgb, m = timed("0_marker", correct_with_marker, rgb, marker)
+        marker_used, marker_de = m.used, m.skin_delta_e
+        if not m.used:
+            notes.append(f"marker rejected, using skin-pixel fallback: {m.reason}")
 
     ita = timed("ita", classify, rgb) if cfg.classify_skin and cfg.classify_on == "raw" else None
 
@@ -155,6 +171,8 @@ def process_image(
         ita_angle=None if ita is None else ita.ita_angle,
         fst=None if ita is None else ita.fitzpatrick_type.value,
         ccm_applied=ccm_applied,
+        marker_used=marker_used,
+        marker_skin_delta_e=marker_de,
         timings_ms=timings,
         notes=notes,
     )
