@@ -7,6 +7,7 @@ import { ActionsMenu, Centered, LoadError, PageHeader, Spinner, StatusChip, Tabl
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 import { RegisterClinicianDialog } from './RegisterClinicianDialog';
+import { ResetPasswordDialog } from './ResetPasswordDialog';
 
 const cliniciansKey = ['clinicians'];
 
@@ -16,7 +17,7 @@ type Action = 'unlock' | 'resetMfa' | 'deactivate';
 const newestFirst = (a: ClinicianSummary, b: ClinicianSummary) =>
   b.createdAt.localeCompare(a.createdAt) || a.username.localeCompare(b.username);
 
-/** Facility clinicians: register, unlock, reset MFA or deactivate (all audited). */
+/** Facility clinicians: register, unlock, reset password or MFA, or deactivate (all audited). */
 export function CliniciansPage() {
   const session = useSession();
   const me = useAdmin()?.username;
@@ -25,6 +26,7 @@ export function CliniciansPage() {
   const queryClient = useQueryClient();
   const [registering, setRegistering] = useState(false);
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [resetting, setResetting] = useState<ClinicianSummary | null>(null);
 
   // The highlight on a newly registered row fades after a few seconds.
   useEffect(() => {
@@ -99,6 +101,12 @@ export function CliniciansPage() {
     reload();
   };
 
+  const onPasswordReset = () => {
+    toast.success('Password reset', `${resetting?.username} is signed out and can sign in with the new password.`);
+    setResetting(null);
+    reload();
+  };
+
   return (
     <>
       <PageHeader
@@ -140,6 +148,7 @@ export function CliniciansPage() {
               const isSelf = c.username === me;
               const items = [
                 ...(c.locked ? [{ label: 'Unlock', onSelect: () => void run('unlock', c) }] : []),
+                ...(c.active && !isSelf ? [{ label: 'Reset password', onSelect: () => setResetting(c) }] : []),
                 ...(c.mfaEnabled ? [{ label: 'Reset MFA', onSelect: () => void run('resetMfa', c) }] : []),
                 ...(c.active && !isSelf ? [{ label: 'Deactivate', danger: true, onSelect: () => void run('deactivate', c) }] : []),
               ];
@@ -169,6 +178,9 @@ export function CliniciansPage() {
         </TableCard>
       )}
       {registering && <RegisterClinicianDialog onClose={() => setRegistering(false)} onRegistered={onRegistered} />}
+      {resetting && (
+        <ResetPasswordDialog clinician={resetting} onClose={() => setResetting(null)} onReset={onPasswordReset} />
+      )}
     </>
   );
 }

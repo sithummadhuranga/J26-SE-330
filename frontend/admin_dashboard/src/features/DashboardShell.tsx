@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router';
 import { useAdmin, useSession } from '../app/sessionContext';
+import { AccountPage } from './AccountPage';
 import { AuditPage } from './AuditPage';
 import { CliniciansPage } from './CliniciansPage';
 import { DevicesPage } from './DevicesPage';
@@ -8,6 +9,7 @@ const tabs = [
   { path: '/clinicians', label: 'Clinicians' },
   { path: '/devices', label: 'Devices' },
   { path: '/audit', label: 'Audit log' },
+  { path: '/account', label: 'My account' },
 ];
 
 /** The signed-in frame: navigation, current user and facility, and sign-out. */
@@ -45,6 +47,7 @@ export function DashboardShell() {
           <Route path="/clinicians" element={<CliniciansPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="*" element={<Navigate to="/clinicians" replace />} />
         </Routes>
       </main>

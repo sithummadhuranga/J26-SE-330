@@ -44,6 +44,12 @@ export interface ClinicianSummary {
   createdAt: string;
 }
 
+/** A started two-step setup: the secret for typing in, and the otpauth:// URI the QR code holds. */
+export interface MfaEnrollment {
+  secret: string;
+  otpauthUri: string;
+}
+
 export interface DeviceSummary {
   deviceId: string;
   registeredAt: string;

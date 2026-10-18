@@ -460,6 +460,36 @@ button {
   margin: 0 24px;
   overflow-x: auto;
 }
+
+/* ---- my account ---- */
+
+.account {
+  margin: 0 24px;
+  padding: 20px 24px;
+  max-width: 560px;
+}
+.account__title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account__qr img {
+  display: block;
+  width: 192px;
+  height: 192px;
+  background: var(--white);
+}
+.account__secret code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+}
+.account__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .table {
   width: 100%;
   border-collapse: collapse;

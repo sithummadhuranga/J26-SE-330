@@ -1,5 +1,5 @@
 import { clientId } from './config';
-import type { AuthAuditEntry, ClinicianSummary, DeviceSummary, TokenPair } from './models';
+import type { AuthAuditEntry, ClinicianSummary, DeviceSummary, MfaEnrollment, TokenPair } from './models';
 
 /** No HTTP answer at all: gateway down, CORS refused, timeout. */
 export class TransportError extends Error {
@@ -92,6 +92,23 @@ export class AdminApi {
 
   async resetMfa(token: string, username: string): Promise<void> {
     await this.post(`v1/admin/clinicians/${enc(username)}/reset-mfa`, null, token);
+  }
+
+  /** Also clears a lockout and signs the clinician out everywhere. Throws ApiError 400 PASSWORD_TOO_SHORT, 409 CANNOT_RESET_OWN_PASSWORD. */
+  async resetPassword(token: string, username: string, password: string): Promise<void> {
+    await this.post(`v1/admin/clinicians/${enc(username)}/reset-password`, { password }, token);
+  }
+
+  // ---- own account: two-step sign-in ----
+
+  /** Starts two-step setup with a new secret; MFA turns on only after confirmMfa. Throws ApiError 409 MFA_ALREADY_ENABLED. */
+  mfaEnroll(token: string): Promise<MfaEnrollment> {
+    return this.post('v1/auth/mfa/enroll', null, token) as Promise<MfaEnrollment>;
+  }
+
+  /** Throws ApiError 400 INVALID_TOTP, or 409 MFA_NOT_ENROLLED, MFA_ALREADY_ENABLED. */
+  async confirmMfa(token: string, code: string): Promise<void> {
+    await this.post('v1/auth/mfa/confirm', { code }, token);
   }
 
   // ---- devices ----

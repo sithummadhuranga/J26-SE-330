@@ -121,8 +121,35 @@ status, body = login(NURSE, PASSWORD, DEVICE_A)
 check("5 failures lock the account", status == 400 and body["code"] == "CREDENTIAL_LOCKED", f"{status} {body}")
 status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/unlock", token=admin_a)
 check("admin unlocks (204)", status == 204, f"{status}")
-status, _ = login(NURSE, PASSWORD, DEVICE_A)
+status, body = login(NURSE, PASSWORD, DEVICE_A)
 check("login works after unlock", status == 200, f"{status}")
+
+print("Password reset")
+before_reset = body["refreshToken"]
+NEW_PASSWORD = "Reset-Pass-" + secrets.token_hex(4)
+for _ in range(5):
+    login(NURSE, "wrong-password", DEVICE_A)
+status, body = http("POST", f"/v1/admin/clinicians/{NURSE}/reset-password", {"password": "short"}, admin_a)
+check("a short new password is refused (400)", status == 400 and body["code"] == "PASSWORD_TOO_SHORT", f"{status} {body}")
+status, body = http("POST", f"/v1/admin/clinicians/{NURSE}/reset-password", {"password": NEW_PASSWORD}, admin_b)
+check("another facility's admin gets 404 for the reset", status == 404, f"{status} {body}")
+status, body = http("POST", f"/v1/admin/clinicians/{ADMIN_A}/reset-password", {"password": NEW_PASSWORD}, admin_a)
+check("admin cannot reset their own password",
+      status == 409 and body["code"] == "CANNOT_RESET_OWN_PASSWORD", f"{status} {body}")
+status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/reset-password", {"password": NEW_PASSWORD}, nurse)
+check("a nurse cannot reset passwords", status in (401, 403), f"{status}")
+status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/reset-password", {"password": NEW_PASSWORD}, admin_a)
+check("admin resets the password of a locked nurse (204)", status == 204, f"{status}")
+status, _ = refresh(before_reset)
+check("the session from before the reset can no longer refresh", status == 400, f"{status}")
+check("every session of the nurse is revoked",
+      sql(f"""select count(*) from clinical.clinician_session s join clinical.clinician c using (clinician_id)
+              where c.username = '{NURSE}' and s.revoked_at is null""") == "0")
+status, body = login(NURSE, PASSWORD, DEVICE_A)
+check("the old password no longer works", status == 400 and body["code"] == "INVALID_CREDENTIALS", f"{status} {body}")
+status, body = login(NURSE, NEW_PASSWORD, DEVICE_A)
+check("the new password works, and the reset cleared the lockout", status == 200, f"{status} {body}")
+nurse_refresh = body["refreshToken"]
 
 status, body = http("POST", f"/v1/admin/clinicians/{ADMIN_A}/deactivate", token=admin_a)
 check("admin cannot deactivate themselves", status == 409 and body["code"] == "CANNOT_DEACTIVATE_SELF", f"{status} {body}")
@@ -136,10 +163,12 @@ check("... and cannot refresh an existing session", status == 400, f"{status}")
 print("Audit trail")
 status, body = http("GET", "/v1/admin/auth-audit?limit=500", token=admin_a)
 actions = {e["action"] for e in body if e["username"] == NURSE} if status == 200 else set()
-expected = {"REGISTER", "LOGIN", "MFA_ENROLL", "MFA_CONFIRM", "MFA_RESET", "LOCKOUT", "UNLOCK", "DEACTIVATE"}
+expected = {"REGISTER", "LOGIN", "MFA_ENROLL", "MFA_CONFIRM", "MFA_RESET", "LOCKOUT", "UNLOCK", "PASSWORD_RESET",
+            "DEACTIVATE"}
 check("admin audit log shows the nurse's whole lifecycle", expected <= actions, f"missing {expected - actions}")
 by_admin = {e["action"] for e in body if e["username"] == NURSE and e["actorUsername"] == ADMIN_A}
-check("admin actions carry the admin as actor", {"REGISTER", "MFA_RESET", "UNLOCK", "DEACTIVATE"} <= by_admin, by_admin)
+check("admin actions carry the admin as actor",
+      {"REGISTER", "MFA_RESET", "UNLOCK", "PASSWORD_RESET", "DEACTIVATE"} <= by_admin, by_admin)
 failed = [e for e in body if e["username"] == NURSE and not e["success"]]
 check("failed attempts are recorded with a reason",
       {"MFA_REQUIRED", "INVALID_TOTP", "INVALID_CREDENTIALS"} <= {e["reasonCode"] for e in failed})

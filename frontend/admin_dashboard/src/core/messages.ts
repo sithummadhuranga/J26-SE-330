@@ -34,6 +34,7 @@ const actionLabels: Record<string, string> = {
   MFA_CONFIRM: 'Two-step turned on',
   MFA_RESET: 'Two-step reset',
   DEVICE_REVOKE: 'Device revoked',
+  PASSWORD_RESET: 'Password reset',
 };
 
 /** An audit action as an admin would say it. */
@@ -71,7 +72,12 @@ export const codes: Record<string, string> = {
   MISSING_FULL_NAME: 'Enter the full name.',
   UNKNOWN_FACILITY: 'Your facility is not registered. Contact the system administrator.',
   CANNOT_DEACTIVATE_SELF: 'You cannot deactivate your own account. Ask another admin.',
+  CANNOT_RESET_OWN_PASSWORD: 'You cannot reset your own password here. Ask another admin.',
   NOT_FOUND: 'This item could not be found. It may have been changed by someone else; refresh the list.',
+  // Two-step sign-in
+  INVALID_TOTP: 'That code is not right. Check the time on your phone and enter the newest code.',
+  MFA_ALREADY_ENABLED: 'Two-step sign-in is already on for your account.',
+  MFA_NOT_ENROLLED: 'Setup was not started or has expired. Start again.',
   // Devices
   DEVICE_ALREADY_REVOKED: 'This device is already revoked.',
 };

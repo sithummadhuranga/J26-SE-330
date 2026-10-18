@@ -111,6 +111,47 @@ describe('clinicians (real identity service and database)', () => {
     });
   });
 
+  it('resetting a password unlocks the clinician, and only the new password works', async () => {
+    const admin = await adminSession();
+    const name = uniqueName('reset');
+    await registerClinician(admin, name);
+    expect((await mobileLogin(name, strongPassword, `dev-${name}`)).status).toBe(200);
+    for (let i = 0; i < 5; i++) await mobileLogin(name, 'wrong-password-123', `dev-${name}`);
+    expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.locked).toBe(true);
+    const user = await openClinicians();
+
+    await user.click(within(rowOf(name)).getByRole('button', { name: `Actions for ${name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset password' }));
+    const dialog = screen.getByRole('dialog', { name: `Reset password for ${name}` });
+    await user.type(within(dialog).getByLabelText('New password'), 'short');
+    await user.click(within(dialog).getByRole('button', { name: 'Reset password' }));
+    expect(within(dialog).getByText('At least 12 characters')).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText('New password'));
+    await user.type(within(dialog).getByLabelText('New password'), 'New-E2e-Pass-2026!');
+    await user.click(within(dialog).getByRole('button', { name: 'Reset password' }));
+
+    expect(await findToast(`${name} is signed out and can sign in with the new password.`)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.locked).toBe(false);
+    expect(await mobileLogin(name, strongPassword, `dev-${name}`)).toMatchObject({ status: 400, code: 'INVALID_CREDENTIALS' });
+    expect((await mobileLogin(name, 'New-E2e-Pass-2026!', `dev-${name}`)).status).toBe(200);
+  });
+
+  it('an admin cannot reset their own password: the option is not offered, and the server refuses it too', async () => {
+    const user = await openClinicians();
+    const actions = within(rowOf(`${demoAdmin.username} (you)`)).queryByRole('button', {
+      name: `Actions for ${demoAdmin.username}`,
+    });
+    if (actions) {
+      await user.click(actions);
+      expect(screen.queryByRole('menuitem', { name: 'Reset password' })).not.toBeInTheDocument();
+    }
+    const admin = await adminSession();
+    await expect(
+      admin.authorized((t) => admin.api.resetPassword(t, demoAdmin.username, 'Another-Pass-2026!')),
+    ).rejects.toMatchObject({ code: 'CANNOT_RESET_OWN_PASSWORD' });
+  });
+
   it('a username with unusual characters is escaped in the URL, and an unknown one is not found', async () => {
     const admin = await adminSession();
     await expect(admin.authorized((t) => admin.api.unlock(t, 'no such/user'))).rejects.toMatchObject({ status: 404 });

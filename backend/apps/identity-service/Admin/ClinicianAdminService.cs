@@ -6,6 +6,8 @@ namespace IdentityService.Admin;
 
 public sealed record RegisterClinicianRequest(string Username, string Password, string FullName, string Role);
 
+public sealed record ResetPasswordRequest(string? Password);
+
 public sealed record ClinicianSummary(Guid ClinicianId, string Username, string FullName, string Role, bool Active,
     bool Locked, bool MfaEnabled, DateTime CreatedAt);
 
@@ -117,6 +119,26 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             WHERE clinician_id = @id
             """);
 
+    /// <summary>
+    /// For a forgotten password: sets a new one, clears any lockout and revokes every session, so whoever might know
+    /// the old password is signed out too. An admin cannot reset their own password here; another admin does it.
+    /// </summary>
+    public async Task<string?> ResetPasswordAsync(Guid actorId, string facilityId, string username, string? password,
+        CancellationToken ct)
+    {
+        if (password is null || password.Length < MinPasswordLength) return "PASSWORD_TOO_SHORT";
+        if (await ResolveAsync(facilityId, username, ct) == actorId) return "CANNOT_RESET_OWN_PASSWORD";
+        var (hash, salt) = hasher.Hash(password);
+        (string, object?)[] args = [("h", Convert.ToBase64String(hash)), ("s", salt)];
+        return await ChangeAsync(actorId, facilityId, username, "PASSWORD_RESET", ct, args,
+            """
+            UPDATE clinical.clinician_credential
+            SET password_hash = @h, password_salt = @s, failed_attempts = 0, locked_until = NULL
+            WHERE clinician_id = @id
+            """,
+            "UPDATE clinical.clinician_session SET revoked_at = now() WHERE clinician_id = @id AND revoked_at IS NULL");
+    }
+
     /// <summary>Recent auth events for clinicians and devices of this facility, newest first.</summary>
     public async Task<IReadOnlyList<AuthAuditEntry>> AuditLogAsync(string facilityId, int limit, CancellationToken ct)
     {
@@ -150,8 +172,13 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
     }
 
     /// <summary>Runs the statements for one clinician of the admin's facility and audits the action.</summary>
+    private Task<string?> ChangeAsync(Guid actorId, string facilityId, string username, string action,
+        CancellationToken ct, params string[] statements) =>
+        ChangeAsync(actorId, facilityId, username, action, ct, [], statements);
+
+    /// <param name="args">Extra parameters for the statements, besides @id.</param>
     private async Task<string?> ChangeAsync(Guid actorId, string facilityId, string username, string action,
-        CancellationToken ct, params string[] statements)
+        CancellationToken ct, (string Name, object? Value)[] args, params string[] statements)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -168,7 +195,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         if (clinicianId is null) return "NOT_FOUND";
 
         foreach (var sql in statements)
-            await Sql.ExecAsync(conn, tx, sql, ct, ("id", clinicianId.Value));
+            await Sql.ExecAsync(conn, tx, sql, ct, [("id", clinicianId.Value), .. args]);
         await AuthAudit.WriteAsync(conn, tx, action, username, clinicianId, null, true, null, ct, actorId);
         await tx.CommitAsync(ct);
         return null;

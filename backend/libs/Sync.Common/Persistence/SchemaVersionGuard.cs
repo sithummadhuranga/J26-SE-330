@@ -34,7 +34,7 @@ public static class ExpectedSchemaVersions
     {
         ["clinical"] = 10,
         ["messaging"] = 2,
-        ["audit"] = 4,
+        ["audit"] = 5,
         ["sync"] = 2,
         ["baseline"] = 1,
         ["ablation"] = 1,
