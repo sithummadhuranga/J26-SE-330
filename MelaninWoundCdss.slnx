@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/backend/apps/recommendation-service/">
     <Project Path="backend/apps/recommendation-service/RecommendationService.csproj" />
+    <Project Path="backend/apps/recommendation-service/WoundRag.Core/WoundRag.Core.csproj" />
     <Project Path="backend/apps/recommendation-service/WoundRag.Shared/WoundRag.Shared.csproj" />
   </Folder>
   <Folder Name="/backend/apps/sync/" />

@@ -21,6 +21,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\apps\recommendation-service\RecommendationService.csproj" />
+    <ProjectReference Include="..\..\apps\recommendation-service\WoundRag.Core\WoundRag.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The sources of truth Core is checked against: her request contract and the corpus schema. -->
+  <ItemGroup>
+    <None Include="..\..\..\contracts\rag-request.schema.json" Link="contracts\rag-request.schema.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\db\migrations\rag\0003_guideline_chunks.sql" Link="migrations\0003_guideline_chunks.sql"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
