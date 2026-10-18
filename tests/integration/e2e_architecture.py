@@ -203,14 +203,16 @@ check("another facility does not see these changes (facility scope)",
       status == 200 and not any(c["assessmentId"] == a for c in changes_b), status)
 
 # ------------------------------------------------------------------------------------------------------------
-section("§7.3 / §12 / ADR 0003: identity and tokens")
+section("§7.3 / §12 / ADR 0003, 0006: identity and tokens")
 header = json.loads(base64.urlsafe_b64decode(token.split(".")[0] + "=="))
 claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
 check("access token is RS256 with a key id", header.get("alg") == "RS256" and header.get("kid"), header)
 check("claims sub, device_id, facility_id, role, client_id; 15-minute lifetime",
       {"sub", "device_id", "facility_id", "role", "client_id"} <= claims.keys() and
       840 <= claims["exp"] - int(time.time()) <= 905, claims)
-_, jwks = http("GET", "/.well-known/jwks.json")
+# The JWKS address comes from discovery, as a resource server finds it (OpenIddict serves it at /.well-known/jwks).
+_, discovery = http("GET", "/.well-known/openid-configuration")
+_, jwks = http("GET", "/" + discovery["jwks_uri"].split("/", 3)[3])
 check("JWKS publishes only public key material", all("d" not in k and "p" not in k for k in jwks["keys"]), jwks)
 none_token = b64url(b'{"alg":"none","typ":"JWT"}') + "." + token.split(".")[1] + "."
 status, _ = http("GET", "/v1/sync/changes", token=none_token)
@@ -225,9 +227,11 @@ hs_head = b64url(b'{"alg":"HS256","typ":"JWT"}') + "." + token.split(".")[1]
 hs_token = hs_head + "." + b64url(_hmac.new(n, hs_head.encode(), hashlib.sha256).digest())
 status, _ = http("GET", "/v1/sync/changes", token=hs_token)
 check("HS256 token signed with the public key (algorithm confusion) is refused", status == 401, status)
+# OpenID Connect refresh tokens are encrypted (JWE) and never stored; the session row only keeps random bytes.
 digest = hashlib.sha256(refresh.encode()).hexdigest()
-check("refresh token is stored only as its SHA-256 hash",
-      sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = decode('{digest}', 'hex')") == "1"
+check("refresh token is an encrypted token that the database never stores, in any form",
+      len(refresh.split(".")) == 5
+      and sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = decode('{digest}', 'hex')") == "0"
       and sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = convert_to('{refresh}', 'UTF8')") == "0")
 check("every credential has its own salt",
       sql("select count(*) - count(distinct password_salt) from clinical.clinician_credential") == "0")
