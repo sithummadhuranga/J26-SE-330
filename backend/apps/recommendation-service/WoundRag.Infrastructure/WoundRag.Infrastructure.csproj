@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Dapper" />
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Sql/*.sql" LogicalName="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Composition/response_sections.yaml" LogicalName="response_sections.yaml" />
   </ItemGroup>
 
 </Project>

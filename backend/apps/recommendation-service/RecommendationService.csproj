@@ -23,9 +23,11 @@
     <ProjectReference Include="WoundRag.Infrastructure/WoundRag.Infrastructure.csproj" />
   </ItemGroup>
 
-  <!-- Member 4's request contract, copied next to the binary: the reader validates against it, never a copy of ours. -->
+  <!-- Member 4's contracts, copied next to the binary: requests and responses are checked against hers, never a copy. -->
   <ItemGroup>
     <None Include="../../../contracts/rag-request.schema.json" Link="contracts/rag-request.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../../contracts/rag-response.schema.json" Link="contracts/rag-response.schema.json"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

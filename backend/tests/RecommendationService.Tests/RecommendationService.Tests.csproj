@@ -31,6 +31,7 @@
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\research\IT23294202\guideline-corpus\manifests\iwgdf-2023.r2.json" Link="manifests\iwgdf-2023.r2.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\Cases\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

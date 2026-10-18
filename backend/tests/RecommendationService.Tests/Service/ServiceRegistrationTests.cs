@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RecommendationService.Configuration;
 using RecommendationService.Recommendations;
+using WoundRag.Core.Composition;
 using WoundRag.Core.Generation;
 using WoundRag.Infrastructure.Corpus;
 using WoundRag.Infrastructure.Generation;
@@ -61,6 +62,21 @@ public class ServiceRegistrationTests
         Assert.All(chain.Generators, g => Assert.IsType<ModelStudioGenerator>(g));
         Assert.Equal(["deepseek-v4.1-flash", "qwen3.7-flash-2026-07-15"], chain.Generators.Select(g => g.Model));
         Assert.Same(chain, services.GetRequiredService<GenerationChain>());
+    }
+
+    [Fact]
+    public void The_protocol_service_resolves_with_the_confirmed_r2_placement()
+    {
+        using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
+        Assert.NotNull(services.GetRequiredService<ProtocolService>());
+        Assert.Equal(166, services.GetRequiredService<SectionPlacement>().Sections.Count);
+    }
+
+    [Fact]
+    public void A_placement_for_another_corpus_version_stops_start_up()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddRecommendationService(Settings with { CorpusVersion = "iwgdf-2023.r9" }));
+        Assert.Contains("iwgdf-2023.r2", e.Message);
     }
 
     [Fact]
