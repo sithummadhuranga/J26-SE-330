@@ -15,7 +15,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="WoundRag.Core/WoundRag.Core.csproj" />
     <ProjectReference Include="WoundRag.Infrastructure/WoundRag.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Member 4's request contract, copied next to the binary: the reader validates against it, never a copy of ours. -->
+  <ItemGroup>
+    <None Include="../../../contracts/rag-request.schema.json" Link="contracts/rag-request.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
