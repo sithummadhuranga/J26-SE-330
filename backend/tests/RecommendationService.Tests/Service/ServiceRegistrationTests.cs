@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RecommendationService.Configuration;
+using WoundRag.Infrastructure.Corpus;
 
 namespace RecommendationService.Tests.Service;
 
@@ -19,6 +20,14 @@ public class ServiceRegistrationTests
         var connection = new NpgsqlConnectionStringBuilder(dataSource.ConnectionString);
         Assert.Equal(("db", "cdss", "rag_svc"), (connection.Host, connection.Database, connection.Username));
         Assert.Same(Settings, services.GetRequiredService<RecommendationSettings>());
+    }
+
+    [Fact]
+    public void The_corpus_is_read_through_one_repository_over_the_shared_data_source()
+    {
+        using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
+        Assert.IsType<PostgresCorpusRepository>(services.GetRequiredService<ICorpusRepository>());
+        Assert.Same(services.GetRequiredService<ICorpusRepository>(), services.GetRequiredService<ICorpusRepository>());
     }
 
     [Fact]

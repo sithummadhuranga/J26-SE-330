@@ -1,4 +1,4 @@
-<!-- The recommendation service's database access. For now only retrieval, which the rerank and verify steps also run. -->
+<!-- The recommendation service's database access: the frozen corpus and retrieval (which the rerank and verify steps also run). -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../WoundRag.Core/WoundRag.Core.csproj" />
     <ProjectReference Include="../WoundRag.Shared/WoundRag.Shared.csproj" />
   </ItemGroup>
 
