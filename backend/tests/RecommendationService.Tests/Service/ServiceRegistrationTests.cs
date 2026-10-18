@@ -4,14 +4,18 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RecommendationService.Configuration;
 using RecommendationService.Recommendations;
+using WoundRag.Core.Generation;
 using WoundRag.Infrastructure.Corpus;
+using WoundRag.Infrastructure.Generation;
 using WoundRag.Infrastructure.Retrieval;
 
 namespace RecommendationService.Tests.Service;
 
 public class ServiceRegistrationTests
 {
-    private static readonly RecommendationSettings Settings = new("Host=db;Database=cdss;Username=rag_svc", "iwgdf-2023.r2");
+    private static readonly GenerationSettings NoKeys = new(["deepseek-modelstudio", "qwen"], TimeSpan.FromSeconds(20), null, null);
+
+    private static readonly RecommendationSettings Settings = new("Host=db;Database=cdss;Username=rag_svc", "iwgdf-2023.r2", NoKeys);
 
     [Fact]
     public void One_data_source_serves_the_configured_database()
@@ -39,6 +43,24 @@ public class ServiceRegistrationTests
         Assert.IsType<PostgresGuidelineRetrieval>(services.GetRequiredService<IGuidelineRetrieval>());
         Assert.IsType<PostgresRerankScoreRepository>(services.GetRequiredService<IRerankScoreRepository>());
         Assert.NotNull(services.GetRequiredService<CaseRetrievalService>());
+    }
+
+    [Fact]
+    public void Without_keys_the_chain_has_no_model_to_call()
+    {
+        using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
+        Assert.Empty(services.GetRequiredService<GenerationChain>().Generators);
+    }
+
+    [Fact]
+    public void With_keys_the_chain_asks_deepseek_then_qwen_through_the_http_client_factory()
+    {
+        var withKeys = Settings with { Generation = NoKeys with { ApiKey = "k", WorkspaceId = "ws" } };
+        using var services = new ServiceCollection().AddRecommendationService(withKeys).BuildServiceProvider();
+        var chain = services.GetRequiredService<GenerationChain>();
+        Assert.All(chain.Generators, g => Assert.IsType<ModelStudioGenerator>(g));
+        Assert.Equal(["deepseek-v4.1-flash", "qwen3.7-flash-2026-07-15"], chain.Generators.Select(g => g.Model));
+        Assert.Same(chain, services.GetRequiredService<GenerationChain>());
     }
 
     [Fact]

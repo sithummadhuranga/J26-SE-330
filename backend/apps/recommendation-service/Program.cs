@@ -3,9 +3,12 @@
 using RecommendationService.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddRecommendationService(RecommendationSettings.From(builder.Configuration));
+var settings = RecommendationSettings.From(builder.Configuration);
+builder.Services.AddRecommendationService(settings);
 
 var app = builder.Build();
+if (!settings.Generation.HasKeys)
+    app.Logger.LogWarning("{ApiKey} and {Workspace} are not set: every answer will be extractive.", GenerationSettings.ApiKeyKey, GenerationSettings.WorkspaceKey);
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.Run();
 
