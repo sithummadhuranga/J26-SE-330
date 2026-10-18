@@ -31,15 +31,19 @@ class WoundSegmentation {
 
 /// Runs the exported YOLO11n-seg model (input 1x3x480x640 float32, RGB, 0..1) and post-processes the output.
 class WoundSegmenter {
-  WoundSegmenter._(this._interpreter);
+  WoundSegmenter._(this._interpreter, this._gpu);
 
   final Interpreter _interpreter;
+  final GpuDelegateV2? _gpu;
   final Float32List _pred = Float32List(37 * kAnchors);
   final Float32List _proto = Float32List(kMaskDim * kProtoH * kProtoW);
 
-  factory WoundSegmenter.fromFile(File modelFile, {int threads = 4}) {
+  /// [useGpu] adds the Android GPU delegate; the model then runs in 16-bit float on the GPU, so check its accuracy.
+  factory WoundSegmenter.fromFile(File modelFile, {int threads = 4, bool useGpu = false}) {
     final options = InterpreterOptions()..threads = threads;
-    return WoundSegmenter._(Interpreter.fromFile(modelFile, options: options));
+    final gpu = useGpu ? GpuDelegateV2() : null;
+    if (gpu != null) options.addDelegate(gpu);
+    return WoundSegmenter._(Interpreter.fromFile(modelFile, options: options), gpu);
   }
 
   /// [input]: the R plane, then G, then B, values 0..1, length 3 x 480 x 640.
@@ -62,7 +66,10 @@ class WoundSegmenter {
     );
   }
 
-  void close() => _interpreter.close();
+  void close() {
+    _interpreter.close();
+    _gpu?.delete();
+  }
 }
 
 /// Converts the RGBA pixels of a 640x480 image into the model's input layout. Other sizes need resizing first, which

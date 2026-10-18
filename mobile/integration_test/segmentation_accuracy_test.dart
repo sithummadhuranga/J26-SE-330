@@ -15,6 +15,8 @@ import 'package:path_provider/path_provider.dart';
 /// and push_parity_files.sh copies them over with the model; pass wound_accuracy as its last argument. The images are
 /// DFUC2022 photos (research use only), so they are pushed for the test and never bundled in the app.
 ///
+/// Add --dart-define=WOUND_THREADS=n for the CPU thread count (default 4) or --dart-define=WOUND_GPU=true for the GPU.
+///
 /// The score is compared with the Python result for the same model and images, which the manifest holds. They should agree
 /// within 0.01 Dice. Timings are from whatever device runs this. An emulator is not a phone, so take latency from the real
 /// handset.
@@ -22,6 +24,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   const enabled = bool.fromEnvironment('WOUND_ACCURACY');
+  const threads = int.fromEnvironment('WOUND_THREADS', defaultValue: 4);
+  const useGpu = bool.fromEnvironment('WOUND_GPU');
   const conf = 0.25;
 
   testWidgets('on-device Dice matches the Python result', skip: !enabled, (tester) async {
@@ -45,7 +49,7 @@ void main() {
     }
     await Future<void>.delayed(const Duration(seconds: 2));
 
-    final segmenter = WoundSegmenter.fromFile(modelFile);
+    final segmenter = WoundSegmenter.fromFile(modelFile, threads: threads, useGpu: useGpu);
     final dice = <double>[];
     final iou = <double>[];
     final inferenceMs = <double>[];
@@ -86,7 +90,7 @@ void main() {
     final meanDice = mean(dice);
     final pythonDice = (manifest['python_mean_dice'] as num).toDouble();
     // ignore: avoid_print
-    print('RESULT ${ids.length} images, model ${manifest['model']}, conf $conf: '
+    print('RESULT ${ids.length} images, model ${manifest['model']}, ${useGpu ? 'GPU' : '$threads CPU threads'}, conf $conf: '
         'mean Dice ${meanDice.toStringAsFixed(4)} (Python ${pythonDice.toStringAsFixed(4)}), '
         'mean IoU ${mean(iou).toStringAsFixed(4)} (Python ${(manifest['python_mean_iou'] as num).toStringAsFixed(4)}), '
         'pooled Dice ${(2 * inter / (predSum + gtSum)).toStringAsFixed(4)} (Python ${(manifest['python_pooled_dice'] as num).toStringAsFixed(4)}), '
