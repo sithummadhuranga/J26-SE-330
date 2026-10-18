@@ -3,7 +3,9 @@
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using RecommendationService.Recommendations;
 using WoundRag.Infrastructure.Corpus;
+using WoundRag.Infrastructure.Retrieval;
 
 namespace RecommendationService.Configuration;
 
@@ -15,6 +17,9 @@ public static class ServiceRegistration
         services.AddSingleton(_ => NpgsqlDataSource.Create(settings.ConnectionString));
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ICorpusRepository, PostgresCorpusRepository>();
+        services.AddSingleton<IGuidelineRetrieval, PostgresGuidelineRetrieval>();
+        services.AddSingleton<IRerankScoreRepository, PostgresRerankScoreRepository>();
+        services.AddSingleton<CaseRetrievalService>();
         return services;
     }
 }

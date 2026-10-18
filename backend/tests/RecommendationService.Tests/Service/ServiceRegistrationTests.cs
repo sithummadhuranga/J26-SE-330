@@ -3,7 +3,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using RecommendationService.Configuration;
+using RecommendationService.Recommendations;
 using WoundRag.Infrastructure.Corpus;
+using WoundRag.Infrastructure.Retrieval;
 
 namespace RecommendationService.Tests.Service;
 
@@ -28,6 +30,15 @@ public class ServiceRegistrationTests
         using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
         Assert.IsType<PostgresCorpusRepository>(services.GetRequiredService<ICorpusRepository>());
         Assert.Same(services.GetRequiredService<ICorpusRepository>(), services.GetRequiredService<ICorpusRepository>());
+    }
+
+    [Fact]
+    public void Retrieval_scores_and_the_case_retrieval_service_resolve()
+    {
+        using var services = new ServiceCollection().AddRecommendationService(Settings).BuildServiceProvider();
+        Assert.IsType<PostgresGuidelineRetrieval>(services.GetRequiredService<IGuidelineRetrieval>());
+        Assert.IsType<PostgresRerankScoreRepository>(services.GetRequiredService<IRerankScoreRepository>());
+        Assert.NotNull(services.GetRequiredService<CaseRetrievalService>());
     }
 
     [Fact]
