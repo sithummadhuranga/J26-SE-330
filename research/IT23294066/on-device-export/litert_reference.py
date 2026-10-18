@@ -25,13 +25,15 @@ CONF, IOU, MAX_DET = 0.25, 0.7, 300
 
 def letterbox(rgb, size=(INPUT_H, INPUT_W), pad_value=114):
     """Fit an RGB image into size (h, w) keeping its aspect ratio, as Ultralytics' LetterBox does with centre padding.
+    Shrinking uses area averaging (Ultralytics uses bilinear, which aliases on 12-megapixel phone photos); enlarging is
+    bilinear. Photos that are already 640x480 are not resized, so nothing changes for the DFUC images.
     Returns the canvas, the scale used, and the (left, top) padding."""
     h0, w0 = rgb.shape[:2]
     r = min(size[0] / h0, size[1] / w0)
     new_w, new_h = round(w0 * r), round(h0 * r)
     dw, dh = (size[1] - new_w) / 2, (size[0] - new_h) / 2
     if (w0, h0) != (new_w, new_h):
-        rgb = cv2.resize(rgb, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        rgb = cv2.resize(rgb, (new_w, new_h), interpolation=cv2.INTER_AREA if r < 1 else cv2.INTER_LINEAR)
     top, bottom = round(dh - 0.1), round(dh + 0.1)
     left, right = round(dw - 0.1), round(dw + 0.1)
     canvas = cv2.copyMakeBorder(rgb, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(pad_value,) * 3)
