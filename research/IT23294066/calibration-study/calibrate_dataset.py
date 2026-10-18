@@ -24,15 +24,22 @@ sys.path.insert(0, os.path.join(REPO, "research", "IT23343702", "colorimetric-ca
 from colorimetric import pipeline as P  # noqa: E402
 from colorimetric.api import CalibrationPipeline  # noqa: E402
 
+# Settings of our own that are not in the calibration code's ablation list. Everything not named stays at its default.
+CUSTOM_VARIANTS = {
+    "ccm_only": dataclasses.replace(P.PipelineConfig(), stretch=False, illumination="none", use_ccm=True,
+                                    use_specular=False, use_clahe=False),
+}
+VARIANTS = {**P.ABLATION_VARIANTS, **CUSTOM_VARIANTS}
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", required=True)
-    ap.add_argument("--variant", required=True, choices=sorted(P.ABLATION_VARIANTS))
+    ap.add_argument("--variant", required=True, choices=sorted(VARIANTS))
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    config = P.ABLATION_VARIANTS[args.variant]
+    config = VARIANTS[args.variant]
     pipeline = CalibrationPipeline(config=config)
     commit = subprocess.run(["git", "-C", REPO, "log", "-1", "--format=%H", "--", "research/IT23343702"],
                             capture_output=True, text=True).stdout.strip()
