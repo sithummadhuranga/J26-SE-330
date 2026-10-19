@@ -25,30 +25,14 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from colorimetric.ita import skin_mask_hsv  # noqa: E402
+from colorimetric.gate import FEATURE_NAMES, context_features  # noqa: E402
 
-NAMES = ["skin_L", "skin_a", "skin_b", "skin_ita", "skin_L_std", "img_L_p5", "img_L_p50", "img_L_p95",
-         "L_ratio", "skin_frac", "skin_hue", "skin_sat", "ita_minus_img"]
+NAMES = list(FEATURE_NAMES)
 ITA_ONLY = [3]
 
 
 def image_features(bgr: np.ndarray) -> np.ndarray | None:
-    h, w = bgr.shape[:2]
-    s = 256 / max(h, w)
-    if s < 1:
-        bgr = cv2.resize(bgr, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    m = skin_mask_hsv(rgb)
-    if m.sum() < 200:
-        return None
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
-    L, a, b = lab[..., 0] * 100 / 255, lab[..., 1] - 128, lab[..., 2] - 128
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
-    sl, sa, sb = L[m].mean(), a[m].mean(), b[m].mean()
-    ita = np.degrees(np.arctan2(sl - 50, sb))
-    p5, p50, p95 = np.percentile(L, [5, 50, 95])
-    return np.array([sl, sa, sb, ita, L[m].std(), p5, p50, p95, sl / max(L.mean(), 1e-3), m.mean(),
-                     hsv[..., 0][m].mean() * 2, hsv[..., 1][m].mean() / 2.55, ita - np.degrees(np.arctan2(p50 - 50, 20))], dtype=np.float32)
+    return context_features(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
 
 def load_features(data: Path, cache: Path):
