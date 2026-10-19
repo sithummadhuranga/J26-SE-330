@@ -1,5 +1,5 @@
 import { clientId } from './config';
-import type { AuthAuditEntry, ClinicianSummary, DeviceSummary, MfaEnrollment, TokenPair } from './models';
+import type { AuthAuditEntry, ClinicianSummary, DeviceSummary, MfaEnrollment, MyProfile, TokenPair } from './models';
 
 /** No HTTP answer at all: gateway down, CORS refused, timeout. */
 export class TransportError extends Error {
@@ -102,6 +102,13 @@ export class AdminApi {
   /** Also clears a lockout and signs the clinician out everywhere. Throws ApiError 400 PASSWORD_TOO_SHORT, 409 CANNOT_RESET_OWN_PASSWORD. */
   async resetPassword(token: string, username: string, password: string): Promise<void> {
     await this.post(`v1/admin/clinicians/${enc(username)}/reset-password`, { password }, token);
+  }
+
+  // ---- own account ----
+
+  /** Your own profile; the account is the one in the token. Throws ApiError 404 once the account is deactivated. */
+  me(token: string): Promise<MyProfile> {
+    return this.get('v1/me', token) as Promise<MyProfile>;
   }
 
   // ---- own account: two-step sign-in ----

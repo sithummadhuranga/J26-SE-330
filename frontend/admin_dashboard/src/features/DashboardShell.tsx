@@ -2,12 +2,12 @@ import type { ReactNode } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router';
 import { useAdmin, useSession } from '../app/sessionContext';
 import { greeting } from '../core/format';
-import { InitialsAvatar } from '../ui/components';
 import { HistoryIcon, PeopleIcon, PersonIcon, PhoneIcon } from '../ui/icons';
 import { AccountPage } from './AccountPage';
 import { AuditPage } from './AuditPage';
 import { CliniciansPage } from './CliniciansPage';
 import { DevicesPage } from './DevicesPage';
+import { ProfileMenu } from './ProfileMenu';
 
 const tabs: { path: string; label: string; icon: ReactNode }[] = [
   { path: '/clinicians', label: 'Clinicians', icon: <PeopleIcon /> },
@@ -41,8 +41,9 @@ export function DashboardShell() {
             <span className="appbar__facility">Facility {admin?.facilityId}</span>
           </div>
           <div className="appbar__user">
-            {admin && <InitialsAvatar name={admin.username} size={40} />}
-            <button type="button" className="btn btn--on-dark" onClick={() => void session.signOut()}>
+            <ProfileMenu />
+            {/* On a phone-sized screen sign-out stays one tap away; on wider screens it is in the profile panel. */}
+            <button type="button" className="btn btn--on-dark appbar__signout" onClick={() => void session.signOut()}>
               Sign out
             </button>
           </div>
