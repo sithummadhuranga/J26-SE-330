@@ -25,7 +25,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from colorimetric import marker as M  # noqa: E402
-from colorimetric.ita import classify_image  # noqa: E402
+from colorimetric.ita import classify_image, skin_mask_hsv  # noqa: E402
 
 OUT = ROOT / "tests" / "golden"
 LAYOUT, REF = M.load_layout(), M.load_reference()
@@ -71,6 +71,27 @@ def photo(rgb, seed, h=480, w=640, sheet=True):
     return np.clip(np.rint(img), 0, 255).astype(np.uint8)
 
 
+def photo_at_ita(target, seed, base=(190.0, 140.0, 112.0)):
+    """A photo whose ITA is within 0.05 degrees of `target`: bisection on a brightness factor, then a
+    search over whole-level colour offsets (the skin colour is an integer RGB, so ITA moves in steps)."""
+    lo, hi = 0.5, 1.3
+    for _ in range(40):
+        k = (lo + hi) / 2
+        ita = classify_image(photo(np.rint(np.asarray(base) * k), seed=seed)).ita_angle
+        lo, hi = (k, hi) if ita < target else (lo, k)
+    centre = np.rint(np.asarray(base) * (lo + hi) / 2)
+    best = None
+    for dr in range(-2, 3):
+        for dg in range(-2, 3):
+            for db in range(-2, 3):
+                img = photo(centre + (dr, dg, db), seed=seed)
+                err = abs(classify_image(img).ita_angle - target)
+                if best is None or err < best[0]:
+                    best = (err, img)
+    assert best[0] < 0.05, (target, best[0])
+    return best[1]
+
+
 def ita_both(rgb):
     lab8 = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float64)
     labf = cv2.cvtColor(rgb.astype(np.float32) / 255.0, cv2.COLOR_RGB2LAB).astype(np.float64)
@@ -102,6 +123,7 @@ def main() -> None:
         "c03_warm_light": dict(gain=(1.5, 1.0, 0.65)),
         "c04_bright": dict(gain=(2.0, 2.0, 2.0)),
         "c05_cool_and_dim": dict(gain=(0.6, 0.8, 1.2)),
+        "c06_dim_400px": dict(gain=(0.7, 0.7, 0.7), size=400),  # patches are read as fractions of the crop
     }
     for name, kw in crops.items():
         img = sticker(**kw)
@@ -153,6 +175,21 @@ def main() -> None:
         except ValueError as e:
             entry.update({"error": "too few skin pixels", "message": str(e)})
         exp["skin_type"][name] = entry
+    for name, target, seed in (("p07_ita_just_above_28", 28.10, 31), ("p08_ita_just_below_28", 27.90, 32)):
+        img = photo_at_ita(target, seed)
+        save(OUT / "photos" / f"{name}.png", img)
+        res = classify_image(img)
+        l8, lf = ita_both(img)
+        m = skin_mask_hsv(img)
+        ita_f = float(np.degrees(np.arctan2(lf[..., 0][m].mean() - 50, lf[..., 2][m].mean())))
+        exp["skin_type"][name] = {
+            "size": [640, 480], "error": None, "skin_pixel_count": res.skin_pixel_count, "ita_opencv8": round(res.ita_angle, 3),
+            "mean_L_opencv8": round(res.mean_L, 3), "mean_b_opencv8": round(res.mean_b, 3), "ita_float": round(ita_f, 3),
+            "ita_difference_deg": round(ita_f - res.ita_angle, 3), "fitzpatrick": res.fitzpatrick_type.value,
+            "gate_dark_at_28": bool(res.ita_angle <= 28.0), "tolerance": {"ita_deg": 0.15, "pixel_count": 25},
+            "boundary_case": "ITA is about 0.1 degrees from the III/IV boundary (and the gate cut-off) at 28 degrees. "
+                             "A port within +-0.5 degrees may legitimately give the other class; compare ITA, not the class.",
+        }
     # same image with the old V limit, to pin the 20 vs 35 behaviour
     img = photo(skins["p05_very_dark_V_under_35"], seed=14)
     try:
