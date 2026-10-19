@@ -40,6 +40,10 @@ def main():
     args = ap.parse_args()
 
     config = VARIANTS[args.variant]
+    # The colour code's default skin-mask limit changed from V 35 to 20 on 2026-10-19. Keep the old one so the datasets
+    # of the calibration study stay reproducible.
+    if hasattr(config, "skin_v_min"):
+        config = dataclasses.replace(config, skin_v_min=35.0)
     pipeline = CalibrationPipeline(config=config)
     commit = subprocess.run(["git", "-C", REPO, "log", "-1", "--format=%H", "--", "research/IT23343702"],
                             capture_output=True, text=True).stdout.strip()
