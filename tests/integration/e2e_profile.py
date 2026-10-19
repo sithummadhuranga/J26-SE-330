@@ -62,8 +62,47 @@ check("no token is 401", status == 401, status)
 status, _ = http("GET", "/v1/me", token=dash[:-4] + "AAAA")
 check("a tampered token is 401", status == 401, status)
 
+print("Change your name (step 3)")
+status, body = http("PATCH", "/v1/me", {"fullName": "  Profile Admin Renamed  "}, dash)
+check("PATCH /v1/me saves the new name, trimmed, and answers the updated profile",
+      status == 200 and body.get("fullName") == "Profile Admin Renamed" and body.get("username") == ADMIN,
+      f"{status} {body}")
+check("... and it is stored",
+      sql(f"select full_name from clinical.clinician where username = '{ADMIN}'") == "Profile Admin Renamed")
+status, listing = http("GET", "/v1/admin/clinicians", token=dash)
+check("other admins see the new name in the clinicians list",
+      any(c["username"] == ADMIN and c["fullName"] == "Profile Admin Renamed" for c in listing or []), status)
+audit = f"select count(*) from audit.auth_audit a where a.action = 'PROFILE_UPDATE' and a.username = '{ADMIN}'"
+check("the change is audited as PROFILE_UPDATE, with you as the actor",
+      sql(audit) == "1"
+      and sql(f"{audit} and a.actor_clinician_id = a.clinician_id and a.success") == "1")
+
+status, body = http("PATCH", "/v1/me", {"fullName": "Profile Admin Renamed"}, dash)
+check("the same name again is fine and not audited twice", status == 200 and sql(audit) == "1", f"{status} {body}")
+status, body = http("PATCH", "/v1/me", {"fullName": "   "}, dash)
+check("an empty name is refused", status == 400 and body.get("code") == "MISSING_FULL_NAME", f"{status} {body}")
+status, body = http("PATCH", "/v1/me", {}, dash)
+check("a missing name is refused", status == 400 and body.get("code") == "MISSING_FULL_NAME", f"{status} {body}")
+status, body = http("PATCH", "/v1/me", {"fullName": "x" * 121}, dash)
+check("a name over 120 characters is refused", status == 400 and body.get("code") == "FULL_NAME_TOO_LONG",
+      f"{status} {body}")
+status, body = http("PATCH", "/v1/me", {"fullName": "x" * 120}, dash)
+check("exactly 120 characters is accepted", status == 200, f"{status} {body}")
+
+status, body = http("PATCH", "/v1/me", {"fullName": "Hijacked", "username": OTHER, "role": "admin",
+                                         "facilityId": FAC_B}, nurse)
+check("extra fields (username, role, facility) are ignored: only the caller's own name changes",
+      status == 200 and body.get("username") == NURSE and body.get("role") == "nurse"
+      and body.get("facilityId") == FAC_A, f"{status} {body}")
+check("... and the other account is untouched",
+      sql(f"select full_name from clinical.clinician where username = '{OTHER}'") == "Other Facility Admin")
+status, _ = http("PATCH", "/v1/me", {"fullName": "Nobody"})
+check("renaming without a token is 401", status == 401, status)
+
 sql(f"update clinical.clinician set active = false where username = '{NURSE}'")
 status, body = http("GET", "/v1/me", token=nurse)
 check("a deactivated account's still-valid token gets 404, not the profile", status == 404, f"{status} {body}")
+status, body = http("PATCH", "/v1/me", {"fullName": "Too Late"}, nurse)
+check("... and cannot rename the account either", status == 404, f"{status} {body}")
 
 sys.exit(t.finish())

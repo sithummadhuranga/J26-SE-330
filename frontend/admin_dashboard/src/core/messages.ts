@@ -37,6 +37,7 @@ const actionLabels: Record<string, string> = {
   DEVICE_REVOKE: 'Device revoked',
   PASSWORD_RESET: 'Password reset',
   PASSWORD_CHANGE: 'Own password chosen',
+  PROFILE_UPDATE: 'Profile updated',
 };
 
 /** An audit action as an admin would say it. */
