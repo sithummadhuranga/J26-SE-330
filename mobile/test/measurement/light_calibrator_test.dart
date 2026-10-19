@@ -166,6 +166,15 @@ void main() {
       expect(r.notes, contains('skin type read after relative calibration, stand-in reference colours'));
     }, skip: skip);
 
+    test('a 400 x 400 sticker picture works with a 640 x 480 photo, and the photo keeps its size', () async {
+      final small = await readPng('$_goldenDir/crops/c06_dim_400px.png');
+      expect([photo.w, photo.h], [640, 480]);
+      expect([small.w, small.h], [400, 400]);
+      final r = const LightCalibrator().calibrate(photo.rgba, photo.w, photo.h, markerRgb: small.rgb);
+      expect(r.markerUsed, isTrue);
+      expect(r.rgba.length, 640 * 480 * 4); // what the model gets is still 640 x 480
+    }, skip: skip);
+
     test('a rejected sticker leaves the photo unchanged and says why', () {
       final r = const LightCalibrator().calibrate(photo.rgba, photo.w, photo.h, markerRgb: clippedCrop.rgb);
       expect(r.markerUsed, isFalse);
