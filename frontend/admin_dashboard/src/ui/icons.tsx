@@ -85,3 +85,10 @@ export const RefreshIcon = (p: IconProps) => (
     <path d="M19.8 4.6v4h-4" />
   </Icon>
 );
+
+export const EditIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4.5 19.5l1-4.2L15.8 5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.7 18.5l-4.2 1z" />
+    <path d="M13.8 7l3.2 3.2" />
+  </Icon>
+);

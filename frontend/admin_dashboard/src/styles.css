@@ -694,8 +694,13 @@ button {
 /* My account: the app's Profile header and setting rows. */
 .profile {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
+}
+.profile__who {
+  flex: 1;
+  min-width: 180px;
 }
 .profile .avatar {
   border-radius: 16px;
