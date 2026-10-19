@@ -185,9 +185,11 @@ def main():
     p["P2"], p["P3"] = p2, p3
     p["P4"] = all(results[c]["accepted"] >= 0.95 for c in BASE if c != "minus2")
     n_counted = sum(counted.values())
-    if n_counted == 0:
+    if not p["P1"]:
+        verdict = "FAIL (P1: the identity light changed the result)"  # checked first, so an unclear result cannot hide it
+    elif n_counted == 0:
         verdict = "UNCLEAR (no judged condition hurt the raw model by 0.03 or more)"
-    elif not p["P1"] or sum(1 for v in p2.values() if not v) >= 2:
+    elif sum(1 for v in p2.values() if not v) >= 2:
         verdict = "FAIL"
     elif all(p2.values()) and all(p3.values()) and p["P4"]:
         verdict = "PASS"

@@ -129,9 +129,11 @@ def main():
         s3[c] = r["cor_shift_median"] <= 3.0
     p["S2"], p["S3"] = s2, s3
     p["S4"] = all(results[c]["accepted"] >= 0.95 for c in L.BASE if c != "minus2")
-    if not any(counted.values()):
+    if not p["S1"]:
+        verdict = "FAIL (S1: the identity light changed the result)"  # checked first, so an unclear result cannot hide it
+    elif not any(counted.values()):
         verdict = "UNCLEAR (no judged condition moved the raw reading enough to count)"
-    elif not p["S1"] or sum(1 for v in s2.values() if not v) >= 2:
+    elif sum(1 for v in s2.values() if not v) >= 2:
         verdict = "FAIL"
     elif all(s2.values()) and all(s3.values()) and p["S4"]:
         verdict = "PASS"
