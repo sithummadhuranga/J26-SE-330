@@ -12,7 +12,8 @@ import time
 import urllib.error
 import urllib.request
 
-from client import GATEWAY, REPO_ROOT, Checks, create_clinician, http, login, pull_all, sql, uuid7, wait_for, wound_event
+from client import (GATEWAY, REPO_ROOT, Checks, compose, compose_project, create_clinician, http, login, pull_all, sql,
+                    uuid7, wait_for, wound_event)
 
 sys.stdout.reconfigure(encoding="utf-8")  # section titles use §; the Windows console defaults to cp1252
 
@@ -40,25 +41,7 @@ def sh(*args, timeout=180):
     return subprocess.run(list(args), cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout)
 
 
-def running_project():
-    """The Compose project the running gateway belongs to, so stop/start/scale act on that stack and never start a
-    second one under the default name (e.g. after `docker compose -p cdss-oidc up`). COMPOSE_PROJECT_NAME wins."""
-    if os.environ.get("COMPOSE_PROJECT_NAME"):
-        return os.environ["COMPOSE_PROJECT_NAME"]
-    out = sh("docker", "ps", "--filter", "label=com.docker.compose.service=api-gateway",
-             "--format", '{{.Label "com.docker.compose.project"}}').stdout.split()
-    projects = sorted(set(out))
-    if len(projects) != 1:
-        sys.exit(f"Found {len(projects) or 'no'} running stacks {projects}: set COMPOSE_PROJECT_NAME to the one to test.")
-    return projects[0]
-
-
-PROJECT = running_project()
-print(f"Compose project: {PROJECT}")
-
-
-def compose(*args, timeout=300):
-    return sh("docker", "compose", "-p", PROJECT, *args, timeout=timeout)
+print(f"Compose project: {compose_project()}")
 
 
 def kafka(*args, stdin=None, timeout=60):

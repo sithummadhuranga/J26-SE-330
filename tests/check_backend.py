@@ -21,6 +21,9 @@ import time
 import urllib.request
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "integration"))
+from client import compose  # noqa: E402  (docker compose on the running stack's project)
 GATEWAY = os.environ.get("GATEWAY", "http://localhost:8080")
 
 LONG_RUNNING = ["api-gateway", "identity-service", "sync-gateway", "ingest-persister", "outbox-relay", "orchestrator",
@@ -52,7 +55,7 @@ def record(name, ok, detail=""):
 
 def check_services():
     print("\n[1] Services")
-    out = subprocess.run(["docker", "compose", "ps", "-a", "--format", "json"], cwd=ROOT, capture_output=True, text=True)
+    out = compose("ps", "-a", "--format", "json")
     if out.returncode != 0:
         record("docker compose ps", False, out.stderr.strip()[:200] or "is Docker running?")
         return False
