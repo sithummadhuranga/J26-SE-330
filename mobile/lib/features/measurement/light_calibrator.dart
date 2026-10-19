@@ -8,6 +8,9 @@ import 'measurement_pipeline.dart';
 /// (research/IT23343702, marker.py and ita.py) and is checked against its golden vectors, see
 /// test/measurement/light_calibrator_test.dart.
 ///
+/// The sticker picture must be SQUARE (the contract is 500 x 500 at 10 pixels per mm). The Python code reads any
+/// height x width, but the app only ever hands over the square crop, so a picture of another shape is ignored with a note.
+///
 /// STATUS: the calibration is RELATIVE. The reference colours are stand-ins until reference photos of the printed sticker
 /// fill them, so every result says so in its label and the skin class is only as good as the printed grey is close to L* 50.
 const kLightCalibrationVersion = 'light-1';
