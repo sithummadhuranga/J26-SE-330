@@ -40,7 +40,7 @@ export function LoginScreen() {
   return (
     <main className="login">
       <div className="card login__card">
-        <p className="login__brand">MELANIN WOUND CDSS</p>
+        <p className="login__brand">WoundAI</p>
         <h1 className="login__title">Admin dashboard</h1>
         <p className="login__subtitle">Sign in with your facility admin account</p>
 

@@ -3,7 +3,20 @@ import { useEffect, useState } from 'react';
 import { useAdmin, useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import { roleLabel, type ClinicianSummary } from '../core/models';
-import { ActionsMenu, Centered, LoadError, PageHeader, Spinner, StatusChip, TableCard } from '../ui/components';
+import {
+  ActionsMenu,
+  Centered,
+  EmptyState,
+  HeroAction,
+  InitialsAvatar,
+  LoadError,
+  PageHeader,
+  SectionTitle,
+  Spinner,
+  StatusChip,
+  TableCard,
+} from '../ui/components';
+import { PeopleIcon, PlusIcon } from '../ui/icons';
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 import { RegisterClinicianDialog } from './RegisterClinicianDialog';
@@ -122,16 +135,30 @@ export function CliniciansPage() {
         title="Clinicians"
         subtitle="Everyone who can sign in at your facility."
         actions={
-          <>
-            <button type="button" className="btn btn--outline" onClick={reload}>
-              Refresh
-            </button>
-            <button type="button" className="btn btn--primary" onClick={() => setRegistering(true)}>
-              Register clinician
-            </button>
-          </>
+          <button type="button" className="btn btn--outline" onClick={reload}>
+            Refresh
+          </button>
         }
       />
+      <div className="page-body">
+        <HeroAction
+          label="Register clinician"
+          description="Add a nurse, wound specialist or admin to your facility"
+          icon={<PlusIcon size={22} />}
+          onClick={() => setRegistering(true)}
+        />
+        {query.isSuccess && query.data.length > 0 && (
+          <SectionTitle
+            trailing={
+              <span className="section-title__count">
+                {query.data.filter((c) => c.active).length} active · {query.data.length} in total
+              </span>
+            }
+          >
+            Accounts
+          </SectionTitle>
+        )}
+      </div>
       {query.isError ? (
         <LoadError error={query.error} onRetry={reload} />
       ) : query.isPending ? (
@@ -139,14 +166,17 @@ export function CliniciansPage() {
           <Spinner />
         </Centered>
       ) : query.data.length === 0 ? (
-        <Centered>No clinicians yet.</Centered>
+        <EmptyState
+          icon={<PeopleIcon size={24} />}
+          title="No clinicians yet"
+          message="Register the nurses and wound specialists who will use the mobile app."
+        />
       ) : (
         <TableCard>
           <thead>
             <tr>
-              <th>Name</th>
+              <th>Clinician</th>
               <th>Username</th>
-              <th>Role</th>
               <th>Status</th>
               <th>Created</th>
               <th aria-label="Actions" />
@@ -164,12 +194,19 @@ export function CliniciansPage() {
               ];
               return (
                 <tr key={c.clinicianId} className={c.username === justAdded ? 'row--new' : undefined}>
-                  <td>{c.fullName}</td>
+                  <td>
+                    <span className="person">
+                      <InitialsAvatar name={c.fullName} />
+                      <span className="person__text">
+                        <span className="person__name">{c.fullName}</span>
+                        <span className="person__sub">{roleLabel(c.role)}</span>
+                      </span>
+                    </span>
+                  </td>
                   <td>
                     {c.username}
                     {isSelf && ' (you)'}
                   </td>
-                  <td>{roleLabel(c.role)}</td>
                   <td>
                     <span className="chips">
                       {c.active ? <StatusChip label="Active" tone="teal" /> : <StatusChip label="Deactivated" tone="error" />}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WoundColors.bg (lib/core/theme.dart): the launch screen matches the app's first frame, light or dark mode. -->
+    <color name="wound_bg">#F2F0E9</color>
+</resources>
