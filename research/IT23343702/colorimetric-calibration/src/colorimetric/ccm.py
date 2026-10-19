@@ -20,7 +20,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .ita import FitzpatrickType, skin_mask_hsv
+from .ita import SKIN_V_MIN, FitzpatrickType, skin_mask_hsv
 
 # Classic X-Rite/Macbeth ColorChecker patches A1 (dark skin) and A2 (light
 # skin), sRGB under D65. LAB values computed via OpenCV RGB2LAB for
@@ -94,9 +94,10 @@ def sample_skin_lab_colors(
     wound_bbox: tuple[int, int, int, int] | None = None,
     k: int = 6,
     max_pixels: int | None = DEFAULT_MAX_KMEANS_PIXELS,
+    v_min: float = SKIN_V_MIN,
 ) -> np.ndarray:
     """k representative skin colours (LAB), see `_cluster_skin`."""
-    return _cluster_skin(rgb_image, wound_bbox, k, max_pixels)[0]
+    return _cluster_skin(rgb_image, wound_bbox, k, max_pixels, v_min)[0]
 
 
 def _cluster_skin(
@@ -104,6 +105,7 @@ def _cluster_skin(
     wound_bbox: tuple[int, int, int, int] | None,
     k: int,
     max_pixels: int | None,
+    v_min: float = SKIN_V_MIN,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Cluster non-wound skin pixels (LAB space) into k representative colors via k-means.
 
@@ -115,7 +117,7 @@ def _cluster_skin(
     (None = all of them); k=6 centres are stable with far fewer pixels than a photo has.
     Returns (centres (k, 3), pixel count per centre).
     """
-    mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox)
+    mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox, v_min=v_min)
     lab = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB).astype(np.float32)
     lab[..., 0] *= 100.0 / 255.0
     lab[..., 1] -= 128.0
@@ -143,6 +145,7 @@ def estimate_adaptive_ccm(
     shift: str = "relative",
     l_ceiling: float | None = DEFAULT_L_CEILING,
     stratified: bool = True,
+    v_min: float = SKIN_V_MIN,
 ) -> np.ndarray | None:
     """Estimate a per-image 3x3 CCM for FST IV-VI images; None for FST I-III (no correction).
 
@@ -175,7 +178,7 @@ def estimate_adaptive_ccm(
     if not correct:
         return None
 
-    source_colors, counts = _cluster_skin(rgb_image, wound_bbox, k, DEFAULT_MAX_KMEANS_PIXELS)
+    source_colors, counts = _cluster_skin(rgb_image, wound_bbox, k, DEFAULT_MAX_KMEANS_PIXELS, v_min)
     if shift == "fixed":
         lab_shift = REFERENCE_PRIORS["light_skin"]["lab"] - REFERENCE_PRIORS["dark_skin"]["lab"]
     else:
