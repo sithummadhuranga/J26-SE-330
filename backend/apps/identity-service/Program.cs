@@ -2,6 +2,7 @@ using IdentityService.Admin;
 using IdentityService.Auth;
 using IdentityService.Endpoints;
 using IdentityService.Oidc;
+using IdentityService.Profile;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
@@ -45,6 +46,7 @@ builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<MfaService>();
 builder.Services.AddSingleton<ClinicianAdminService>();
 builder.Services.AddSingleton<DeviceAdminService>();
+builder.Services.AddSingleton<ProfileService>();
 builder.Services.AddHostedService<AuthHealthSampler>();
 
 // Only reachable inside the Docker network, behind the API gateway, so forwarded headers are trusted as-is.
@@ -107,6 +109,7 @@ app.MapRazorPages();
 var v1 = app.MapGroup("/v1");
 v1.MapAuthEndpoints();
 v1.MapAdminEndpoints();
+v1.MapMeEndpoints();
 
 await app.RunAsync();
 return 0;
