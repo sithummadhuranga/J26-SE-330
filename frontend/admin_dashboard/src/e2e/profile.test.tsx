@@ -5,12 +5,14 @@ import {
   cleanUp,
   demoAdmin,
   findToast,
+  LoginPageError,
   newSession,
   ownPassword,
   registerClinician,
   renderDashboard,
   requireBackend,
   signInOnScreen,
+  signInThroughLoginPage,
   slow,
   strongPassword,
   uniqueName,
@@ -120,6 +122,49 @@ describe('profile panel from the avatar (real identity service)', () => {
     await user.type(field, 'From My Account');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('From My Account', { selector: '.profile__name' }, slow)).toBeInTheDocument();
+  });
+
+  it('Change password checks the form, refuses a wrong current password, then signs you out for the new one', async () => {
+    const { user, name } = await signedInAsNewAdmin();
+    const newPassword = 'Changed-E2e-Pass-2026!';
+    await user.click(screen.getByRole('button', { name: 'Your profile' }));
+    const panel = await screen.findByRole('dialog', { name: 'Your profile' });
+    await user.click(within(panel).getByRole('button', { name: 'Change password' }));
+    const dialog = screen.getByRole('dialog', { name: 'Change password' });
+    const submit = () => user.click(within(dialog).getByRole('button', { name: 'Change password' }));
+
+    await submit();
+    expect(within(dialog).getByText('Enter your current password')).toBeInTheDocument();
+    expect(within(dialog).getByText('At least 12 characters')).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText('Current password'), 'definitely-wrong-1');
+    await user.type(within(dialog).getByLabelText('New password'), newPassword);
+    await user.type(within(dialog).getByLabelText('New password again'), newPassword + 'x');
+    await submit();
+    expect(within(dialog).getByText('The two new passwords do not match')).toBeInTheDocument();
+
+    await user.clear(within(dialog).getByLabelText('New password again'));
+    await user.type(within(dialog).getByLabelText('New password again'), newPassword);
+    await submit();
+    expect(await within(dialog).findByText('Your current password is not right.', {}, slow)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Current password')).toHaveValue('');
+
+    await user.type(within(dialog).getByLabelText('Current password'), ownPassword);
+    await submit();
+    expect(await screen.findByRole('button', { name: 'Sign in' }, slow)).toBeInTheDocument();
+    expect(await findToast('Sign in with your new password.')).toBeInTheDocument();
+
+    await expect(signInThroughLoginPage(newSession(), name, ownPassword)).rejects.toBeInstanceOf(LoginPageError);
+    expect((await signInThroughLoginPage(newSession(), name, newPassword)).username).toBe(name);
+  });
+
+  it('My account has a Change password button too', async () => {
+    const { user } = await signedInAsNewAdmin('/account');
+    const card = await screen.findByRole('region', { name: 'Password' }, slow);
+    await user.click(within(card).getByRole('button', { name: 'Change password' }));
+    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument();
+    await user.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Change password' })).not.toBeInTheDocument();
   });
 
   it('links to My account, and signs you out', async () => {

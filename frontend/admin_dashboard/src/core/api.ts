@@ -111,6 +111,14 @@ export class AdminApi {
     return this.get('v1/me', token) as Promise<MyProfile>;
   }
 
+  /**
+   * Changes your own password; on success the server ends every session, this one included. Throws ApiError 400
+   * INVALID_CREDENTIALS, PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, or 409 CREDENTIAL_LOCKED.
+   */
+  async changePassword(token: string, currentPassword: string, newPassword: string): Promise<void> {
+    await this.post('v1/me/password', { currentPassword, newPassword }, token);
+  }
+
   /** Changes your own full name; answers the updated profile. Throws ApiError 400 MISSING_FULL_NAME, FULL_NAME_TOO_LONG. */
   updateProfile(token: string, fullName: string): Promise<MyProfile> {
     return this.send('v1/me', {

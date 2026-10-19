@@ -19,7 +19,9 @@ export function LoginScreen() {
     const failure = session.takeSignInFailure();
     // toast.error stays quiet for NeedsSignIn, but here the admin should know why they're back on this screen.
     if (failure) toast.show({ title: "Couldn't sign in", message: describeError(failure), kind: 'error' });
-    else if (session.takeSessionEndedNotice()) {
+    else if (session.takePasswordChangedNotice()) {
+      toast.show({ title: 'Password changed', message: 'Sign in with your new password.', kind: 'success' });
+    } else if (session.takeSessionEndedNotice()) {
       toast.show({ title: 'Signed out', message: 'Your session has ended. Please sign in again.' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

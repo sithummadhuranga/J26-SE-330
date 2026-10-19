@@ -36,7 +36,7 @@ const actionLabels: Record<string, string> = {
   MFA_RESET: 'Two-step reset',
   DEVICE_REVOKE: 'Device revoked',
   PASSWORD_RESET: 'Password reset',
-  PASSWORD_CHANGE: 'Own password chosen',
+  PASSWORD_CHANGE: 'Password changed',
   PROFILE_UPDATE: 'Profile updated',
 };
 
@@ -78,6 +78,10 @@ export const codes: Record<string, string> = {
   UNKNOWN_FACILITY: 'Your facility is not registered. Contact the system administrator.',
   CANNOT_DEACTIVATE_SELF: 'You cannot deactivate your own account. Ask another admin.',
   ALREADY_ACTIVE: 'This account is already active. Refresh the list.',
+  // Your own password (My account)
+  INVALID_CREDENTIALS: 'Your current password is not right.',
+  PASSWORD_UNCHANGED: 'Choose a password different from your current one.',
+  CREDENTIAL_LOCKED: 'Too many wrong passwords. Your account is locked for 15 minutes, or until another admin unlocks it.',
   CANNOT_RESET_OWN_PASSWORD: 'You cannot reset your own password here. Ask another admin.',
   NOT_FOUND: 'This item could not be found. It may have been changed by someone else; refresh the list.',
   // Two-step sign-in

@@ -983,6 +983,9 @@ button {
 .account p {
   color: var(--text-secondary);
 }
+.account + .account {
+  margin-top: 14px;
+}
 .account__qr img {
   display: block;
   width: 192px;
