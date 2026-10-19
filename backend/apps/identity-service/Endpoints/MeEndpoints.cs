@@ -3,6 +3,8 @@ using IdentityService.Profile;
 
 namespace IdentityService.Endpoints;
 
+public sealed record UpdateProfileRequest(string? FullName);
+
 /// <summary>
 /// The signed-in clinician's own account, for the dashboard's profile panel (plan: profile management). Any signed-in
 /// clinician may call these; the account is always the one in the access token.
@@ -17,6 +19,17 @@ public static class MeEndpoints
             await profiles.GetAsync(AuthEndpoints.ClinicianId(user), ct) is { } profile
                 ? Results.Ok(profile)
                 : Results.NotFound(new { code = "NOT_FOUND" }));
+
+        me.MapPatch("", async (UpdateProfileRequest req, ClaimsPrincipal user, ProfileService profiles, CancellationToken ct) =>
+        {
+            var (profile, error) = await profiles.RenameAsync(AuthEndpoints.ClinicianId(user), req.FullName, ct);
+            return error switch
+            {
+                null => Results.Ok(profile),
+                "NOT_FOUND" => Results.NotFound(new { code = error }),
+                _ => Results.BadRequest(new { code = error }),
+            };
+        });
 
         return group;
     }

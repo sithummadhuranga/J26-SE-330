@@ -1,3 +1,4 @@
+using IdentityService.Auth;
 using Npgsql;
 
 namespace IdentityService.Profile;
@@ -29,5 +30,44 @@ public sealed class ProfileService(NpgsqlDataSource db)
         if (!await r.ReadAsync(ct)) return null;
         return new MyProfile(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetBoolean(4),
             r.GetBoolean(5), r.GetDateTime(6), r.IsDBNull(7) ? null : r.GetDateTime(7));
+    }
+
+    public const int MaxFullNameLength = 120;
+
+    /// <summary>
+    /// Changes your own full name (step 3), audited as PROFILE_UPDATE with you as the actor. An unchanged name is
+    /// accepted and not audited. Codes: MISSING_FULL_NAME, FULL_NAME_TOO_LONG, NOT_FOUND (deactivated meanwhile).
+    /// </summary>
+    public async Task<(MyProfile? Profile, string? Error)> RenameAsync(Guid clinicianId, string? fullName,
+        CancellationToken ct)
+    {
+        var name = fullName?.Trim() ?? "";
+        if (name.Length == 0) return (null, "MISSING_FULL_NAME");
+        if (name.Length > MaxFullNameLength) return (null, "FULL_NAME_TOO_LONG");
+
+        await using (var conn = await db.OpenConnectionAsync(ct))
+        await using (var tx = await conn.BeginTransactionAsync(ct))
+        {
+            string username, current;
+            await using (var find = new NpgsqlCommand(
+                "SELECT username, full_name FROM clinical.clinician WHERE clinician_id = @id AND active FOR UPDATE",
+                conn, tx))
+            {
+                find.Parameters.AddWithValue("id", clinicianId);
+                await using var r = await find.ExecuteReaderAsync(ct);
+                if (!await r.ReadAsync(ct)) return (null, "NOT_FOUND");
+                username = r.GetString(0);
+                current = r.GetString(1);
+            }
+            if (name != current)
+            {
+                await Sql.ExecAsync(conn, tx, "UPDATE clinical.clinician SET full_name = @n WHERE clinician_id = @id",
+                    ct, ("n", name), ("id", clinicianId));
+                await AuthAudit.WriteAsync(conn, tx, "PROFILE_UPDATE", username, clinicianId, null, true, null, ct,
+                    clinicianId);
+            }
+            await tx.CommitAsync(ct);
+        }
+        return (await GetAsync(clinicianId, ct), null);
     }
 }
