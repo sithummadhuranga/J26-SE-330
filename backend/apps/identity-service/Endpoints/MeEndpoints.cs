@@ -1,9 +1,12 @@
 using System.Security.Claims;
+using IdentityService.Auth;
 using IdentityService.Profile;
 
 namespace IdentityService.Endpoints;
 
 public sealed record UpdateProfileRequest(string? FullName);
+
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
 /// <summary>
 /// The signed-in clinician's own account, for the dashboard's profile panel (plan: profile management). Any signed-in
@@ -27,6 +30,21 @@ public static class MeEndpoints
             {
                 null => Results.Ok(profile),
                 "NOT_FOUND" => Results.NotFound(new { code = error }),
+                _ => Results.BadRequest(new { code = error }),
+            };
+        });
+
+        // Ends every session on success, this one included: the client signs in again with the new password.
+        me.MapPost("/password", async (ChangePasswordRequest req, ClaimsPrincipal user, CredentialValidator credentials,
+            CancellationToken ct) =>
+        {
+            var error = await credentials.ChangeOwnPasswordAsync(AuthEndpoints.ClinicianId(user), req.CurrentPassword,
+                req.NewPassword, ct);
+            return error switch
+            {
+                null => Results.NoContent(),
+                "NOT_FOUND" => Results.NotFound(new { code = error }),
+                "CREDENTIAL_LOCKED" => Results.Conflict(new { code = error }),
                 _ => Results.BadRequest(new { code = error }),
             };
         });
