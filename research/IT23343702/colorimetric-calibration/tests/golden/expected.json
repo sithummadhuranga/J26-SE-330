@@ -1,0 +1,375 @@
+{
+ "note": "Synthetic vectors. Gains are per-channel linear-light multipliers (R, G, B). Tolerances are suggestions.",
+ "lab_implementation": {
+  "estimate_gains": "median of the patch pixels -> cv2.cvtColor uint8 RGB2LAB (L*=L8*100/255, a,b=v-128) for the a*b* neutrality and dE checks; target grey -> linear RGB via cv2 float32 LAB2RGB then sRGB decode.",
+  "skin_type": "cv2.cvtColor uint8 RGB2LAB, mean over the HSV skin mask; HSV from cv2 uint8 (H 0-179 -> degrees x2)."
+ },
+ "constants": {
+  "MAX_GREY_L_STD": 5.0,
+  "MAX_CLIPPED_FRACTION": 0.05,
+  "GAIN_RANGE": [
+   0.25,
+   4.0
+  ],
+  "MIN_PATCH_PIXELS": 64,
+  "MAX_GREY_AB_ERROR": 20.0,
+  "MAX_SKIN_DELTA_E": 15.0
+ },
+ "grey_gains": {
+  "c01_reference_colours": {
+   "used": true,
+   "gains": [
+    0.9984,
+    0.9984,
+    0.9984
+   ],
+   "skin_delta_e": {
+    "skin_a": 0.04,
+    "skin_b": 0.1
+   },
+   "label": "relative calibration, stand-in reference colours",
+   "gains_tolerance": 0.01
+  },
+  "c02_dim_exposure": {
+   "used": true,
+   "gains": [
+    2.8422,
+    2.8422,
+    2.8422
+   ],
+   "skin_delta_e": {
+    "skin_a": 1.06,
+    "skin_b": 0.29
+   },
+   "label": "relative calibration, stand-in reference colours",
+   "gains_tolerance": 0.01
+  },
+  "c03_warm_light": {
+   "used": true,
+   "gains": [
+    0.6706,
+    0.9984,
+    1.5408
+   ],
+   "skin_delta_e": {
+    "skin_a": 0.04,
+    "skin_b": 0.1
+   },
+   "label": "relative calibration, stand-in reference colours",
+   "gains_tolerance": 0.01
+  },
+  "c04_bright": {
+   "used": true,
+   "gains": [
+    0.5029,
+    0.5029,
+    0.5029
+   ],
+   "skin_delta_e": {
+    "skin_a": 0.04,
+    "skin_b": 0.1
+   },
+   "label": "relative calibration, stand-in reference colours",
+   "gains_tolerance": 0.01
+  },
+  "c05_cool_and_dim": {
+   "used": true,
+   "gains": [
+    1.6827,
+    1.2527,
+    0.839
+   ],
+   "skin_delta_e": {
+    "skin_a": 1.0,
+    "skin_b": 0.1
+   },
+   "label": "relative calibration, stand-in reference colours",
+   "gains_tolerance": 0.01
+  },
+  "r01_grey_clipped": {
+   "used": false,
+   "reason_contains": "clipped",
+   "reason": "grey patch clipped (100% of pixels)",
+   "reference": "stand-in (sticker/marker_reference.json)"
+  },
+  "r02_grey_uneven": {
+   "used": false,
+   "reason_contains": "not uniform",
+   "reason": "grey patch not uniform (L* std 6.8)",
+   "reference": "stand-in (sticker/marker_reference.json)"
+  },
+  "r03_too_small": {
+   "used": false,
+   "reason_contains": "pixels",
+   "reason": "grey patch has only 16 pixels",
+   "reference": "stand-in (sticker/marker_reference.json)"
+  },
+  "r04_grey_not_neutral": {
+   "used": false,
+   "reason_contains": "not neutral",
+   "reason": "grey patch not neutral (a*b* 49.5 from the reference, limit 20)",
+   "reference": "stand-in (sticker/marker_reference.json)"
+  },
+  "r05_gain_out_of_range": {
+   "used": false,
+   "reason_contains": "out of range",
+   "reason": "grey patch gains out of range (12.75-12.75)",
+   "reference": "stand-in (sticker/marker_reference.json)"
+  },
+  "r06_skin_patch_off": {
+   "used": false,
+   "reason_contains": "skin_a patch off by dE",
+   "reason": "skin_a patch off by dE 34.4 after correction (limit 15)",
+   "reference": "reference_photos_example.json"
+  }
+ },
+ "apply_gains": {
+  "g01_warm": {
+   "input": "photos/p02_medium_skin.png",
+   "output": "photos/apply_g01_warm.png",
+   "gains": [
+    1.2,
+    1.0,
+    0.8
+   ],
+   "lut_R_first_16": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17
+   ],
+   "lut_R_last_4": [
+    255,
+    255,
+    255,
+    255
+   ],
+   "lut_G_at_[0,64,128,255]": [
+    0,
+    64,
+    128,
+    255
+   ],
+   "lut_B_at_[0,64,128,255]": [
+    0,
+    57,
+    115,
+    231
+   ],
+   "exact_match_expected": true
+  },
+  "g02_dim": {
+   "input": "photos/p02_medium_skin.png",
+   "output": "photos/apply_g02_dim.png",
+   "gains": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "lut_R_first_16": [
+    0,
+    0,
+    1,
+    2,
+    2,
+    2,
+    3,
+    4,
+    4,
+    4,
+    5,
+    6,
+    6,
+    7,
+    7,
+    8
+   ],
+   "lut_R_last_4": [
+    185,
+    186,
+    187,
+    188
+   ],
+   "lut_G_at_[0,64,128,255]": [
+    0,
+    44,
+    92,
+    188
+   ],
+   "lut_B_at_[0,64,128,255]": [
+    0,
+    44,
+    92,
+    188
+   ],
+   "exact_match_expected": true
+  },
+  "g03_identity": {
+   "input": "photos/p02_medium_skin.png",
+   "output": "photos/apply_g03_identity.png",
+   "gains": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "lut_R_first_16": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "lut_R_last_4": [
+    252,
+    253,
+    254,
+    255
+   ],
+   "lut_G_at_[0,64,128,255]": [
+    0,
+    64,
+    128,
+    255
+   ],
+   "lut_B_at_[0,64,128,255]": [
+    0,
+    64,
+    128,
+    255
+   ],
+   "exact_match_expected": true
+  }
+ },
+ "skin_type": {
+  "p01_light_skin": {
+   "size": [
+    640,
+    480
+   ],
+   "error": null,
+   "skin_pixel_count": 134127,
+   "ita_opencv8": 52.933,
+   "mean_L_opencv8": 74.488,
+   "mean_b_opencv8": 18.498,
+   "ita_float": 52.875,
+   "ita_difference_deg": -0.058,
+   "fitzpatrick": "II",
+   "gate_dark_at_28": false,
+   "tolerance": {
+    "ita_deg": 0.15,
+    "pixel_count": 25
+   }
+  },
+  "p02_medium_skin": {
+   "size": [
+    640,
+    480
+   ],
+   "error": null,
+   "skin_pixel_count": 113936,
+   "ita_opencv8": 29.279,
+   "mean_L_opencv8": 62.213,
+   "mean_b_opencv8": 21.782,
+   "ita_float": 28.89,
+   "ita_difference_deg": -0.388,
+   "fitzpatrick": "III",
+   "gate_dark_at_28": false,
+   "tolerance": {
+    "ita_deg": 0.15,
+    "pixel_count": 25
+   }
+  },
+  "p03_tan_skin": {
+   "size": [
+    640,
+    480
+   ],
+   "error": null,
+   "skin_pixel_count": 111451,
+   "ita_opencv8": -4.855,
+   "mean_L_opencv8": 48.256,
+   "mean_b_opencv8": 20.539,
+   "ita_float": -5.253,
+   "ita_difference_deg": -0.398,
+   "fitzpatrick": "V",
+   "gate_dark_at_28": true,
+   "tolerance": {
+    "ita_deg": 0.15,
+    "pixel_count": 25
+   }
+  },
+  "p04_dark_skin": {
+   "size": [
+    640,
+    480
+   ],
+   "error": null,
+   "skin_pixel_count": 117181,
+   "ita_opencv8": -40.15,
+   "mean_L_opencv8": 34.481,
+   "mean_b_opencv8": 18.396,
+   "ita_float": -40.47,
+   "ita_difference_deg": -0.319,
+   "fitzpatrick": "VI",
+   "gate_dark_at_28": true,
+   "tolerance": {
+    "ita_deg": 0.15,
+    "pixel_count": 25
+   }
+  },
+  "p05_very_dark_V_under_35": {
+   "size": [
+    640,
+    480
+   ],
+   "error": null,
+   "skin_pixel_count": 91717,
+   "ita_opencv8": -70.552,
+   "mean_L_opencv8": 19.058,
+   "mean_b_opencv8": 10.926,
+   "ita_float": -70.675,
+   "ita_difference_deg": -0.123,
+   "fitzpatrick": "VI",
+   "gate_dark_at_28": true,
+   "tolerance": {
+    "ita_deg": 0.15,
+    "pixel_count": 25
+   },
+   "with_v_min_35": {
+    "error": "too few skin pixels",
+    "message": "Only 0 skin pixels found (need >= 100). Check wound_bbox and lighting; the skin mask may be too strict for this image."
+   }
+  },
+  "p06_black_shadow_only": {
+   "size": [
+    640,
+    480
+   ],
+   "error": "too few skin pixels",
+   "message": "Only 0 skin pixels found (need >= 100). Check wound_bbox and lighting; the skin mask may be too strict for this image."
+  }
+ }
+}
