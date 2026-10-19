@@ -10,6 +10,10 @@ threshold 0.35 gets 87% / 35%. The shipped weights are fitted on all 592 images,
 figures, not an in-sample score, describe expected behaviour. Labels are dermatologist labels on
 diseased skin (noisy), and the data are clinical photos, not wound photos: UNVERIFIED on DFUC.
 
+It does NOT carry over to a second dataset. On 193 hand-labelled ISIC images (97 dark) the 28 deg
+ITA gate gets dark recall 0.99 / light specificity 0.87, this model at 0.35 gets 0.71 / 0.96.
+The two datasets disagree about which gate is better, so do not replace the 28 deg rule with this.
+
 Not wired into the pipeline by default; call `dark_probability` / `is_dark` yourself.
 """
 
