@@ -46,6 +46,19 @@ export interface ClinicianSummary {
   mustChangePassword: boolean;
 }
 
+/** The signed-in clinician's own account (GET /v1/me). */
+export interface MyProfile {
+  username: string;
+  fullName: string;
+  role: string;
+  facilityId: string;
+  mfaEnabled: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  /** Null before the first sign-in is recorded. */
+  lastSignInAt: string | null;
+}
+
 /** A started two-step setup: the secret for typing in, and the otpauth:// URI the QR code holds. */
 export interface MfaEnrollment {
   secret: string;

@@ -374,6 +374,156 @@ button {
   padding-bottom: 32px;
 }
 
+/* ---- profile: the avatar button and the panel it opens ---- */
+
+.appbar__signout {
+  display: none;
+}
+.profile-menu {
+  position: relative;
+}
+.profile-menu__trigger {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.profile-menu__trigger:hover .avatar,
+.profile-menu__trigger[aria-expanded='true'] .avatar {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4.5px var(--accent);
+}
+.profile-menu__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.profile-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-raised);
+  animation: panel-in 140ms ease-out;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.profile-panel__loading {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+}
+.profile-panel__error {
+  color: var(--error);
+}
+.profile-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile-panel__head .avatar {
+  border-radius: 16px;
+  background: linear-gradient(90deg, var(--accent-soft), #ffffff);
+  box-shadow: var(--shadow-card);
+}
+.profile-panel__who {
+  min-width: 0;
+}
+.profile-panel__name {
+  font-size: 16px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.profile-panel__username {
+  color: var(--text);
+  font-size: 13px;
+}
+.profile-panel__sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.profile-panel__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-field);
+  background: var(--bg);
+}
+.profile-panel__facts div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profile-panel__facts dt {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.profile-panel__facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.profile-panel__rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+.profile-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.profile-panel__row:last-child {
+  border-bottom: none;
+}
+.profile-panel__label {
+  flex: 1;
+}
+.profile-backdrop {
+  display: none;
+}
+.profile-panel__row:hover {
+  background: var(--hover-tint);
+}
+.profile-panel__row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.profile-panel__row .icon-tile {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+.profile-panel__chevron {
+  color: var(--text-tertiary);
+}
+
 /* ---- shared building blocks (mobile/lib/core/widgets.dart) ---- */
 
 .icon {
@@ -1085,7 +1235,8 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast {
+  .toast,
+  .profile-panel {
     animation: none;
   }
   .spinner {
@@ -1100,8 +1251,36 @@ button {
   .appbar__greeting {
     font-size: 18px;
   }
-  .appbar__user .avatar {
-    display: none;
+  .appbar__signout {
+    display: inline-flex;
+  }
+  .profile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgba(29, 28, 24, 0.4);
+  }
+  /* The profile panel opens as a sheet from the bottom, like the app's bottom sheets. */
+  .profile-panel {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    width: auto;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+    animation: sheet-in 180ms ease-out;
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(24px);
+      opacity: 0;
+    }
   }
   /* The app's bottom navigation: icons over labels, the pill around the selected icon. */
   .tabs {

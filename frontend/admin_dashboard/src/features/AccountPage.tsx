@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAdmin, useSession } from '../app/sessionContext';
 import type { MfaEnrollment } from '../core/models';
+import { meKey } from '../core/queryKeys';
 import {
   Centered,
   Field,
@@ -34,7 +35,10 @@ export function AccountPage() {
     queryFn: () => session.authorized((t) => session.api.clinicians(t)),
   });
   useLoadFailureToast("Couldn't load your account", query.error);
-  const reload = () => void queryClient.invalidateQueries({ queryKey: cliniciansKey });
+  const reload = () => {
+    void queryClient.invalidateQueries({ queryKey: cliniciansKey });
+    void queryClient.invalidateQueries({ queryKey: meKey }); // the profile panel shows the two-step status too
+  };
   const me = query.data?.find((c) => c.username === admin?.username);
 
   const start = async () => {
