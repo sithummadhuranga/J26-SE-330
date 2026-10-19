@@ -59,6 +59,19 @@ export interface MyProfile {
   lastSignInAt: string | null;
 }
 
+/** One of your sign-ins that is still going (GET /v1/me/sessions). */
+export interface MySession {
+  sessionId: string;
+  /** "admin-dashboard" or "mobile". */
+  client: string;
+  /** The phone, for mobile sessions; null for the dashboard. */
+  deviceId: string | null;
+  signedInAt: string;
+  /** The latest sign-in or token refresh in this session. */
+  lastUsedAt: string;
+  expiresAt: string;
+}
+
 /** A started two-step setup: the secret for typing in, and the otpauth:// URI the QR code holds. */
 export interface MfaEnrollment {
   secret: string;

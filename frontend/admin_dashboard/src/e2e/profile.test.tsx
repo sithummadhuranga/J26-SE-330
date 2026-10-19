@@ -6,6 +6,7 @@ import {
   demoAdmin,
   findToast,
   LoginPageError,
+  mobileLogin,
   newSession,
   ownPassword,
   registerClinician,
@@ -165,6 +166,41 @@ describe('profile panel from the avatar (real identity service)', () => {
     expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument();
     await user.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog', { name: 'Change password' })).not.toBeInTheDocument();
+  });
+
+  it('Your sessions lists the browser and the phone, and ending the phone one signs it out', async () => {
+    const name = uniqueName('sess');
+    await registerClinician(await adminSession(), name, 'admin');
+    // The phone signs in first (the test-only password grant does not ask for a new password), then this browser.
+    const phone = await mobileLogin(name, strongPassword, `dev-${name}`);
+    expect(phone.status).toBe(200);
+    const session = newSession();
+    const user = renderDashboard(session, '/account');
+    await signInOnScreen(user, session, name, strongPassword, undefined, ownPassword);
+
+    const card = await screen.findByRole('region', { name: 'Your sessions' }, slow);
+    expect(await screen.findByText('Your sessions · 2', {}, slow)).toBeInTheDocument();
+    expect(within(card).getByText('Admin dashboard')).toBeInTheDocument();
+    expect(within(card).getByText(`· dev-${name}`, { exact: false })).toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: /^End session: Mobile app on / }));
+    const dialog = screen.getByRole('dialog', { name: 'End this session?' });
+    await user.click(within(dialog).getByRole('button', { name: 'End session' }));
+    expect(await findToast(`Mobile app on dev-${name} is signed out.`)).toBeInTheDocument();
+    expect(await screen.findByText('Your sessions · 1', {}, slow)).toBeInTheDocument();
+    expect(within(card).queryByText(`· dev-${name}`, { exact: false })).not.toBeInTheDocument();
+    // The server agrees: only this browser's session is left.
+    expect(await session.authorized((t) => session.api.mySessions(t))).toHaveLength(1);
+  });
+
+  it('End all sessions signs you out here too and says why', async () => {
+    const { user } = await signedInAsNewAdmin('/account');
+    await screen.findByText('Your sessions · 1', {}, slow);
+    await user.click(screen.getByRole('button', { name: 'End all sessions' }));
+    const dialog = screen.getByRole('dialog', { name: 'End all your sessions?' });
+    await user.click(within(dialog).getByRole('button', { name: 'End all sessions' }));
+    expect(await screen.findByRole('button', { name: 'Sign in' }, slow)).toBeInTheDocument();
+    expect(await findToast('All your sessions have ended. Sign in again here.')).toBeInTheDocument();
   });
 
   it('links to My account, and signs you out', async () => {

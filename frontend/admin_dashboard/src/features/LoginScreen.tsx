@@ -17,10 +17,13 @@ export function LoginScreen() {
   // Back here because the server ended the session, or the last sign-in did not complete: say so once.
   useEffect(() => {
     const failure = session.takeSignInFailure();
+    const ended = session.takeEndedHereNotice();
     // toast.error stays quiet for NeedsSignIn, but here the admin should know why they're back on this screen.
     if (failure) toast.show({ title: "Couldn't sign in", message: describeError(failure), kind: 'error' });
-    else if (session.takePasswordChangedNotice()) {
+    else if (ended === 'passwordChanged') {
       toast.show({ title: 'Password changed', message: 'Sign in with your new password.', kind: 'success' });
+    } else if (ended === 'sessionsEnded') {
+      toast.show({ title: 'Signed out everywhere', message: 'All your sessions have ended. Sign in again here.' });
     } else if (session.takeSessionEndedNotice()) {
       toast.show({ title: 'Signed out', message: 'Your session has ended. Please sign in again.' });
     }

@@ -99,3 +99,10 @@ export const KeyIcon = (p: IconProps) => (
     <path d="M10.8 11.8L19.5 3.5M16 7l2.6 2.6M14 9l2 2" />
   </Icon>
 );
+
+export const MonitorIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4.5" width="18" height="12" rx="2.2" />
+    <path d="M9 20h6M12 16.5V20" />
+  </Icon>
+);

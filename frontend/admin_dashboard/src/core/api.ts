@@ -1,5 +1,13 @@
 import { clientId } from './config';
-import type { AuthAuditEntry, ClinicianSummary, DeviceSummary, MfaEnrollment, MyProfile, TokenPair } from './models';
+import type {
+  AuthAuditEntry,
+  ClinicianSummary,
+  DeviceSummary,
+  MfaEnrollment,
+  MyProfile,
+  MySession,
+  TokenPair,
+} from './models';
 
 /** No HTTP answer at all: gateway down, CORS refused, timeout. */
 export class TransportError extends Error {
@@ -126,6 +134,21 @@ export class AdminApi {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fullName }),
     }) as Promise<MyProfile>;
+  }
+
+  /** Your active sign-ins, the most recently used first. */
+  mySessions(token: string): Promise<MySession[]> {
+    return this.get('v1/me/sessions', token) as Promise<MySession[]>;
+  }
+
+  /** Ends one of your sessions. Throws ApiError 404 if it is already over. */
+  async endSession(token: string, sessionId: string): Promise<void> {
+    await this.send(`v1/me/sessions/${enc(sessionId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  /** Ends every session of yours, this one included. */
+  async endAllSessions(token: string): Promise<void> {
+    await this.send('v1/me/sessions', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
   }
 
   // ---- own account: two-step sign-in ----
