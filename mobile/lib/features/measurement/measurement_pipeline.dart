@@ -7,18 +7,37 @@ import 'wound_segmenter.dart';
 import 'yolo_seg_postprocess.dart';
 
 /// What the colour calibration hands back: the calibrated image (RGBA, the same size it was given), the skin type it
-/// estimated if any, and the version of the calibration code, which goes into the wound event.
+/// estimated if any, and the version of the calibration code, which goes into the wound event. When a sticker picture was
+/// used it also says so, in plain words ([markerLabel], for example 'relative calibration, stand-in reference colours').
 class CalibrationResult {
-  const CalibrationResult(this.rgba, {this.fitzpatrickClass, required this.version});
+  const CalibrationResult(
+    this.rgba, {
+    this.fitzpatrickClass,
+    required this.version,
+    this.markerUsed = false,
+    this.markerLabel,
+    this.itaAngle,
+    this.notes = const [],
+  });
 
   final Uint8List rgba;
   final String? fitzpatrickClass;
   final String version;
+  final bool markerUsed;
+  final String? markerLabel;
+
+  /// The skin angle the class was read from, in degrees, if one was computed.
+  final double? itaAngle;
+
+  /// What a person should know about, for example that the sticker was rejected.
+  final List<String> notes;
 }
 
 /// The colour calibration step. Its code belongs to someone else and may change, so the pipeline only relies on this.
+/// [markerRgb] is the straightened picture of the reference sticker (square, interleaved R, G, B, cut from the full-size
+/// photo), or null when no sticker was found.
 abstract class Calibrator {
-  CalibrationResult calibrate(Uint8List rgba, int width, int height);
+  CalibrationResult calibrate(Uint8List rgba, int width, int height, {Uint8List? markerRgb});
 }
 
 /// Whether the calibration gets the original photo or the 640x480 copy made for the model.
@@ -109,14 +128,14 @@ class MeasurementPipeline {
   /// [rgba] is the photo (RGBA, [width] x [height]). [scale] turns pixels of the 640x480 picture into mm² and comes from
   /// the reference marker; without it the result has no area. A calibration that throws, or returns the wrong size, is
   /// skipped and the original photo is used, so a problem there never stops the measurement.
-  MeasurementResult analyze(Uint8List rgba, int width, int height, {PlaneScale? scale}) {
+  MeasurementResult analyze(Uint8List rgba, int width, int height, {PlaneScale? scale, Uint8List? markerRgb}) {
     final notes = <String>[];
     final timings = <String, double>{};
     final clock = Stopwatch()..start();
     CalibrationResult? calibration;
     PreparedImage image;
     if (calibrator != null && calibrateOn == CalibrationInput.original) {
-      calibration = _calibrate(rgba, width, height, notes);
+      calibration = _calibrate(rgba, width, height, notes, markerRgb);
       timings['calibration'] = _lap(clock);
       image = prepareImage(calibration?.rgba ?? rgba, width, height);
       timings['prepare'] = _lap(clock);
@@ -124,14 +143,14 @@ class MeasurementPipeline {
     }
     image = prepareImage(rgba, width, height);
     timings['prepare'] = _lap(clock);
-    return _continueFrom(image, scale, notes, timings, clock);
+    return _continueFrom(image, scale, notes, timings, clock, markerRgb);
   }
 
   /// Like [analyze] for a photo that was already fitted to the 640x480 input (for example in a background isolate,
   /// because shrinking a 12-megapixel photo takes a moment). Calibration, if there is one, runs on this canvas.
-  MeasurementResult analyzePrepared(PreparedImage prepared, {PlaneScale? scale, double? prepareMs}) {
+  MeasurementResult analyzePrepared(PreparedImage prepared, {PlaneScale? scale, double? prepareMs, Uint8List? markerRgb}) {
     final timings = <String, double>{'prepare': ?prepareMs};
-    return _continueFrom(prepared, scale, <String>[], timings, Stopwatch()..start());
+    return _continueFrom(prepared, scale, <String>[], timings, Stopwatch()..start(), markerRgb);
   }
 
   MeasurementResult _continueFrom(
@@ -140,11 +159,12 @@ class MeasurementPipeline {
     List<String> notes,
     Map<String, double> timings,
     Stopwatch clock,
+    Uint8List? markerRgb,
   ) {
     var image = prepared;
     CalibrationResult? calibration;
     if (calibrator != null) {
-      calibration = _calibrate(prepared.rgba, kInputW, kInputH, notes);
+      calibration = _calibrate(prepared.rgba, kInputW, kInputH, notes, markerRgb);
       timings['calibration'] = _lap(clock);
       if (calibration != null) {
         image = PreparedImage(
@@ -196,13 +216,14 @@ class MeasurementPipeline {
     return ms;
   }
 
-  CalibrationResult? _calibrate(Uint8List rgba, int width, int height, List<String> notes) {
+  CalibrationResult? _calibrate(Uint8List rgba, int width, int height, List<String> notes, Uint8List? markerRgb) {
     try {
-      final result = calibrator!.calibrate(rgba, width, height);
+      final result = calibrator!.calibrate(rgba, width, height, markerRgb: markerRgb);
       if (result.rgba.length != rgba.length) {
         notes.add('calibration returned an image of the wrong size, so the original photo was used');
         return null;
       }
+      notes.addAll(result.notes);
       return result;
     } catch (e) {
       notes.add('calibration failed ($e), so the original photo was used');

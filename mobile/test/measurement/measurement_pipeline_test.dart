@@ -36,18 +36,20 @@ class FakeCalibrator implements Calibrator {
   final String? skin;
   final String version;
   int? seenWidth, seenHeight;
+  Uint8List? seenMarker;
 
   @override
-  CalibrationResult calibrate(Uint8List rgba, int width, int height) {
+  CalibrationResult calibrate(Uint8List rgba, int width, int height, {Uint8List? markerRgb}) {
     seenWidth = width;
     seenHeight = height;
+    seenMarker = markerRgb;
     if (fail) throw StateError('boom');
     if (wrongSize) return CalibrationResult(Uint8List(10), version: version);
     final out = Uint8List.fromList(rgba);
     for (var p = 0; p < width * height; p++) {
       out[4 * p] = 255 - rgba[4 * p]; // invert red, so a calibrated image is easy to recognise
     }
-    return CalibrationResult(out, fitzpatrickClass: skin, version: version);
+    return CalibrationResult(out, fitzpatrickClass: skin, version: version, notes: markerRgb == null ? const [] : ['sticker used']);
   }
 }
 
@@ -75,6 +77,17 @@ void main() {
       MeasurementPipeline(segmenter: s, segmentationVersion: 'seg-test-1', calibrator: c, calibrateOn: on);
 
   final photo = solidPhoto(1280, 960, [180, 90, 60]);
+
+  test('the sticker picture goes to the calibration and its notes reach the result', () {
+    final cal = FakeCalibrator();
+    final sticker = Uint8List(500 * 500 * 3);
+    final withSticker = pipeline(FakeSegmenter(mask: blob(), found: true), c: cal).analyze(photo, 1280, 960, markerRgb: sticker);
+    expect(cal.seenMarker, same(sticker));
+    expect(withSticker.notes, ['sticker used']);
+    final without = pipeline(FakeSegmenter(mask: blob(), found: true), c: cal).analyze(photo, 1280, 960);
+    expect(cal.seenMarker, isNull);
+    expect(without.notes, isEmpty);
+  });
 
   test('a complete measurement becomes a valid wound event analytics', () {
     final result = pipeline(FakeSegmenter(mask: blob(), found: true), c: FakeCalibrator())
