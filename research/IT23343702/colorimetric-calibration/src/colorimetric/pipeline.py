@@ -30,7 +30,7 @@ from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm, normalise_skin_L_var
 from .enhance import clahe_median, remove_specular
 from .illumination import gray_world, multi_scale_retinex_L, single_scale_retinex_L, white_balance
 from .marker import correct_with_marker
-from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, classify_image, needs_ccm, skin_mask_hsv
+from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, SKIN_V_MIN, classify_image, needs_ccm, skin_mask_hsv
 from .preprocess import _check_rgb, process_raw_input
 
 
@@ -44,6 +44,7 @@ class PipelineConfig:
     classify_skin: bool = True         # step 3; off = no ITA/FST, so no CCM either
     use_ccm: bool = True               # step 4
     gate_cutoff: float = GATE_CUTOFF_STANDARD
+    skin_v_min: float = SKIN_V_MIN     # lower V limit (%) of the skin mask; 35.0 = research guide, see ita.py
     classify_on: str = "raw"           # "raw" | "processed"
     use_specular: bool = True          # step 5
     use_clahe: bool = True             # step 6
@@ -61,6 +62,7 @@ class ProcessResult:
     fst: str | None
     ccm_applied: bool
     marker_used: bool = False
+    marker_label: str | None = None    # e.g. "relative calibration, stand-in reference colours"; None if no marker used
     marker_skin_delta_e: dict[str, float] = field(default_factory=dict)
     timings_ms: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
@@ -113,16 +115,19 @@ def process_image(
 
     def classify(img):
         try:
-            return classify_image(img, wound_bbox=wound_bbox)
+            return classify_image(img, wound_bbox=wound_bbox, v_min=cfg.skin_v_min)
         except ValueError as e:
             notes.append(f"skin tone not estimated: {e}")
             return None
 
-    marker_used, marker_de = False, {}
+    marker_used, marker_de, marker_label = False, {}, None
     if marker is not None and cfg.use_marker:
         rgb, m = timed("0_marker", correct_with_marker, rgb, marker)
         marker_used, marker_de = m.used, m.skin_delta_e
-        if not m.used:
+        if m.used:
+            marker_label = m.label
+            notes.append(f"skin type read after {m.label}")
+        else:
             notes.append(f"marker rejected, using skin-pixel fallback: {m.reason}")
 
     ita = timed("ita", classify, rgb) if cfg.classify_skin and cfg.classify_on == "raw" else None
@@ -151,8 +156,8 @@ def process_image(
             try:
                 M = timed("4_ccm_fit", estimate_adaptive_ccm, img, ita.fitzpatrick_type,
                           wound_bbox=wound_bbox, k=cfg.ccm_k, correct=True,
-                          shift=cfg.ccm_shift, stratified=cfg.ccm_stratified)
-                skin = skin_mask_hsv(img, wound_bbox=wound_bbox) if cfg.ccm_l_variance else None
+                          shift=cfg.ccm_shift, stratified=cfg.ccm_stratified, v_min=cfg.skin_v_min)
+                skin = skin_mask_hsv(img, wound_bbox=wound_bbox, v_min=cfg.skin_v_min) if cfg.ccm_l_variance else None
                 img = timed("4_ccm_apply", apply_adaptive_ccm, img, M)
                 if skin is not None:
                     img = timed("4_l_variance", normalise_skin_L_variance, img, skin)
@@ -172,6 +177,7 @@ def process_image(
         fst=None if ita is None else ita.fitzpatrick_type.value,
         ccm_applied=ccm_applied,
         marker_used=marker_used,
+        marker_label=marker_label,
         marker_skin_delta_e=marker_de,
         timings_ms=timings,
         notes=notes,
