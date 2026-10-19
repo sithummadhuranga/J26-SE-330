@@ -215,6 +215,92 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         return (stored, null);
     }
 
+    /// <summary>
+    /// A signed-in clinician changes their own password (plan: profile management, step 5). The current password is
+    /// required, and a wrong one counts towards the same lockout as signing in. On success the new password is set,
+    /// any lockout and pending "choose your own password" are cleared, and every session ends: the token carries no
+    /// session id, so this browser cannot be told apart from the others, and ending them all is the safe choice
+    /// after a password change anyway.
+    /// </summary>
+    /// <returns>Null on success, or PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, INVALID_CREDENTIALS, CREDENTIAL_LOCKED,
+    /// NOT_FOUND (deactivated meanwhile).</returns>
+    public async Task<string?> ChangeOwnPasswordAsync(Guid clinicianId, string? currentPassword, string? newPassword,
+        CancellationToken ct)
+    {
+        if (newPassword is null || newPassword.Length < Admin.ClinicianAdminService.MinPasswordLength)
+            return "PASSWORD_TOO_SHORT";
+
+        string username, hash; byte[] salt; DateTime? lockedUntil;
+        await using (var read = db.CreateCommand("""
+            SELECT c.username, cc.password_hash, cc.password_salt, cc.locked_until
+            FROM clinical.clinician c JOIN clinical.clinician_credential cc USING (clinician_id)
+            WHERE c.clinician_id = @id AND c.active
+            """))
+        {
+            read.Parameters.AddWithValue("id", clinicianId);
+            await using var r = await read.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return "NOT_FOUND";
+            username = r.GetString(0); hash = r.GetString(1); salt = (byte[])r[2];
+            lockedUntil = r.IsDBNull(3) ? null : r.GetDateTime(3);
+        }
+
+        // Slow hashing happens before the transaction so it never holds a database connection.
+        var locked = lockedUntil > DateTime.UtcNow;
+        var currentOk = !locked && await VerifyAsync(currentPassword ?? "", hash, salt, ct);
+        if (currentOk && newPassword == currentPassword) return "PASSWORD_UNCHANGED";
+        var (newHash, newSalt) = currentOk ? hasher.Hash(newPassword) : (null!, null!);
+
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        int failedAttempts; string storedHash;
+        await using (var lockRow = new NpgsqlCommand(
+            "SELECT failed_attempts, password_hash, locked_until FROM clinical.clinician_credential WHERE clinician_id = @id FOR UPDATE",
+            conn, tx))
+        {
+            lockRow.Parameters.AddWithValue("id", clinicianId);
+            await using var r = await lockRow.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return "NOT_FOUND";
+            failedAttempts = r.GetInt32(0); storedHash = r.GetString(1);
+            locked |= !r.IsDBNull(2) && r.GetDateTime(2) > DateTime.UtcNow;
+        }
+
+        if (locked)
+        {
+            await AuthAudit.WriteAsync(conn, tx, "PASSWORD_CHANGE", username, clinicianId, null, false, "CREDENTIAL_LOCKED", ct,
+                clinicianId);
+            await tx.CommitAsync(ct);
+            return "CREDENTIAL_LOCKED";
+        }
+        // The password changed meanwhile (an admin reset): the check above was against the old one.
+        if (storedHash != hash) currentOk = false;
+
+        if (!currentOk)
+        {
+            var attempts = failedAttempts + 1;
+            var lockNow = attempts >= MaxFailedAttempts;
+            await Sql.ExecAsync(conn, tx, """
+                UPDATE clinical.clinician_credential SET failed_attempts = @a, locked_until = @l WHERE clinician_id = @id
+                """, ct, ("a", lockNow ? 0 : attempts), ("l", lockNow ? DateTime.UtcNow + LockoutDuration : null),
+                ("id", clinicianId));
+            await AuthAudit.WriteAsync(conn, tx, lockNow ? "LOCKOUT" : "PASSWORD_CHANGE", username, clinicianId, null, false,
+                lockNow ? "CREDENTIAL_LOCKED" : "INVALID_CREDENTIALS", ct, clinicianId);
+            await tx.CommitAsync(ct);
+            return lockNow ? "CREDENTIAL_LOCKED" : "INVALID_CREDENTIALS";
+        }
+
+        await Sql.ExecAsync(conn, tx, """
+            UPDATE clinical.clinician_credential
+            SET password_hash = @h, password_salt = @s, failed_attempts = 0, locked_until = NULL, must_change_password = false
+            WHERE clinician_id = @id
+            """, ct, ("h", Convert.ToBase64String(newHash)), ("s", newSalt), ("id", clinicianId));
+        await Sql.ExecAsync(conn, tx,
+            "UPDATE clinical.clinician_session SET revoked_at = now() WHERE clinician_id = @id AND revoked_at IS NULL",
+            ct, ("id", clinicianId));
+        await AuthAudit.WriteAsync(conn, tx, "PASSWORD_CHANGE", username, clinicianId, null, true, null, ct, clinicianId);
+        await tx.CommitAsync(ct);
+        return null;
+    }
+
     /// <summary>Checks the password without holding a connection; skips unknown or locked accounts.</summary>
     private async Task<(string? Hash, bool Ok)> PreVerifyPasswordAsync(string username, string password, CancellationToken ct)
     {

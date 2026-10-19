@@ -3,12 +3,14 @@ import secrets
 import sys
 from datetime import datetime
 
-from client import Checks, create_clinician, dashboard_login, http, login, sql
+from client import Checks, create_clinician, dashboard_login, http, login, refresh, sql
 
 FAC_A, FAC_B = "fac-001", "fac-002"
 PASSWORD = "Profile-Pass-" + secrets.token_hex(4)
 suffix = secrets.token_hex(3)
 ADMIN, NURSE, OTHER = f"prof.admin.{suffix}", f"prof.nurse.{suffix}", f"prof.other.{suffix}"
+PW_USER, LOCK_USER, DUE_USER = f"prof.pw.{suffix}", f"prof.lock.{suffix}", f"prof.due.{suffix}"
+NEW_PASSWORD = "Profile-New-" + secrets.token_hex(4)
 DEVICE = "dev-prof-" + secrets.token_hex(3)
 
 t = Checks()
@@ -99,10 +101,80 @@ check("... and the other account is untouched",
 status, _ = http("PATCH", "/v1/me", {"fullName": "Nobody"})
 check("renaming without a token is 401", status == 401, status)
 
+print("Change your password (step 5)")
+create_clinician(PW_USER, PASSWORD, "admin", FAC_A, "Password Changer")
+_, body = dashboard_login(PW_USER, PASSWORD)
+pw_dash, pw_dash_refresh = body["accessToken"], body["refreshToken"]
+_, body = login(PW_USER, PASSWORD, DEVICE + "-pw")
+pw_phone_refresh = body["refreshToken"]
+
+status, body = http("POST", "/v1/me/password", {"currentPassword": "not-my-password", "newPassword": NEW_PASSWORD}, pw_dash)
+check("a wrong current password is refused", status == 400 and body.get("code") == "INVALID_CREDENTIALS", f"{status} {body}")
+check("... counts as a failed attempt",
+      sql(f"select cc.failed_attempts from clinical.clinician_credential cc join clinical.clinician c using (clinician_id) "
+          f"where c.username = '{PW_USER}'") == "1")
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": "short"}, pw_dash)
+check("a new password under 12 characters is refused", status == 400 and body.get("code") == "PASSWORD_TOO_SHORT",
+      f"{status} {body}")
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": PASSWORD}, pw_dash)
+check("the same password again is refused", status == 400 and body.get("code") == "PASSWORD_UNCHANGED", f"{status} {body}")
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD}, pw_dash)
+check("a missing new password is refused", status == 400 and body.get("code") == "PASSWORD_TOO_SHORT", f"{status} {body}")
+status, _ = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD})
+check("without a token it is 401", status == 401, status)
+
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD}, pw_dash)
+check("the right current password and a new one: 204", status == 204, f"{status} {body}")
+status, body = dashboard_login(PW_USER, PASSWORD)
+check("the old password no longer signs in", status == 400 and body.get("code") == "INVALID_CREDENTIALS", f"{status} {body}")
+status, _ = dashboard_login(PW_USER, NEW_PASSWORD)
+check("the new password signs in", status == 200, status)
+status, _ = refresh(pw_dash_refresh, client_id="admin-dashboard")
+check("every session ended: the dashboard's refresh is refused", status == 400, status)
+status, _ = refresh(pw_phone_refresh)
+check("... and the phone's too", status == 400, status)
+check("the failed-attempt count is back to 0",
+      sql(f"select cc.failed_attempts from clinical.clinician_credential cc join clinical.clinician c using (clinician_id) "
+          f"where c.username = '{PW_USER}'") == "0")
+changes = f"select count(*) from audit.auth_audit a where a.action = 'PASSWORD_CHANGE' and a.username = '{PW_USER}'"
+check("audited: one failed and one successful PASSWORD_CHANGE, both with you as actor",
+      sql(f"{changes} and a.success and a.actor_clinician_id = a.clinician_id") == "1"
+      and sql(f"{changes} and not a.success and a.reason_code = 'INVALID_CREDENTIALS'") == "1")
+
+print("Wrong current passwords lock the account (step 5)")
+create_clinician(LOCK_USER, PASSWORD, "admin", FAC_A, "Lock Test")
+_, body = login(LOCK_USER, PASSWORD, DEVICE + "-lock")
+lock_token = body["accessToken"]
+for _ in range(4):
+    http("POST", "/v1/me/password", {"currentPassword": "wrong-password", "newPassword": NEW_PASSWORD}, lock_token)
+status, body = http("POST", "/v1/me/password", {"currentPassword": "wrong-password", "newPassword": NEW_PASSWORD},
+                    lock_token)
+check("the 5th wrong current password locks the account (409)", status == 409 and body.get("code") == "CREDENTIAL_LOCKED",
+      f"{status} {body}")
+check("... recorded as a LOCKOUT",
+      sql(f"select count(*) from audit.auth_audit where action = 'LOCKOUT' and username = '{LOCK_USER}'") == "1")
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD}, lock_token)
+check("while locked even the right current password is refused", status == 409 and body.get("code") == "CREDENTIAL_LOCKED",
+      f"{status} {body}")
+status, body = login(LOCK_USER, PASSWORD, DEVICE + "-lock")
+check("... and signing in is locked too", status == 400 and body.get("code") == "CREDENTIAL_LOCKED", f"{status} {body}")
+
+print("Changing your own password clears 'choose your own' (step 5)")
+http("POST", "/v1/admin/clinicians",
+     {"username": DUE_USER, "password": PASSWORD, "fullName": "Due Nurse", "role": "nurse"}, dash)
+_, body = login(DUE_USER, PASSWORD, DEVICE + "-due")
+due = body["accessToken"]
+check("an admin-chosen password is due for change", http("GET", "/v1/me", token=due)[1].get("mustChangePassword") is True)
+status, _ = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD}, due)
+check("changing it yourself clears that", status == 204 and http("GET", "/v1/me", token=due)[1].get("mustChangePassword") is False,
+      status)
+
 sql(f"update clinical.clinician set active = false where username = '{NURSE}'")
 status, body = http("GET", "/v1/me", token=nurse)
 check("a deactivated account's still-valid token gets 404, not the profile", status == 404, f"{status} {body}")
 status, body = http("PATCH", "/v1/me", {"fullName": "Too Late"}, nurse)
 check("... and cannot rename the account either", status == 404, f"{status} {body}")
+status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD}, nurse)
+check("... or change its password", status == 404, f"{status} {body}")
 
 sys.exit(t.finish())
