@@ -70,7 +70,7 @@ export function SessionsSection() {
   const paged = usePaged(sessions);
   return (
     <>
-      <div className="page-body page-body--after">
+      <div id="sessions" className="page-body page-body--section page-body--after" tabIndex={-1}>
         <SectionTitle
           trailing={
             sessions.length > 0 && (

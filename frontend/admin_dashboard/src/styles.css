@@ -990,9 +990,33 @@ button {
 .page-body--after {
   padding-top: 28px;
 }
-/* Its heading lines up with the 560px card under it, so "End all sessions" sits over the card. */
-.page-body--after:has(+ .account) {
+/* A section heading on My account: as wide as the 560px card under it, so "End all sessions" sits over the card. */
+.page-body--section {
   max-width: 608px;
+  scroll-margin-top: 16px;
+}
+/* Focused only when a profile-panel link jumps here: no ring around the heading. */
+.page-body--section:focus,
+.profile-panel:focus {
+  outline: none;
+}
+/* Details as label and value pairs (My account's Profile card). */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 .sessions {
   padding-top: 6px;
@@ -1369,6 +1393,16 @@ button {
   .panel,
   .account {
     margin: 0 16px;
+  }
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* A row's button (Change password, End session) goes under its text, full width, so the text keeps its room. */
+  .setting-row {
+    flex-wrap: wrap;
+  }
+  .setting-row > .btn {
+    flex: 1 1 100%;
   }
   .search {
     width: 100%;
