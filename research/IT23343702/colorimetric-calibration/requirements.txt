@@ -3,7 +3,6 @@ scikit-image>=0.22
 numpy>=1.26
 matplotlib>=3.8
 imbalanced-learn>=0.12
-scikit-learn>=1.4
 Pillow>=10.2
 pandas>=2.2
 pytest>=8.0
@@ -14,6 +13,5 @@ streamlit>=1.30
 # (e.g. macOS arm64), install manually when needed:
 #   pip install tflite-runtime
 
-# Skin-type CNN training (scripts/train_fst_cnn.py, T52) needs TensorFlow/Keras; not required
-# by the calibration package itself:
-#   pip install tensorflow
+# Evaluation and training scripts (scikit-learn, TensorFlow) are in requirements-scripts.txt;
+# the calibration package itself does not need them.
