@@ -487,7 +487,6 @@ button {
   align-items: center;
   gap: 14px;
   width: 100%;
-  max-width: 560px;
   padding: 18px;
   border: none;
   border-radius: var(--radius-l);
