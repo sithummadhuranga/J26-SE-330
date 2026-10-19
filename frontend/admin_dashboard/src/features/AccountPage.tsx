@@ -18,6 +18,7 @@ import {
 import { EditIcon, KeyIcon, ShieldIcon } from '../ui/icons';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
+import { SessionsSection } from './SessionsSection';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
 /** The signed-in admin's own account: turning on two-step sign-in (architecture §7.3). */
@@ -137,6 +138,7 @@ export function AccountPage() {
           )}
         </section>
       )}
+      <SessionsSection />
       {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
       {editing && myProfile.data && <EditProfileDialog fullName={myProfile.data.fullName} onClose={() => setEditing(false)} />}
     </>

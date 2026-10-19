@@ -38,7 +38,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
     toast.dismiss();
     try {
       await session.authorized((t) => session.api.changePassword(t, current, next));
-      session.endAfterPasswordChange(); // the sign-in screen takes over and asks for the new password
+      session.endHere('passwordChanged'); // the sign-in screen takes over and asks for the new password
     } catch (err) {
       setBusy(false);
       // A wrong current password belongs next to that field; anything else is a toast.

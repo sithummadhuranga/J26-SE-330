@@ -15,6 +15,9 @@ export class NeedsSignIn extends Error {
 }
 
 /** The signed-in admin, read from the tokens (for display; the backend checks them). */
+/** How you ended your own session from My account. */
+export type EndedHere = 'passwordChanged' | 'sessionsEnded';
+
 export interface Admin {
   id: string;
   username: string;
@@ -47,7 +50,7 @@ export class AuthSession {
   private refreshing: Promise<string> | null = null;
   private ended = false;
   private failure: NeedsSignIn | null = null;
-  private passwordChanged = false;
+  private endedHere: EndedHere | null = null;
 
   constructor(api: AdminApi, store: TokenStore, now: () => number = Date.now, redirectUri = defaultRedirectUri) {
     this.api = api;
@@ -77,11 +80,11 @@ export class AuthSession {
     return ended;
   }
 
-  /** True once after you changed your own password, so the sign-in screen can ask for the new one. */
-  takePasswordChangedNotice(): boolean {
-    const changed = this.passwordChanged;
-    this.passwordChanged = false;
-    return changed;
+  /** Why you ended your own session from My account, once, so the sign-in screen can say so. */
+  takeEndedHereNotice(): EndedHere | null {
+    const reason = this.endedHere;
+    this.endedHere = null;
+    return reason;
   }
 
   /** Why the last sign-in did not complete, once, so the sign-in screen can say so. */
@@ -161,11 +164,11 @@ export class AuthSession {
   }
 
   /**
-   * After a successful POST /v1/me/password: the server has already ended every session, this one included, so end
-   * it here too without calling the server, and tell the sign-in screen why.
+   * After you changed your password or ended all your sessions: the server has already ended every session, this one
+   * included, so end it here too without calling the server, and tell the sign-in screen why.
    */
-  endAfterPasswordChange(): void {
-    this.passwordChanged = true;
+  endHere(reason: EndedHere): void {
+    this.endedHere = reason;
     this.clear();
   }
 
