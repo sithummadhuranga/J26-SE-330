@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAdmin, useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import { roleLabel, type ClinicianSummary } from '../core/models';
+import { usePaged } from '../core/paging';
 import {
   ActionsMenu,
   Centered,
@@ -17,6 +18,7 @@ import {
   TableCard,
 } from '../ui/components';
 import { PeopleIcon, PlusIcon } from '../ui/icons';
+import { Pagination } from '../ui/Pagination';
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 import { RegisterClinicianDialog } from './RegisterClinicianDialog';
@@ -54,6 +56,8 @@ export function CliniciansPage() {
   });
   useLoadFailureToast("Couldn't load clinicians", query.error);
   const reload = () => void queryClient.invalidateQueries({ queryKey: cliniciansKey });
+  const sorted = useMemo(() => [...(query.data ?? [])].sort(newestFirst), [query.data]);
+  const paged = usePaged(sorted);
 
   const run = async (action: Action, c: ClinicianSummary) => {
     const api = session.api;
@@ -119,6 +123,7 @@ export function CliniciansPage() {
   const onRegistered = (username: string) => {
     setRegistering(false);
     setJustAdded(username);
+    paged.setPage(0); // the new clinician is the first row of the first page
     toast.success('Clinician registered', `${username} can now sign in on the mobile app.`);
     reload();
   };
@@ -172,7 +177,7 @@ export function CliniciansPage() {
           message="Register the nurses and wound specialists who will use the mobile app."
         />
       ) : (
-        <TableCard>
+        <TableCard footer={<Pagination paged={paged} noun="clinicians" />}>
           <thead>
             <tr>
               <th>Clinician</th>
@@ -183,7 +188,7 @@ export function CliniciansPage() {
             </tr>
           </thead>
           <tbody>
-            {[...query.data].sort(newestFirst).map((c) => {
+            {paged.rows.map((c) => {
               const isSelf = c.username === me;
               const items = [
                 ...(c.locked ? [{ label: 'Unlock', onSelect: () => void run('unlock', c) }] : []),

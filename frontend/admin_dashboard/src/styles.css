@@ -750,7 +750,70 @@ button {
 }
 .table-card {
   margin: 0 24px;
+  overflow: hidden;
+}
+.table-card__scroll {
   overflow-x: auto;
+}
+
+/* ---- pager: under each table, arrows bottom right ---- */
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  padding: 10px 14px 10px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.pager__range {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pager__buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pager__page {
+  min-width: 96px;
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pager__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  background: var(--surface);
+  color: var(--accent-dark);
+  cursor: pointer;
+}
+.pager__btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+}
+.pager__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pager__btn:disabled {
+  border-color: var(--border);
+  color: var(--text-tertiary);
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* ---- my account ---- */

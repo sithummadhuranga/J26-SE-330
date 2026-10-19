@@ -24,11 +24,22 @@ async function openClinicians() {
   const session = newSession();
   const user = renderDashboard(session);
   await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
-  await screen.findByText(`${demoAdmin.username} (you)`, {}, slow);
+  await screen.findByRole('button', { name: 'Next page' }, slow); // the table and its pager are shown
   return user;
 }
 
 const rowOf = (username: string) => screen.getByText(username).closest('tr')!;
+
+/** The row with [text], moving through the pages with the arrows (the demo admin, the oldest, is on the last). */
+async function rowOnSomePage(user: ReturnType<typeof renderDashboard>, text: string) {
+  for (;;) {
+    const cell = screen.queryByText(text);
+    if (cell) return cell.closest('tr')!;
+    const next = screen.getByRole('button', { name: 'Next page' });
+    if ((next as HTMLButtonElement).disabled) throw new Error(`"${text}" is on no page`);
+    await user.click(next);
+  }
+}
 
 describe('clinicians (real identity service and database)', () => {
   it('registering a clinician saves them, shows them as the first row, and they can sign in on the app', async () => {
@@ -99,7 +110,7 @@ describe('clinicians (real identity service and database)', () => {
 
   it('an admin cannot deactivate themselves: the option is not offered, and the server refuses it too', async () => {
     const user = await openClinicians();
-    const me = rowOf(`${demoAdmin.username} (you)`);
+    const me = await rowOnSomePage(user, `${demoAdmin.username} (you)`);
     const actions = within(me).queryByRole('button', { name: `Actions for ${demoAdmin.username}` });
     if (actions) {
       await user.click(actions);
@@ -160,7 +171,7 @@ describe('clinicians (real identity service and database)', () => {
 
   it('an admin cannot reset their own password: the option is not offered, and the server refuses it too', async () => {
     const user = await openClinicians();
-    const actions = within(rowOf(`${demoAdmin.username} (you)`)).queryByRole('button', {
+    const actions = within(await rowOnSomePage(user, `${demoAdmin.username} (you)`)).queryByRole('button', {
       name: `Actions for ${demoAdmin.username}`,
     });
     if (actions) {
@@ -171,6 +182,32 @@ describe('clinicians (real identity service and database)', () => {
     await expect(
       admin.authorized((t) => admin.api.resetPassword(t, demoAdmin.username, 'Another-Pass-2026!')),
     ).rejects.toMatchObject({ code: 'CANNOT_RESET_OWN_PASSWORD' });
+  });
+
+  it('the table shows 10 newest-first rows a page, and the arrows move between pages', async () => {
+    const admin = await adminSession();
+    const total = (await admin.authorized((t) => admin.api.clinicians(t))).length;
+    if (total <= 10) await registerClinician(admin, uniqueName('page')); // make sure there is a second page
+    const user = await openClinicians();
+    const pager = screen.getByRole('navigation', { name: 'clinicians pages' });
+
+    expect(screen.getAllByRole('row')).toHaveLength(11); // header + 10
+    expect(within(pager).getByText(/^1–10 of \d+$/)).toBeInTheDocument();
+    expect(within(pager).getByRole('button', { name: 'First page' })).toBeDisabled();
+    expect(within(pager).getByRole('button', { name: 'Previous page' })).toBeDisabled();
+    const firstOnPage1 = screen.getAllByRole('row')[1]!.textContent;
+
+    await user.click(within(pager).getByRole('button', { name: 'Next page' }));
+    expect(within(pager).getByText(/^11–\d+ of \d+$/)).toBeInTheDocument();
+    expect(within(pager).getByText(/^Page 2 of \d+$/)).toBeInTheDocument();
+    expect(screen.getAllByRole('row')[1]!.textContent).not.toBe(firstOnPage1);
+
+    await user.click(within(pager).getByRole('button', { name: 'Last page' }));
+    expect(within(pager).getByRole('button', { name: 'Next page' })).toBeDisabled();
+    expect(screen.getByText(`${demoAdmin.username} (you)`)).toBeInTheDocument(); // the oldest account comes last
+
+    await user.click(within(pager).getByRole('button', { name: 'First page' }));
+    expect(screen.getAllByRole('row')[1]!.textContent).toBe(firstOnPage1);
   });
 
   it('a username with unusual characters is escaped in the URL, and an unknown one is not found', async () => {
