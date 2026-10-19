@@ -6,7 +6,7 @@ import { formatDateTime } from '../core/format';
 import { roleLabel } from '../core/models';
 import { meKey } from '../core/queryKeys';
 import { IconTile, InitialsAvatar, Spinner, StatusChip } from '../ui/components';
-import { ChevronRightIcon, EditIcon, KeyIcon, PersonIcon, ShieldIcon } from '../ui/icons';
+import { ChevronRightIcon, EditIcon, KeyIcon, MonitorIcon, PersonIcon, ShieldIcon } from '../ui/icons';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 
@@ -23,6 +23,7 @@ export function ProfileMenu() {
   const [changingPassword, setChangingPassword] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const panelId = useId();
 
   const me = useQuery({
@@ -50,6 +51,17 @@ export function ProfileMenu() {
     };
   }, [open]);
 
+  // Keyboard users land in the panel when it opens.
+  useEffect(() => {
+    if (open) panel.current?.focus();
+  }, [open]);
+
+  /** After a dialog opened from the panel closes, focus goes back to the avatar. */
+  const backToAvatar = (close: () => void) => () => {
+    close();
+    button.current?.focus();
+  };
+
   const go = (path: string) => {
     setOpen(false);
     navigate(path);
@@ -59,7 +71,14 @@ export function ProfileMenu() {
   const name = profile?.fullName ?? admin?.username ?? '';
 
   return (
-    <div className="profile-menu" ref={root}>
+    <div
+      className="profile-menu"
+      ref={root}
+      onBlur={(e) => {
+        // Tabbing out of the panel closes it, like a click outside.
+        if (open && e.relatedTarget && !root.current?.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
       <button
         ref={button}
         type="button"
@@ -76,7 +95,7 @@ export function ProfileMenu() {
       {/* Dims the page behind the bottom sheet on a phone-sized screen; hidden on wider ones. */}
       {open && <div className="profile-backdrop" aria-hidden="true" onClick={() => setOpen(false)} />}
       {open && (
-        <div id={panelId} className="profile-panel" role="dialog" aria-label="Your profile">
+        <div id={panelId} ref={panel} className="profile-panel" role="dialog" aria-label="Your profile" tabIndex={-1}>
           {me.isPending ? (
             <div className="profile-panel__loading">
               <Spinner />
@@ -151,11 +170,18 @@ export function ProfileMenu() {
               <span className="profile-panel__label">My account</span>
               <ChevronRightIcon size={18} className="profile-panel__chevron" />
             </button>
-            <button type="button" className="profile-panel__row" onClick={() => go('/account')}>
+            <button type="button" className="profile-panel__row" onClick={() => go('/account#security')}>
               <IconTile>
                 <ShieldIcon size={18} />
               </IconTile>
               <span className="profile-panel__label">Two-step sign-in</span>
+              <ChevronRightIcon size={18} className="profile-panel__chevron" />
+            </button>
+            <button type="button" className="profile-panel__row" onClick={() => go('/account#sessions')}>
+              <IconTile>
+                <MonitorIcon size={18} />
+              </IconTile>
+              <span className="profile-panel__label">Your sessions</span>
               <ChevronRightIcon size={18} className="profile-panel__chevron" />
             </button>
           </div>
@@ -164,8 +190,8 @@ export function ProfileMenu() {
           </button>
         </div>
       )}
-      {editing && profile && <EditProfileDialog fullName={profile.fullName} onClose={() => setEditing(false)} />}
-      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
+      {editing && profile && <EditProfileDialog fullName={profile.fullName} onClose={backToAvatar(() => setEditing(false))} />}
+      {changingPassword && <ChangePasswordDialog onClose={backToAvatar(() => setChangingPassword(false))} />}
     </div>
   );
 }

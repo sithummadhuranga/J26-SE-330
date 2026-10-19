@@ -116,8 +116,11 @@ describe('profile panel from the avatar (real identity service)', () => {
 
   it('My account shows your full name and has its own Edit profile button', async () => {
     const { user, name } = await signedInAsNewAdmin('/account');
-    expect(await screen.findByText(`E2E ${name}`, {}, slow)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Edit profile' }));
+    expect(await screen.findByText(`E2E ${name}`, { selector: '.profile__name' }, slow)).toBeInTheDocument();
+    const details = screen.getByRole('region', { name: 'Profile' });
+    expect(within(details).getByText(name)).toBeInTheDocument(); // the username, in the details
+    expect(within(details).getByText('Admin')).toBeInTheDocument();
+    await user.click(within(details).getByRole('button', { name: 'Edit profile' }));
     const field = within(screen.getByRole('dialog', { name: 'Edit profile' })).getByLabelText('Full name');
     await user.clear(field);
     await user.type(field, 'From My Account');
@@ -201,6 +204,50 @@ describe('profile panel from the avatar (real identity service)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'End all sessions' }));
     expect(await screen.findByRole('button', { name: 'Sign in' }, slow)).toBeInTheDocument();
     expect(await findToast('All your sessions have ended. Sign in again here.')).toBeInTheDocument();
+  });
+
+  it('works from the keyboard: focus moves into the panel and dialogs, wraps, and comes back to the avatar', async () => {
+    const user = await signedIn();
+    const avatar = screen.getByRole('button', { name: 'Your profile' });
+    avatar.focus();
+    await user.keyboard('{Enter}');
+    const panel = await screen.findByRole('dialog', { name: 'Your profile' });
+    expect(panel).toHaveFocus();
+    await within(panel).findByRole('button', { name: 'Edit profile' }, slow);
+
+    await user.tab(); // Edit profile is the first action
+    expect(within(panel).getByRole('button', { name: 'Edit profile' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    const dialog = screen.getByRole('dialog', { name: 'Edit profile' });
+    expect(within(dialog).getByLabelText('Full name')).toHaveFocus();
+    within(dialog).getByRole('button', { name: 'Save' }).focus();
+    await user.tab(); // past the last button, back to the first field
+    expect(within(dialog).getByLabelText('Full name')).toHaveFocus();
+    await user.tab({ shift: true }); // and backwards from the first to the last
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Edit profile' })).not.toBeInTheDocument();
+    expect(avatar).toHaveFocus();
+
+    // Tabbing out of the panel closes it.
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog', { name: 'Your profile' });
+    screen.getAllByRole('button', { name: 'Sign out' }).at(-1)!.focus(); // the panel's last control
+    await user.tab();
+    expect(screen.queryByRole('dialog', { name: 'Your profile' })).not.toBeInTheDocument();
+  });
+
+  it('the panel links open My account at the right section', async () => {
+    const user = await signedIn();
+    await user.click(screen.getByRole('button', { name: 'Your profile' }));
+    const panel = await screen.findByRole('dialog', { name: 'Your profile' });
+    await user.click(within(panel).getByRole('button', { name: 'Your sessions' }));
+    await screen.findByRole('heading', { name: 'My account' }, slow);
+    await waitFor(() => expect(document.activeElement?.id).toBe('sessions'), slow);
+
+    await user.click(screen.getByRole('button', { name: 'Your profile' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Your profile' })).getByRole('button', { name: 'Two-step sign-in' }));
+    await waitFor(() => expect(document.activeElement?.id).toBe('security'), slow);
   });
 
   it('links to My account, and signs you out', async () => {
