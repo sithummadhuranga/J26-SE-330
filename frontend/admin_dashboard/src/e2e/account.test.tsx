@@ -6,6 +6,7 @@ import {
   findToast,
   LoginPageError,
   newSession,
+  ownPassword,
   registerClinician,
   renderDashboard,
   requireBackend,
@@ -26,7 +27,7 @@ async function newAdminOnAccountPage() {
   await registerClinician(await adminSession(), name, 'admin');
   const session = newSession();
   const user = renderDashboard(session, '/account');
-  await signInOnScreen(user, session, name, strongPassword);
+  await signInOnScreen(user, session, name, strongPassword, undefined, ownPassword);
   await screen.findByRole('heading', { name: 'My account' }, slow);
   return { user, name };
 }
@@ -52,8 +53,8 @@ describe('my account: two-step sign-in (real identity service)', () => {
     expect(await within(card).findByText('On', {}, slow)).toBeInTheDocument();
 
     // The password alone no longer signs in; with a fresh code from the app it does.
-    await expect(signInThroughLoginPage(newSession(), name, strongPassword)).rejects.toBeInstanceOf(LoginPageError);
-    const admin = await signInThroughLoginPage(newSession(), name, strongPassword, totpCode(secret, step() + 1));
+    await expect(signInThroughLoginPage(newSession(), name, ownPassword)).rejects.toBeInstanceOf(LoginPageError);
+    const admin = await signInThroughLoginPage(newSession(), name, ownPassword, totpCode(secret, step() + 1));
     expect(admin.username).toBe(name);
 
     // The clinicians list shows it to every admin of the facility.

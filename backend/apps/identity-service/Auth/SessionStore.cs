@@ -61,16 +61,33 @@ public sealed class SessionStore(NpgsqlDataSource db, JwtOptions jwt)
     }
 
     /// <summary>
+    /// How long a rotated refresh token can still be traded, for a phone that lost the answer to its refresh.
+    /// </summary>
+    public static readonly TimeSpan RefreshGrace = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// Ends the session <paramref name="sessionId"/> and issues the next one in its family, auditing a REFRESH.
     /// Null when the session is unknown, already rotated, revoked, expired, the clinician was deactivated or the
     /// device revoked: only a new sign-in helps then.
     /// </summary>
+    /// <remarks>
+    /// Grace: if the session was rotated less than <see cref="RefreshGrace"/> ago and the row that replaced it is
+    /// still active (its refresh token never used), that row is rotated instead. The answer to the earlier refresh was
+    /// lost on the way to the phone, so the phone never had the newer token. Once the newer token has been used, or the
+    /// session was ended any other way, the old token is refused as before. Mobile only: weak networks are a phone
+    /// problem, and the dashboard's admin tokens keep the strict rule.
+    /// </remarks>
     public async Task<ActiveSession?> RotateAsync(Guid sessionId, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
-        var session = await FindActiveAsync(conn, tx, "s.session_id = @key", sessionId, ct);
+        var session = await FindActiveAsync(conn, tx, "s.session_id = @key", sessionId, ct)
+            ?? await FindActiveAsync(conn, tx, $"""
+                s.client_id = 'mobile'
+                AND s.session_id = (SELECT o.replaced_by FROM clinical.clinician_session o
+                                    WHERE o.session_id = @key AND o.revoked_at > now() - interval '{RefreshGrace.TotalSeconds} seconds')
+                """, sessionId, ct);
         if (session is null)
         {
             await AuthAudit.WriteAsync(conn, tx, "REFRESH", "(refresh)", null, null, false, "INVALID_REFRESH_TOKEN", ct);
@@ -80,6 +97,11 @@ public sealed class SessionStore(NpgsqlDataSource db, JwtOptions jwt)
 
         await RevokeRowAsync(conn, tx, session.SessionId, ct);
         var next = await IssueAsync(conn, tx, session.Clinician, session.FamilyId, ct);
+        // Only the token the phone presented gets grace. After a grace refresh the row it skipped never reached the
+        // phone, so it keeps no replaced_by and its token is refused from now on.
+        await Sql.ExecAsync(conn, tx,
+            "UPDATE clinical.clinician_session SET replaced_by = @next WHERE session_id = @presented",
+            ct, ("next", next), ("presented", sessionId));
         await AuthAudit.WriteAsync(conn, tx, "REFRESH", session.Username, session.ClinicianId, session.DeviceId, true, null, ct);
         await tx.CommitAsync(ct);
         return session with { SessionId = next };

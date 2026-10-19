@@ -244,18 +244,32 @@ def authorize_url(client_id, redirect_uri, challenge, device=None, method="S256"
     return "/connect/authorize?" + urllib.parse.urlencode(params)
 
 
-def sign_in(browser, url, username, password, totp=None):
-    """Runs the login page; returns (where the browser was sent, last page, reason shown on the page)."""
+def sign_in(browser, url, username, password, totp=None, new_password=None, confirm=None):
+    """Runs the login page; returns (where the browser was sent, last page, reason shown on the page).
+    [new_password] answers the "choose your own password" step, if the page asks (an admin chose the password)."""
     _, _, page, out = browser.follow(url)
     if out:
         return out, page, None
     fields = form_fields(page)
     fields.update(Username=username, Password=password)
     _, _, page, out = browser.follow(browser.url, fields)
-    if out or page_error(page) or totp is None:
-        return out, page, page_error(page)
+    if not out and not page_error(page) and totp is not None and 'name="Totp"' in page:
+        fields = form_fields(page)
+        fields["Totp"] = totp
+        _, _, page, out = browser.follow(browser.url, fields)
+    if not out and new_password is not None and asks_for_new_password(page):
+        return choose_password(browser, page, new_password, confirm)
+    return out, page, page_error(page)
+
+
+def asks_for_new_password(page):
+    return 'name="NewPassword"' in page
+
+
+def choose_password(browser, page, new_password, confirm=None):
+    """Submits the login page's "choose your own password" step; same return as sign_in."""
     fields = form_fields(page)
-    fields["Totp"] = totp
+    fields.update(NewPassword=new_password, ConfirmPassword=new_password if confirm is None else confirm)
     _, _, page, out = browser.follow(browser.url, fields)
     return out, page, page_error(page)
 

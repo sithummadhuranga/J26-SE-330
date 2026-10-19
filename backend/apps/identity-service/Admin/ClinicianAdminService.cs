@@ -9,7 +9,7 @@ public sealed record RegisterClinicianRequest(string Username, string Password, 
 public sealed record ResetPasswordRequest(string? Password);
 
 public sealed record ClinicianSummary(Guid ClinicianId, string Username, string FullName, string Role, bool Active,
-    bool Locked, bool MfaEnabled, DateTime CreatedAt);
+    bool Locked, bool MfaEnabled, DateTime CreatedAt, bool MustChangePassword);
 
 public sealed record AuthAuditEntry(long Id, DateTime RecordedAt, string Action, bool Success, string Username,
     string? ReasonCode, string? DeviceId, string? ActorUsername);
@@ -49,8 +49,8 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
                     ON CONFLICT (username) DO NOTHING
                     RETURNING clinician_id
                 )
-                INSERT INTO clinical.clinician_credential (clinician_id, password_hash, password_salt)
-                SELECT clinician_id, @h, @s FROM c
+                INSERT INTO clinical.clinician_credential (clinician_id, password_hash, password_salt, must_change_password)
+                SELECT clinician_id, @h, @s, @must FROM c
                 RETURNING clinician_id
                 """, conn, tx);
             insert.Parameters.AddWithValue("u", username);
@@ -59,6 +59,9 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             insert.Parameters.AddWithValue("f", facilityId);
             insert.Parameters.AddWithValue("h", Convert.ToBase64String(hash));
             insert.Parameters.AddWithValue("s", salt);
+            // An admin shares the password in person, so the clinician replaces it on first sign-in; the command-line
+            // bootstrap is run by whoever will use the account.
+            insert.Parameters.AddWithValue("must", actorId is not null);
             if (await insert.ExecuteScalarAsync(ct) is not Guid id) return (null, "USERNAME_TAKEN");
             clinicianId = id;
         }
@@ -81,7 +84,8 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
     {
         await using var cmd = db.CreateCommand("""
             SELECT c.clinician_id, c.username, c.full_name, c.role, c.active,
-                   COALESCE(cc.locked_until > now(), false), COALESCE(cc.mfa_enabled, false), c.created_at
+                   COALESCE(cc.locked_until > now(), false), COALESCE(cc.mfa_enabled, false), c.created_at,
+                   COALESCE(cc.must_change_password, false)
             FROM clinical.clinician c
             LEFT JOIN clinical.clinician_credential cc USING (clinician_id)
             WHERE c.facility_id = @f
@@ -92,7 +96,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         await using var r = await cmd.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
             list.Add(new ClinicianSummary(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetBoolean(4),
-                r.GetBoolean(5), r.GetBoolean(6), r.GetDateTime(7)));
+                r.GetBoolean(5), r.GetBoolean(6), r.GetDateTime(7), r.GetBoolean(8)));
         return list;
     }
 
@@ -109,6 +113,18 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         return await ChangeAsync(actorId, facilityId, username, "DEACTIVATE", ct,
             "UPDATE clinical.clinician SET active = false WHERE clinician_id = @id",
             "UPDATE clinical.clinician_session SET revoked_at = now() WHERE clinician_id = @id AND revoked_at IS NULL");
+    }
+
+    /// <summary>Undoes a deactivation. Sessions ended by it stay ended; the clinician signs in again.</summary>
+    public async Task<string?> ReactivateAsync(Guid actorId, string facilityId, string username, CancellationToken ct)
+    {
+        await using var cmd = db.CreateCommand(
+            "SELECT active FROM clinical.clinician WHERE username = @u AND facility_id = @f");
+        cmd.Parameters.AddWithValue("u", username);
+        cmd.Parameters.AddWithValue("f", facilityId);
+        if (await cmd.ExecuteScalarAsync(ct) is true) return "ALREADY_ACTIVE";
+        return await ChangeAsync(actorId, facilityId, username, "REACTIVATE", ct,
+            "UPDATE clinical.clinician SET active = true WHERE clinician_id = @id");
     }
 
     /// <summary>For a lost phone: removes the TOTP secret so the clinician can enroll again.</summary>
@@ -133,7 +149,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         return await ChangeAsync(actorId, facilityId, username, "PASSWORD_RESET", ct, args,
             """
             UPDATE clinical.clinician_credential
-            SET password_hash = @h, password_salt = @s, failed_attempts = 0, locked_until = NULL
+            SET password_hash = @h, password_salt = @s, failed_attempts = 0, locked_until = NULL, must_change_password = true
             WHERE clinician_id = @id
             """,
             "UPDATE clinical.clinician_session SET revoked_at = now() WHERE clinician_id = @id AND revoked_at IS NULL");

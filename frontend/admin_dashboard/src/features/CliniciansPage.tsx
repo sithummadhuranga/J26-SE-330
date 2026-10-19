@@ -11,7 +11,7 @@ import { ResetPasswordDialog } from './ResetPasswordDialog';
 
 const cliniciansKey = ['clinicians'];
 
-type Action = 'unlock' | 'resetMfa' | 'deactivate';
+type Action = 'unlock' | 'resetMfa' | 'deactivate' | 'reactivate';
 
 /** Newest first, so a clinician who was just registered is the top row (the server sorts by username). */
 const newestFirst = (a: ClinicianSummary, b: ClinicianSummary) =>
@@ -76,6 +76,15 @@ export function CliniciansPage() {
         failed: `Couldn't deactivate ${c.username}`,
         call: (t: string) => api.deactivate(t, c.username),
       },
+      reactivate: {
+        title: `Reactivate ${c.username}?`,
+        message: `${c.fullName} can sign in again with their current password. Their old sessions stay ended.`,
+        label: 'Reactivate',
+        destructive: false,
+        done: `Reactivated ${c.username}.`,
+        failed: `Couldn't reactivate ${c.username}`,
+        call: (t: string) => api.reactivate(t, c.username),
+      },
     }[action];
 
     const yes = await confirm({
@@ -102,7 +111,7 @@ export function CliniciansPage() {
   };
 
   const onPasswordReset = () => {
-    toast.success('Password reset', `${resetting?.username} is signed out and can sign in with the new password.`);
+    toast.success('Password reset', `${resetting?.username} is signed out, signs in with the new password, then chooses their own.`);
     setResetting(null);
     reload();
   };
@@ -151,6 +160,7 @@ export function CliniciansPage() {
                 ...(c.active && !isSelf ? [{ label: 'Reset password', onSelect: () => setResetting(c) }] : []),
                 ...(c.mfaEnabled ? [{ label: 'Reset MFA', onSelect: () => void run('resetMfa', c) }] : []),
                 ...(c.active && !isSelf ? [{ label: 'Deactivate', danger: true, onSelect: () => void run('deactivate', c) }] : []),
+                ...(!c.active ? [{ label: 'Reactivate', onSelect: () => void run('reactivate', c) }] : []),
               ];
               return (
                 <tr key={c.clinicianId} className={c.username === justAdded ? 'row--new' : undefined}>
@@ -165,6 +175,9 @@ export function CliniciansPage() {
                       {c.active ? <StatusChip label="Active" tone="teal" /> : <StatusChip label="Deactivated" tone="error" />}
                       {c.locked && <StatusChip label="Locked" tone="error" />}
                       {c.mfaEnabled && <StatusChip label="MFA on" tone="blue" />}
+                      {c.active && c.mustChangePassword && (
+                        <StatusChip label="New password due" tone="muted" title="Chooses their own password at the next sign-in" />
+                      )}
                     </span>
                   </td>
                   <td>{formatDateTime(c.createdAt)}</td>

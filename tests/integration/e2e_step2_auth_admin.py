@@ -160,15 +160,33 @@ check("deactivated nurse cannot log in", status == 400, f"{status}")
 status, _ = refresh(nurse_refresh)
 check("... and cannot refresh an existing session", status == 400, f"{status}")
 
+print("Reactivation")
+status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/reactivate", token=admin_b)
+check("another facility's admin gets 404 for the reactivation", status == 404, f"{status}")
+status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/reactivate", token=admin_a)
+check("admin reactivates the nurse (204)", status == 204, f"{status}")
+status, _ = refresh(nurse_refresh)
+check("sessions ended by the deactivation stay ended", status == 400, f"{status}")
+status, _ = login(NURSE, NEW_PASSWORD, DEVICE_A)
+check("the reactivated nurse signs in again", status == 200, f"{status}")
+status, body = http("POST", f"/v1/admin/clinicians/{NURSE}/reactivate", token=admin_a)
+check("reactivating an active account is 409", status == 409 and body["code"] == "ALREADY_ACTIVE", f"{status} {body}")
+status, _ = http("POST", f"/v1/admin/clinicians/{NURSE}/deactivate", token=admin_a)
+check("... and can be deactivated again", status == 204, f"{status}")
+
 print("Audit trail")
 status, body = http("GET", "/v1/admin/auth-audit?limit=500", token=admin_a)
 actions = {e["action"] for e in body if e["username"] == NURSE} if status == 200 else set()
 expected = {"REGISTER", "LOGIN", "MFA_ENROLL", "MFA_CONFIRM", "MFA_RESET", "LOCKOUT", "UNLOCK", "PASSWORD_RESET",
-            "DEACTIVATE"}
+            "DEACTIVATE", "REACTIVATE"}
 check("admin audit log shows the nurse's whole lifecycle", expected <= actions, f"missing {expected - actions}")
 by_admin = {e["action"] for e in body if e["username"] == NURSE and e["actorUsername"] == ADMIN_A}
 check("admin actions carry the admin as actor",
-      {"REGISTER", "MFA_RESET", "UNLOCK", "PASSWORD_RESET", "DEACTIVATE"} <= by_admin, by_admin)
+      {"REGISTER", "MFA_RESET", "UNLOCK", "PASSWORD_RESET", "DEACTIVATE", "REACTIVATE"} <= by_admin, by_admin)
+list_status, clinicians = http("GET", "/v1/admin/clinicians", token=admin_a)
+mine = next((c for c in clinicians if c["username"] == NURSE), {}) if list_status == 200 else {}
+check("the clinician list says the admin-set password must still be changed", mine.get("mustChangePassword") is True,
+      mine)
 failed = [e for e in body if e["username"] == NURSE and not e["success"]]
 check("failed attempts are recorded with a reason",
       {"MFA_REQUIRED", "INVALID_TOTP", "INVALID_CREDENTIALS"} <= {e["reasonCode"] for e in failed})
