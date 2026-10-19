@@ -130,11 +130,17 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
   );
 }
 
-/** A table inside a card that scrolls sideways only when it needs more room than it has. */
-export function TableCard({ children }: { children: ReactNode }) {
+/**
+ * A table inside a card that scrolls sideways only when it needs more room than it has. [footer] (the pager) stays
+ * at the bottom of the card and does not scroll with the table.
+ */
+export function TableCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (
     <div className="card table-card">
-      <table className="table">{children}</table>
+      <div className="table-card__scroll">
+        <table className="table">{children}</table>
+      </div>
+      {footer}
     </div>
   );
 }

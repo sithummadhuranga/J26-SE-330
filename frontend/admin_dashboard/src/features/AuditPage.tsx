@@ -4,9 +4,11 @@ import { useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import { auditActionLabel, auditReasonLabel } from '../core/messages';
 import type { AuthAuditEntry } from '../core/models';
+import { usePaged } from '../core/paging';
 import { fuzzyMatch } from '../core/search';
 import { Centered, EmptyState, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
 import { HistoryIcon } from '../ui/icons';
+import { Pagination } from '../ui/Pagination';
 import { useLoadFailureToast } from '../ui/toastContext';
 
 const limits = [100, 250, 500, 1000] as const;
@@ -41,6 +43,14 @@ export function AuditPage() {
 
   const all = query.data ?? [];
   const rows = all.filter((e) => matches(e, search.trim(), failuresOnly));
+  const paged = usePaged(rows);
+  // A new search, filter or amount starts again at the newest events.
+  const fresh =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      paged.setPage(0);
+    };
 
   return (
     <>
@@ -66,14 +76,14 @@ export function AuditPage() {
               aria-label="Search audit log"
               placeholder="Search user, action, result or device"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => fresh(setSearch)(e.target.value)}
             />
           </div>
           <div className="segmented" role="group" aria-label="Which events">
-            <button type="button" aria-pressed={!failuresOnly} onClick={() => setFailuresOnly(false)}>
+            <button type="button" aria-pressed={!failuresOnly} onClick={() => fresh(setFailuresOnly)(false)}>
               All events
             </button>
-            <button type="button" aria-pressed={failuresOnly} onClick={() => setFailuresOnly(true)}>
+            <button type="button" aria-pressed={failuresOnly} onClick={() => fresh(setFailuresOnly)(true)}>
               Failures only
             </button>
           </div>
@@ -85,7 +95,7 @@ export function AuditPage() {
           )}
           <label className="toolbar__select">
             <span>Show</span>
-            <select aria-label="How many events" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+            <select aria-label="How many events" value={limit} onChange={(e) => fresh(setLimit)(Number(e.target.value))}>
               {limits.map((l) => (
                 <option key={l} value={l}>
                   Last {l}
@@ -129,7 +139,7 @@ export function AuditPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((e) => (
+                {paged.rows.map((e) => (
                   <tr key={e.id}>
                     <td className="table__time">{formatDateTime(e.recordedAt)}</td>
                     <td>{auditActionLabel(e.action)}</td>
@@ -149,6 +159,7 @@ export function AuditPage() {
             </table>
           </div>
         )}
+        {query.isSuccess && rows.length > 0 && <Pagination paged={paged} noun="events" />}
       </section>
     </>
   );

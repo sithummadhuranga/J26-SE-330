@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import type { DeviceSummary } from '../core/models';
+import { usePaged } from '../core/paging';
 import {
   Centered,
   EmptyState,
@@ -14,10 +16,19 @@ import {
   TableCard,
 } from '../ui/components';
 import { InfoIcon, PhoneIcon } from '../ui/icons';
+import { Pagination } from '../ui/Pagination';
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
 const devicesKey = ['devices'];
+
+/** When anything last happened to the device: revoked, last used, or registered. */
+const lastChange = (d: DeviceSummary) =>
+  Math.max(...[d.revokedAt, d.lastSeenAt, d.registeredAt].map((t) => (t ? Date.parse(t) : 0)));
+
+/** The latest change first, so a phone just used or just revoked is the top row. */
+const latestFirst = (a: DeviceSummary, b: DeviceSummary) =>
+  lastChange(b) - lastChange(a) || a.deviceId.localeCompare(b.deviceId);
 
 /** Registered phones; revoking ends their sessions within 30 s but leaves unsynced data on the phone. */
 export function DevicesPage() {
@@ -32,6 +43,8 @@ export function DevicesPage() {
   });
   useLoadFailureToast("Couldn't load devices", query.error);
   const reload = () => void queryClient.invalidateQueries({ queryKey: devicesKey });
+  const sorted = useMemo(() => [...(query.data ?? [])].sort(latestFirst), [query.data]);
+  const paged = usePaged(sorted);
 
   const revoke = async (d: DeviceSummary) => {
     const yes = await confirm({
@@ -82,7 +95,7 @@ export function DevicesPage() {
           message="Phones appear here after a clinician signs in on them."
         />
       ) : (
-        <TableCard>
+        <TableCard footer={<Pagination paged={paged} noun="devices" />}>
           <thead>
             <tr>
               <th>Device</th>
@@ -95,7 +108,7 @@ export function DevicesPage() {
             </tr>
           </thead>
           <tbody>
-            {query.data.map((d) => (
+            {paged.rows.map((d) => (
               <tr key={d.deviceId}>
                 <td>
                   <span className="person">
