@@ -10,6 +10,7 @@ PASSWORD = "Profile-Pass-" + secrets.token_hex(4)
 suffix = secrets.token_hex(3)
 ADMIN, NURSE, OTHER = f"prof.admin.{suffix}", f"prof.nurse.{suffix}", f"prof.other.{suffix}"
 PW_USER, LOCK_USER, DUE_USER = f"prof.pw.{suffix}", f"prof.lock.{suffix}", f"prof.due.{suffix}"
+SESS_USER = f"prof.sess.{suffix}"
 NEW_PASSWORD = "Profile-New-" + secrets.token_hex(4)
 DEVICE = "dev-prof-" + secrets.token_hex(3)
 
@@ -168,6 +169,62 @@ check("an admin-chosen password is due for change", http("GET", "/v1/me", token=
 status, _ = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD}, due)
 check("changing it yourself clears that", status == 204 and http("GET", "/v1/me", token=due)[1].get("mustChangePassword") is False,
       status)
+
+print("Your sessions (step 7)")
+create_clinician(SESS_USER, PASSWORD, "admin", FAC_A, "Session Owner")
+_, browser_1 = dashboard_login(SESS_USER, PASSWORD)
+_, browser_2 = dashboard_login(SESS_USER, PASSWORD)
+_, phone = login(SESS_USER, PASSWORD, DEVICE + "-sess")
+token = browser_1["accessToken"]
+status, _ = refresh(browser_2["refreshToken"], client_id="admin-dashboard")
+status, sessions = http("GET", "/v1/me/sessions", token=token)
+check("lists your three sign-ins: two browsers and a phone (a refresh stays the same session)",
+      status == 200 and len(sessions) == 3, f"{status} {sessions}")
+check("each has a client, and only the phone has a device",
+      sorted(x["client"] for x in sessions) == ["admin-dashboard", "admin-dashboard", "mobile"]
+      and [x["deviceId"] for x in sessions if x["client"] == "mobile"] == [DEVICE + "-sess"]
+      and all(x["deviceId"] is None for x in sessions if x["client"] != "mobile"), sessions)
+check("signed in, last used and expiry are in order",
+      all(stamp(x["signedInAt"]) <= stamp(x["lastUsedAt"]) < stamp(x["expiresAt"]) for x in sessions), sessions)
+check("most recently used first", [stamp(x["lastUsedAt"]) for x in sessions]
+      == sorted((stamp(x["lastUsedAt"]) for x in sessions), reverse=True), sessions)
+check("nothing secret in the list", not any({"refreshTokenHash", "clinicianId"} & set(x) for x in sessions), sessions)
+
+status, others = http("GET", "/v1/me/sessions", token=dash)
+check("another admin's list never shows your sessions",
+      status == 200 and not {x["sessionId"] for x in others} & {x["sessionId"] for x in sessions}, status)
+
+phone_session = next(x["sessionId"] for x in sessions if x["client"] == "mobile")
+status, body = http("DELETE", f"/v1/me/sessions/{phone_session}", token=token)
+check("ending the phone's session: 204", status == 204, f"{status} {body}")
+status, _ = refresh(phone["refreshToken"])
+check("... its refresh token stops working", status == 400, status)
+status, left = http("GET", "/v1/me/sessions", token=token)
+check("... and it leaves the list", status == 200 and len(left) == 2 and phone_session not in {x["sessionId"] for x in left},
+      left)
+check("... audited as LOGOUT for that device, with you as actor",
+      sql(f"select count(*) from audit.auth_audit a where a.action = 'LOGOUT' and a.username = '{SESS_USER}' "
+          f"and a.device_id = '{DEVICE}-sess' and a.actor_clinician_id = a.clinician_id") == "1")
+status, _ = http("DELETE", f"/v1/me/sessions/{phone_session}", token=token)
+check("ending it again is 404", status == 404, status)
+status, _ = http("DELETE", "/v1/me/sessions/7d0e8d4e-3c1a-4c55-9a48-000000000000", token=token)
+check("an unknown session is 404", status == 404, status)
+status, _ = http("DELETE", "/v1/me/sessions/not-a-session-id", token=token)
+check("a malformed id is 404", status == 404, status)
+other_session = others[0]["sessionId"] if others else "00000000-0000-0000-0000-000000000000"
+status, _ = http("DELETE", f"/v1/me/sessions/{other_session}", token=token)
+check("someone else's session is 404, never ended", status == 404 and http("GET", "/v1/me/sessions", token=dash)[1]
+      and any(x["sessionId"] == other_session for x in http("GET", "/v1/me/sessions", token=dash)[1]), status)
+
+status, _ = http("DELETE", "/v1/me/sessions", token=token)
+check("ending all your sessions: 204", status == 204, status)
+status, _ = refresh(browser_1["refreshToken"], client_id="admin-dashboard")
+check("... both browsers' refresh tokens stop working", status == 400
+      and refresh(browser_2["refreshToken"], client_id="admin-dashboard")[0] == 400, status)
+status, left = http("GET", "/v1/me/sessions", token=token)
+check("... and the list is empty", status == 200 and left == [], left)
+status, _ = http("GET", "/v1/me/sessions")
+check("without a token it is 401", status == 401, status)
 
 sql(f"update clinical.clinician set active = false where username = '{NURSE}'")
 status, body = http("GET", "/v1/me", token=nurse)

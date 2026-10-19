@@ -49,6 +49,23 @@ public static class MeEndpoints
             };
         });
 
+        me.MapGet("/sessions", async (ClaimsPrincipal user, ProfileService profiles, CancellationToken ct) =>
+            Results.Ok(await profiles.SessionsAsync(AuthEndpoints.ClinicianId(user), ct)));
+
+        // Someone else's session, an unknown id and one already ended are all just "not found".
+        me.MapDelete("/sessions/{sessionId}", async (string sessionId, ClaimsPrincipal user, ProfileService profiles,
+            CancellationToken ct) =>
+            Guid.TryParse(sessionId, out var id) && await profiles.EndSessionsAsync(AuthEndpoints.ClinicianId(user), id, ct)
+                ? Results.NoContent()
+                : Results.NotFound(new { code = "NOT_FOUND" }));
+
+        // Every session, this one included: the client then signs in again.
+        me.MapDelete("/sessions", async (ClaimsPrincipal user, ProfileService profiles, CancellationToken ct) =>
+        {
+            await profiles.EndSessionsAsync(AuthEndpoints.ClinicianId(user), null, ct);
+            return Results.NoContent();
+        });
+
         return group;
     }
 }

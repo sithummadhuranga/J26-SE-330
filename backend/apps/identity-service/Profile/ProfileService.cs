@@ -4,6 +4,13 @@ using Npgsql;
 namespace IdentityService.Profile;
 
 /// <param name="LastSignInAt">The newest successful sign-in, from the auth audit; null before the first one.</param>
+/// <summary>One sign-in that is still going: a session family with an active row.</summary>
+/// <param name="Client">"admin-dashboard" or "mobile".</param>
+/// <param name="DeviceId">The phone, for mobile sessions; null for the dashboard.</param>
+/// <param name="LastUsedAt">The latest sign-in or token refresh in this session.</param>
+public sealed record MySession(Guid SessionId, string Client, string? DeviceId, DateTime SignedInAt, DateTime LastUsedAt,
+    DateTime ExpiresAt);
+
 public sealed record MyProfile(string Username, string FullName, string Role, string FacilityId, bool MfaEnabled,
     bool MustChangePassword, DateTime CreatedAt, DateTime? LastSignInAt);
 
@@ -69,5 +76,56 @@ public sealed class ProfileService(NpgsqlDataSource db)
             await tx.CommitAsync(ct);
         }
         return (await GetAsync(clinicianId, ct), null);
+    }
+
+    /// <summary>Your active sessions (step 7), the most recently used first. Revoked devices' sessions are left out.</summary>
+    public async Task<IReadOnlyList<MySession>> SessionsAsync(Guid clinicianId, CancellationToken ct)
+    {
+        await using var cmd = db.CreateCommand("""
+            SELECT s.family_id, s.client_id, s.device_id,
+                   (SELECT min(f.issued_at) FROM clinical.clinician_session f WHERE f.family_id = s.family_id),
+                   COALESCE(s.last_seen_at, s.issued_at), s.expires_at
+            FROM clinical.clinician_session s
+            LEFT JOIN clinical.device d ON d.device_id = s.device_id
+            WHERE s.clinician_id = @id AND s.revoked_at IS NULL AND s.expires_at > now()
+              AND (s.device_id IS NULL OR d.revoked_at IS NULL)
+            ORDER BY 5 DESC
+            """);
+        cmd.Parameters.AddWithValue("id", clinicianId);
+        var list = new List<MySession>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new MySession(r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetDateTime(3),
+                r.GetDateTime(4), r.GetDateTime(5)));
+        return list;
+    }
+
+    /// <summary>
+    /// Ends one of your sessions, or all of them when [sessionId] is null (step 7): its refresh token stops working and
+    /// an access token it already handed out lapses within 15 minutes. Audited as LOGOUT per session, with you as the
+    /// actor. False when there was nothing of yours to end.
+    /// </summary>
+    public async Task<bool> EndSessionsAsync(Guid clinicianId, Guid? sessionId, CancellationToken ct)
+    {
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        var ended = new List<(string Username, string? DeviceId)>();
+        await using (var cmd = new NpgsqlCommand("""
+            UPDATE clinical.clinician_session s SET revoked_at = now()
+            FROM clinical.clinician c
+            WHERE c.clinician_id = s.clinician_id AND s.clinician_id = @id AND s.revoked_at IS NULL AND s.expires_at > now()
+              AND (@family::uuid IS NULL OR s.family_id = @family)
+            RETURNING c.username, s.device_id
+            """, conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", clinicianId);
+            cmd.Parameters.Add(new NpgsqlParameter<Guid?>("family", NpgsqlTypes.NpgsqlDbType.Uuid) { TypedValue = sessionId });
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) ended.Add((r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1)));
+        }
+        foreach (var (username, deviceId) in ended)
+            await AuthAudit.WriteAsync(conn, tx, "LOGOUT", username, clinicianId, deviceId, true, null, ct, clinicianId);
+        await tx.CommitAsync(ct);
+        return ended.Count > 0;
     }
 }
