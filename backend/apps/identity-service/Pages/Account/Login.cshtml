@@ -13,7 +13,17 @@
 
 <form method="post" autocomplete="off">
     <input type="hidden" asp-for="ReturnUrl" />
-    @if (Model.AskForTotp)
+    @if (Model.AskForNewPassword)
+    {
+        <input type="hidden" asp-for="ChangeTicket" />
+        <p>Your admin set this password for you. Choose your own before you continue.</p>
+        <label for="NewPassword">New password</label>
+        <input asp-for="NewPassword" id="NewPassword" type="password" autocomplete="new-password" minlength="@Model.MinPasswordLength" autofocus required />
+        <label for="ConfirmPassword">New password again</label>
+        <input asp-for="ConfirmPassword" id="ConfirmPassword" type="password" autocomplete="new-password" minlength="@Model.MinPasswordLength" required />
+        <button type="submit">Change password and continue</button>
+    }
+    else if (Model.AskForTotp)
     {
         <input type="hidden" asp-for="MfaTicket" />
         <label for="Totp">Authenticator code</label>

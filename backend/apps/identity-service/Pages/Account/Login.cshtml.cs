@@ -25,7 +25,18 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
     /// <summary>The password step's result, sealed for the TOTP step so the password is never sent twice.</summary>
     [BindProperty] public string? MfaTicket { get; set; }
 
+    [BindProperty] public string? NewPassword { get; set; }
+    [BindProperty] public string? ConfirmPassword { get; set; }
+
+    /// <summary>
+    /// Password, code, client and device all checked, but an admin chose the password: sealed for the step that
+    /// replaces it. A separate purpose from <see cref="MfaTicket"/>, so an MFA ticket can never skip the code.
+    /// </summary>
+    [BindProperty] public string? ChangeTicket { get; set; }
+
     public bool AskForTotp => MfaTicket is not null;
+    public bool AskForNewPassword => ChangeTicket is not null;
+    public int MinPasswordLength => Admin.ClinicianAdminService.MinPasswordLength;
     public string? ErrorCode { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string ClientName { get; private set; } = "";
@@ -35,6 +46,9 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
     private ITimeLimitedDataProtector Protector =>
         protection.CreateProtector("IdentityService.Login.MfaTicket").ToTimeLimitedDataProtector();
 
+    private ITimeLimitedDataProtector ChangeProtector =>
+        protection.CreateProtector("IdentityService.Login.ChangeTicket").ToTimeLimitedDataProtector();
+
     public IActionResult OnGet() => Target() is null ? BadRequest() : Page();
 
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
@@ -42,15 +56,31 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
         if (Target() is not { } target) return BadRequest();
 
         SignInAttempt attempt;
-        if (MfaTicket is not null)
+        if (ChangeTicket is not null)
         {
-            if (Unseal(MfaTicket) is not { } ticket) return Restart("SESSION_EXPIRED");
-            attempt = new SignInAttempt(ticket.Username, null, Totp?.Trim(), target.Client.Id, target.DeviceId, ticket.PasswordHash);
+            if (Unseal(ChangeProtector, ChangeTicket) is not { } ticket) return Restart("SESSION_EXPIRED");
+            var (newPassword, confirm) = (NewPassword, ConfirmPassword);
+            NewPassword = ConfirmPassword = null; // never echoed back into the page
+            if (newPassword != confirm) return Show("PASSWORD_MISMATCH");
+            var (newHash, error) = await credentials.ChangePasswordAsync(ticket.Username, ticket.PasswordHash, newPassword, ct);
+            if (error is "PASSWORD_TOO_SHORT" or "PASSWORD_UNCHANGED") return Show(error);
+            if (error is not null) return Restart(error);
+            // The code was checked before this step; sign in with the new password without asking again.
+            attempt = new SignInAttempt(ticket.Username, null, null, target.Client.Id, target.DeviceId, newHash,
+                EnforcePasswordChange: true, MfaAlreadyVerified: true);
+            ChangeTicket = null;
+        }
+        else if (MfaTicket is not null)
+        {
+            if (Unseal(Protector, MfaTicket) is not { } ticket) return Restart("SESSION_EXPIRED");
+            attempt = new SignInAttempt(ticket.Username, null, Totp?.Trim(), target.Client.Id, target.DeviceId, ticket.PasswordHash,
+                EnforcePasswordChange: true);
         }
         else
         {
             if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrEmpty(Password)) return Restart("MISSING_FIELDS");
-            attempt = new SignInAttempt(Username.Trim(), Password, null, target.Client.Id, target.DeviceId);
+            attempt = new SignInAttempt(Username.Trim(), Password, null, target.Client.Id, target.DeviceId,
+                EnforcePasswordChange: true);
         }
 
         var result = await credentials.ValidateAsync(attempt, ct);
@@ -64,7 +94,11 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
         switch (result.ReasonCode)
         {
             case "MFA_REQUIRED":
-                MfaTicket = Seal(new Ticket(attempt.Username, result.PasswordHash!));
+                MfaTicket = Seal(Protector, new Ticket(attempt.Username, result.PasswordHash!));
+                return Page();
+            case "PASSWORD_CHANGE_REQUIRED":
+                MfaTicket = null;
+                ChangeTicket = Seal(ChangeProtector, new Ticket(attempt.Username, result.PasswordHash!));
                 return Page();
             case "INVALID_TOTP" when MfaTicket is not null:
                 return Show("INVALID_TOTP"); // keep the ticket: the clinician may retry the code
@@ -89,6 +123,7 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
     private IActionResult Restart(string code)
     {
         MfaTicket = null;
+        ChangeTicket = null;
         return Show(code);
     }
 
@@ -104,18 +139,22 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
             "CLIENT_NOT_ALLOWED" => "Only facility admins can sign in to the admin dashboard.",
             "SESSION_EXPIRED" => "The sign-in took too long. Please start again.",
             "MISSING_FIELDS" => "Enter your username and password.",
+            "PASSWORD_MISMATCH" => "The two new passwords do not match.",
+            "PASSWORD_TOO_SHORT" => $"The new password must be at least {MinPasswordLength} characters.",
+            "PASSWORD_UNCHANGED" => "Choose a password different from the one your admin gave you.",
             _ => "Sign-in failed. Please try again.",
         };
         return Page();
     }
 
-    private string Seal(Ticket ticket) => Protector.Protect(JsonSerializer.Serialize(ticket), MfaStepLifetime);
+    private static string Seal(ITimeLimitedDataProtector protector, Ticket ticket) =>
+        protector.Protect(JsonSerializer.Serialize(ticket), MfaStepLifetime);
 
-    private Ticket? Unseal(string sealedTicket)
+    private static Ticket? Unseal(ITimeLimitedDataProtector protector, string sealedTicket)
     {
         try
         {
-            return JsonSerializer.Deserialize<Ticket>(Protector.Unprotect(sealedTicket));
+            return JsonSerializer.Deserialize<Ticket>(protector.Unprotect(sealedTicket));
         }
         catch (Exception e) when (e is System.Security.Cryptography.CryptographicException or JsonException)
         {

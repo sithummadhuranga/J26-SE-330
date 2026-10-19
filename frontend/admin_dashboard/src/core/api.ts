@@ -90,6 +90,11 @@ export class AdminApi {
     await this.post(`v1/admin/clinicians/${enc(username)}/deactivate`, null, token);
   }
 
+  /** Undoes a deactivation. Throws ApiError 409 ALREADY_ACTIVE. */
+  async reactivate(token: string, username: string): Promise<void> {
+    await this.post(`v1/admin/clinicians/${enc(username)}/reactivate`, null, token);
+  }
+
   async resetMfa(token: string, username: string): Promise<void> {
     await this.post(`v1/admin/clinicians/${enc(username)}/reset-mfa`, null, token);
   }

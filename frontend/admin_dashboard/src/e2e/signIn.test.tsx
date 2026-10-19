@@ -13,6 +13,7 @@ import {
   findToast,
   mfaCall,
   newSession,
+  ownPassword,
   redirectUri,
   refreshKey,
   registerClinician,
@@ -95,7 +96,10 @@ describe('signing in through the identity service (OpenID Connect, ADR 0006)', (
     expect(locked?.locked).toBe(true);
 
     await admin.authorized((t) => admin.api.unlock(t, name));
-    await expect(signInThroughLoginPage(newSession(), name, strongPassword)).resolves.toMatchObject({ username: name });
+    // Unlocked; the admin chose this password, so the first sign-in also replaces it.
+    await expect(signInThroughLoginPage(newSession(), name, strongPassword, undefined, ownPassword)).resolves.toMatchObject({
+      username: name,
+    });
   });
 
   it('with MFA on, the login page asks for the code and a valid one opens the dashboard; an admin reset turns it off', async () => {
@@ -105,21 +109,21 @@ describe('signing in through the identity service (OpenID Connect, ADR 0006)', (
 
     // Turn MFA on for that account the way the account owner would.
     const owner = newSession();
-    await signInThroughLoginPage(owner, name, strongPassword);
+    await signInThroughLoginPage(owner, name, strongPassword, undefined, ownPassword);
     const { secret } = await owner.authorized((t) => mfaCall<{ secret: string }>('enroll', t));
     const step = Math.floor(Date.now() / 30_000);
     await owner.authorized((t) => mfaCall('confirm', t, { code: totpCode(secret, step) }));
 
-    await expect(signInThroughLoginPage(newSession(), name, strongPassword, '000000')).rejects.toMatchObject({
+    await expect(signInThroughLoginPage(newSession(), name, ownPassword, '000000')).rejects.toMatchObject({
       code: 'INVALID_TOTP',
     });
     const session = newSession();
     const user = renderDashboard(session);
-    await signInOnScreen(user, session, name, strongPassword, totpCode(secret, step + 1)); // the confirm code cannot be replayed
+    await signInOnScreen(user, session, name, ownPassword, totpCode(secret, step + 1)); // the confirm code cannot be replayed
     expect(await screen.findByRole('heading', { name: 'Clinicians' }, slow)).toBeInTheDocument();
 
     await admin.authorized((t) => admin.api.resetMfa(t, name));
-    await expect(signInThroughLoginPage(newSession(), name, strongPassword)).resolves.toMatchObject({ username: name });
+    await expect(signInThroughLoginPage(newSession(), name, ownPassword)).resolves.toMatchObject({ username: name });
   });
 
   it('a callback this tab did not start is refused, and the sign-in screen says so', async () => {

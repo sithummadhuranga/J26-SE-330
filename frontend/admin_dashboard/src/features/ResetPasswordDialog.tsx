@@ -65,7 +65,7 @@ export function ResetPasswordDialog({
         <Field
           label="New password"
           error={error}
-          help={`At least ${minPasswordLength} characters. Share it with the clinician in person.`}
+          help={`At least ${minPasswordLength} characters. Share it with the clinician in person; they choose their own at their next sign-in.`}
         >
           <input
             name="password"

@@ -31,6 +31,9 @@ export const uniqueName = (tag: string) => `e2e.${tag}.${Date.now().toString(36)
 
 export const strongPassword = 'E2e-Test-Pass-2026!';
 
+/** What a clinician picks on the login page to replace [strongPassword], which their admin chose. */
+export const ownPassword = 'Own-E2e-Pass-2026!';
+
 /** A dashboard session on the real backend; [now] lets a test move the clock forward. */
 export function newSession(store = new MemoryTokenStore(), now?: () => number, baseUrl = backendUrl): AuthSession {
   return new AuthSession(new AdminApi(baseUrl), store, now, redirectUri);
@@ -58,9 +61,16 @@ const unescapeHtml = (html: string) =>
 /**
  * What a browser does between the dashboard and /callback: opens [authorizeUrl], fills in the identity service's
  * real login page (and the authenticator code when asked), following redirects with cookies. Returns the URL the
- * identity service sent the browser back to; throws LoginPageError when the page refused.
+ * identity service sent the browser back to; throws LoginPageError when the page refused. When an admin chose the
+ * password, the page asks for a new one: [newPassword] answers it, otherwise this throws PASSWORD_CHANGE_REQUIRED.
  */
-export async function throughLoginPage(authorizeUrl: string, username: string, password: string, totp?: string) {
+export async function throughLoginPage(
+  authorizeUrl: string,
+  username: string,
+  password: string,
+  totp?: string,
+  newPassword?: string,
+) {
   const cookies = new Map<string, string>();
   let url = authorizeUrl;
 
@@ -107,6 +117,10 @@ export async function throughLoginPage(authorizeUrl: string, username: string, p
   if (!step.leftFor && totp !== undefined && /name="Totp"/.test(step.page) && !errorCode(step.page)) {
     step = await follow(url, { ...fields(step.page), Totp: totp });
   }
+  if (!step.leftFor && /name="NewPassword"/.test(step.page) && !errorCode(step.page)) {
+    if (newPassword === undefined) throw new LoginPageError('PASSWORD_CHANGE_REQUIRED');
+    step = await follow(url, { ...fields(step.page), NewPassword: newPassword, ConfirmPassword: newPassword });
+  }
   if (step.leftFor) return step.leftFor;
   throw new LoginPageError(errorCode(step.page));
 }
@@ -117,8 +131,9 @@ export async function signInThroughLoginPage(
   username: string,
   password: string,
   totp?: string,
+  newPassword?: string,
 ): Promise<Admin> {
-  return session.completeSignIn(await throughLoginPage(await session.beginSignIn(), username, password, totp));
+  return session.completeSignIn(await throughLoginPage(await session.beginSignIn(), username, password, totp, newPassword));
 }
 
 /** The demo admin, signed in through the real identity service. */
@@ -208,12 +223,13 @@ export async function signInOnScreen(
   username: string,
   password: string,
   totp?: string,
+  newPassword?: string,
 ) {
   const go = vi.spyOn(browser, 'go').mockImplementation(() => undefined);
   try {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(go).toHaveBeenCalled());
-    await session.completeSignIn(await throughLoginPage(go.mock.calls[0]![0], username, password, totp));
+    await session.completeSignIn(await throughLoginPage(go.mock.calls[0]![0], username, password, totp, newPassword));
   } finally {
     go.mockRestore();
   }

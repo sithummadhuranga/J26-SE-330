@@ -10,8 +10,12 @@ import { useLoadFailureToast } from '../ui/toastContext';
 
 const limits = [100, 250, 500, 1000] as const;
 
-/** MFA_REQUIRED is the server asking for a code, not a failed attempt (same rule as the auth-health metrics). */
-const isFailure = (e: AuthAuditEntry) => !e.success && e.reasonCode !== 'MFA_REQUIRED';
+/**
+ * MFA_REQUIRED and PASSWORD_CHANGE_REQUIRED are the server asking for the next step, not failed attempts (same rule as
+ * the auth-health metrics).
+ */
+const prompts = new Set(['MFA_REQUIRED', 'PASSWORD_CHANGE_REQUIRED']);
+const isFailure = (e: AuthAuditEntry) => !e.success && !prompts.has(e.reasonCode ?? '');
 
 function matches(e: AuthAuditEntry, query: string, failuresOnly: boolean): boolean {
   if (failuresOnly && !isFailure(e)) return false;

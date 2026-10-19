@@ -42,6 +42,8 @@ export interface ClinicianSummary {
   locked: boolean;
   mfaEnabled: boolean;
   createdAt: string;
+  /** An admin chose the current password (registration or reset); the clinician replaces it at their next sign-in. */
+  mustChangePassword: boolean;
 }
 
 /** A started two-step setup: the secret for typing in, and the otpauth:// URI the QR code holds. */

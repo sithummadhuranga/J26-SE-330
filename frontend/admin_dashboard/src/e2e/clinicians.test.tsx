@@ -130,11 +130,32 @@ describe('clinicians (real identity service and database)', () => {
     await user.type(within(dialog).getByLabelText('New password'), 'New-E2e-Pass-2026!');
     await user.click(within(dialog).getByRole('button', { name: 'Reset password' }));
 
-    expect(await findToast(`${name} is signed out and can sign in with the new password.`)).toBeInTheDocument();
+    expect(await findToast(`${name} is signed out, signs in with the new password, then chooses their own.`)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(within(rowOf(name)).getByText('New password due')).toBeInTheDocument(), slow);
     expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.locked).toBe(false);
     expect(await mobileLogin(name, strongPassword, `dev-${name}`)).toMatchObject({ status: 400, code: 'INVALID_CREDENTIALS' });
     expect((await mobileLogin(name, 'New-E2e-Pass-2026!', `dev-${name}`)).status).toBe(200);
+  });
+
+  it('reactivating a deactivated clinician asks first, saves it, and they can sign in again', async () => {
+    const admin = await adminSession();
+    const name = uniqueName('react');
+    await registerClinician(admin, name);
+    await admin.authorized((t) => admin.api.deactivate(t, name));
+    const user = await openClinicians();
+
+    await user.click(within(rowOf(name)).getByRole('button', { name: `Actions for ${name}` }));
+    expect(screen.queryByRole('menuitem', { name: 'Deactivate' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Reactivate' }));
+    const dialog = screen.getByRole('dialog', { name: `Reactivate ${name}?` });
+    await user.click(within(dialog).getByRole('button', { name: 'Reactivate' }));
+
+    expect(await findToast(`Reactivated ${name}.`)).toBeInTheDocument();
+    await waitFor(() => expect(within(rowOf(name)).getByText('Active')).toBeInTheDocument(), slow);
+    expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.active).toBe(true);
+    expect((await mobileLogin(name, strongPassword, `dev-${name}`)).status).toBe(200);
+    await expect(admin.authorized((t) => admin.api.reactivate(t, name))).rejects.toMatchObject({ code: 'ALREADY_ACTIVE' });
   });
 
   it('an admin cannot reset their own password: the option is not offered, and the server refuses it too', async () => {

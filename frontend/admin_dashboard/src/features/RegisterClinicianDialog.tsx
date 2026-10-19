@@ -74,7 +74,7 @@ export function RegisterClinicianDialog({
         <Field
           label="Initial password"
           error={errors.password}
-          help={`At least ${minPasswordLength} characters. Share it with the clinician in person.`}
+          help={`At least ${minPasswordLength} characters. Share it with the clinician in person; they choose their own when they first sign in.`}
         >
           <input
             name="password"

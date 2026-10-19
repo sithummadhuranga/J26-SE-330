@@ -27,8 +27,11 @@ token, refresh = body["accessToken"], body["refreshToken"]
 status, body = refresh_tokens(refresh)
 check("refresh rotates tokens", status == 200 and body["refreshToken"] != refresh, f"{status}")
 old_refresh, refresh, token = refresh, body["refreshToken"], body["accessToken"]
+status, body = refresh_tokens(refresh)
+check("the new refresh token works", status == 200, f"{status}")
+refresh, token = body["refreshToken"], body["accessToken"]
 status, _ = refresh_tokens(old_refresh)
-check("old refresh token is rejected after rotation", status == 400, f"{status}")
+check("old refresh token is rejected once its replacement was used", status == 400, f"{status}")
 
 status, _ = http("POST", "/v1/sync/push", {"deviceId": DEVICE, "events": [event(uuid7(), uuid7())]})
 check("push without token is 401", status == 401, f"{status}")

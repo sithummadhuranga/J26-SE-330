@@ -30,11 +30,13 @@ const actionLabels: Record<string, string> = {
   REGISTER: 'Account created',
   UNLOCK: 'Account unlocked',
   DEACTIVATE: 'Account deactivated',
+  REACTIVATE: 'Account reactivated',
   MFA_ENROLL: 'Two-step setup started',
   MFA_CONFIRM: 'Two-step turned on',
   MFA_RESET: 'Two-step reset',
   DEVICE_REVOKE: 'Device revoked',
   PASSWORD_RESET: 'Password reset',
+  PASSWORD_CHANGE: 'Own password chosen',
 };
 
 /** An audit action as an admin would say it. */
@@ -44,6 +46,7 @@ const reasonLabels: Record<string, string> = {
   INVALID_CREDENTIALS: 'Wrong password',
   CREDENTIAL_LOCKED: 'Locked',
   MFA_REQUIRED: 'Code requested',
+  PASSWORD_CHANGE_REQUIRED: 'New password requested',
   INVALID_TOTP: 'Wrong code',
   CLIENT_NOT_ALLOWED: 'Not an admin',
   DEVICE_NOT_ALLOWED: 'Device revoked',
@@ -72,6 +75,7 @@ export const codes: Record<string, string> = {
   MISSING_FULL_NAME: 'Enter the full name.',
   UNKNOWN_FACILITY: 'Your facility is not registered. Contact the system administrator.',
   CANNOT_DEACTIVATE_SELF: 'You cannot deactivate your own account. Ask another admin.',
+  ALREADY_ACTIVE: 'This account is already active. Refresh the list.',
   CANNOT_RESET_OWN_PASSWORD: 'You cannot reset your own password here. Ask another admin.',
   NOT_FOUND: 'This item could not be found. It may have been changed by someone else; refresh the list.',
   // Two-step sign-in

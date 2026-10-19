@@ -10,10 +10,15 @@ public sealed record VerifiedClinician(Guid ClinicianId, string Username, string
 /// One sign-in attempt. Either <see cref="Password"/> is given, or <see cref="VerifiedPasswordHash"/> when the
 /// password was already checked in an earlier step (the login page's TOTP step) against that stored hash.
 /// </summary>
+/// <param name="EnforcePasswordChange">The login page asks for a new password when an admin chose the current one.
+/// The password grant (simulator and tests only) does not.</param>
+/// <param name="MfaAlreadyVerified">The code was checked in an earlier step of this sign-in (before a password
+/// change). Only honoured together with <see cref="VerifiedPasswordHash"/>.</param>
 public sealed record SignInAttempt(string Username, string? Password, string? Totp, string Client, string? DeviceId,
-    string? VerifiedPasswordHash = null);
+    string? VerifiedPasswordHash = null, bool EnforcePasswordChange = false, bool MfaAlreadyVerified = false);
 
-/// <param name="PasswordHash">On MFA_REQUIRED: the hash the password was checked against, for the TOTP step.</param>
+/// <param name="PasswordHash">On MFA_REQUIRED or PASSWORD_CHANGE_REQUIRED: the hash the password was checked against,
+/// for the next step.</param>
 public sealed record CredentialResult(VerifiedClinician? Clinician, string? ReasonCode, string? PasswordHash = null)
 {
     public static CredentialResult Fail(string reason, string? passwordHash = null) => new(null, reason, passwordHash);
@@ -32,7 +37,8 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
     private readonly SemaphoreSlim _hashing = new(Math.Max(2, Environment.ProcessorCount));
 
     /// <param name="onSuccess">Runs inside the same transaction before the LOGIN audit row, e.g. to start a session.</param>
-    /// <returns>Codes: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED, CLIENT_NOT_ALLOWED.</returns>
+    /// <returns>Codes: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED, CLIENT_NOT_ALLOWED,
+    /// PASSWORD_CHANGE_REQUIRED.</returns>
     public async Task<CredentialResult> ValidateAsync(SignInAttempt attempt, CancellationToken ct,
         Func<NpgsqlConnection, NpgsqlTransaction, VerifiedClinician, Task>? onSuccess = null)
     {
@@ -47,10 +53,11 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         await using var tx = await conn.BeginTransactionAsync(ct);
 
         Guid clinicianId; string role, facilityId, passwordHash; byte[] salt; int failedAttempts; DateTime? lockedUntil;
-        bool mfaEnabled; byte[]? mfaSecret; long? mfaLastStep;
+        bool mfaEnabled; byte[]? mfaSecret; long? mfaLastStep; bool mustChangePassword;
         await using (var cmd = new NpgsqlCommand("""
             SELECT c.clinician_id, c.role, c.facility_id, cc.password_hash, cc.password_salt,
-                   cc.failed_attempts, cc.locked_until, cc.mfa_enabled, cc.mfa_secret_encrypted, cc.mfa_last_used_step
+                   cc.failed_attempts, cc.locked_until, cc.mfa_enabled, cc.mfa_secret_encrypted, cc.mfa_last_used_step,
+                   cc.must_change_password
             FROM clinical.clinician c
             JOIN clinical.clinician_credential cc USING (clinician_id)
             WHERE c.username = @u AND c.active
@@ -72,6 +79,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
             mfaEnabled = r.GetBoolean(7);
             mfaSecret = r.IsDBNull(8) ? null : (byte[])r[8];
             mfaLastStep = r.IsDBNull(9) ? null : r.GetInt64(9);
+            mustChangePassword = r.GetBoolean(10);
         }
 
         async Task<CredentialResult> FailAttemptAsync(string reason)
@@ -106,7 +114,8 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         if (!valid)
             return await FailAttemptAsync("INVALID_CREDENTIALS");
 
-        if (mfaEnabled && mfaSecret is not null)
+        var mfaDone = attempt.MfaAlreadyVerified && attempt.VerifiedPasswordHash is not null;
+        if (mfaEnabled && mfaSecret is not null && !mfaDone)
         {
             // No code yet: the app should ask for one. Not a guess, so it does not count towards lockout.
             if (string.IsNullOrEmpty(attempt.Totp))
@@ -146,12 +155,64 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         await Sql.ExecAsync(conn, tx,
             "UPDATE clinical.clinician_credential SET failed_attempts = 0, locked_until = NULL WHERE clinician_id = @id",
             ct, ("id", clinicianId));
+
+        // Every check passed, but an admin chose this password: the login page asks for a new one first. Recorded as a
+        // PASSWORD_CHANGE prompt, not a failed LOGIN, so it never counts towards the login failure rate.
+        if (attempt.EnforcePasswordChange && mustChangePassword)
+        {
+            await AuthAudit.WriteAsync(conn, tx, "PASSWORD_CHANGE", username, clinicianId, deviceId, false,
+                "PASSWORD_CHANGE_REQUIRED", ct);
+            await tx.CommitAsync(ct);
+            return CredentialResult.Fail("PASSWORD_CHANGE_REQUIRED", passwordHash);
+        }
+
         var clinician = new VerifiedClinician(clinicianId, username, role, facilityId, attempt.Client,
             attempt.Client == Clients.AdminDashboard ? null : deviceId);
         if (onSuccess is not null) await onSuccess(conn, tx, clinician);
         await AuthAudit.WriteAsync(conn, tx, "LOGIN", username, clinicianId, deviceId, true, null, ct);
         await tx.CommitAsync(ct);
         return new CredentialResult(clinician, null);
+    }
+
+    /// <summary>
+    /// Replaces a password an admin chose, after the login page checked the old one (and the code) against
+    /// <paramref name="expectedHash"/>. Codes: PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, SESSION_EXPIRED (the account
+    /// changed meanwhile: reset again, deactivated). Returns the new hash for the rest of the sign-in.
+    /// </summary>
+    public async Task<(string? NewHash, string? Error)> ChangePasswordAsync(string username, string expectedHash,
+        string? newPassword, CancellationToken ct)
+    {
+        if (newPassword is null || newPassword.Length < Admin.ClinicianAdminService.MinPasswordLength)
+            return (null, "PASSWORD_TOO_SHORT");
+
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        Guid clinicianId; string hash; byte[] salt;
+        await using (var cmd = new NpgsqlCommand("""
+            SELECT c.clinician_id, cc.password_hash, cc.password_salt
+            FROM clinical.clinician c JOIN clinical.clinician_credential cc USING (clinician_id)
+            WHERE c.username = @u AND c.active AND cc.must_change_password
+            FOR UPDATE OF cc
+            """, conn, tx))
+        {
+            cmd.Parameters.AddWithValue("u", username);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return (null, "SESSION_EXPIRED");
+            clinicianId = r.GetGuid(0); hash = r.GetString(1); salt = (byte[])r[2];
+        }
+        if (hash != expectedHash) return (null, "SESSION_EXPIRED");
+        if (await VerifyAsync(newPassword, hash, salt, ct)) return (null, "PASSWORD_UNCHANGED");
+
+        var (newHash, newSalt) = hasher.Hash(newPassword);
+        var stored = Convert.ToBase64String(newHash);
+        await Sql.ExecAsync(conn, tx, """
+            UPDATE clinical.clinician_credential
+            SET password_hash = @h, password_salt = @s, must_change_password = false
+            WHERE clinician_id = @id
+            """, ct, ("h", stored), ("s", newSalt), ("id", clinicianId));
+        await AuthAudit.WriteAsync(conn, tx, "PASSWORD_CHANGE", username, clinicianId, null, true, null, ct);
+        await tx.CommitAsync(ct);
+        return (stored, null);
     }
 
     /// <summary>Checks the password without holding a connection; skips unknown or locked accounts.</summary>
