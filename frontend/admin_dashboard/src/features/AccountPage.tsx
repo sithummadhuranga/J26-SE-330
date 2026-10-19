@@ -3,7 +3,18 @@ import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAdmin, useSession } from '../app/sessionContext';
 import type { MfaEnrollment } from '../core/models';
-import { Centered, Field, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
+import {
+  Centered,
+  Field,
+  IconTile,
+  InitialsAvatar,
+  LoadError,
+  PageHeader,
+  SectionTitle,
+  Spinner,
+  StatusChip,
+} from '../ui/components';
+import { ShieldIcon } from '../ui/icons';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
 /** The same list as the clinicians page, so turning MFA on here updates the chip there too. */
@@ -48,6 +59,16 @@ export function AccountPage() {
   return (
     <>
       <PageHeader title="My account" subtitle={`Signed in as ${admin?.username ?? ''}.`} />
+      <div className="page-body">
+        <div className="profile">
+          <InitialsAvatar name={admin?.username ?? '?'} size={54} />
+          <div>
+            <p className="profile__name">{admin?.username}</p>
+            <p className="profile__sub">Admin · Facility {admin?.facilityId}</p>
+          </div>
+        </div>
+        <SectionTitle>Security</SectionTitle>
+      </div>
       {query.isError ? (
         <LoadError error={query.error} onRetry={reload} />
       ) : query.isPending ? (
@@ -56,10 +77,16 @@ export function AccountPage() {
         </Centered>
       ) : (
         <section className="card account" aria-label="Two-step sign-in">
-          <h2 className="account__title">
-            Two-step sign-in{' '}
+          <div className="setting-row">
+            <IconTile>
+              <ShieldIcon size={20} />
+            </IconTile>
+            <div className="setting-row__text">
+              <h2 className="setting-row__label">Two-step sign-in</h2>
+              <p className="setting-row__sub">A code from your phone as well as your password</p>
+            </div>
             {me?.mfaEnabled ? <StatusChip label="On" tone="blue" /> : <StatusChip label="Off" tone="error" />}
-          </h2>
+          </div>
           {me?.mfaEnabled ? (
             <p>
               Each sign-in asks for a code from your authenticator app. If you lose your phone, ask another admin to

@@ -2,7 +2,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import type { DeviceSummary } from '../core/models';
-import { Centered, LoadError, PageHeader, Spinner, StatusChip, TableCard } from '../ui/components';
+import {
+  Centered,
+  EmptyState,
+  IconTile,
+  LoadError,
+  NoticeStrip,
+  PageHeader,
+  Spinner,
+  StatusChip,
+  TableCard,
+} from '../ui/components';
+import { InfoIcon, PhoneIcon } from '../ui/icons';
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
@@ -52,6 +63,12 @@ export function DevicesPage() {
           </button>
         }
       />
+      <div className="page-body">
+        <NoticeStrip icon={<InfoIcon size={16} />}>
+          A phone registers itself the first time someone signs in on it. A revoked phone is signed out within 15
+          minutes and can never sign in or sync again; records it has not synced yet stay on the phone.
+        </NoticeStrip>
+      </div>
       {query.isError ? (
         <LoadError error={query.error} onRetry={reload} />
       ) : query.isPending ? (
@@ -59,7 +76,11 @@ export function DevicesPage() {
           <Spinner />
         </Centered>
       ) : query.data.length === 0 ? (
-        <Centered>No devices have signed in yet.</Centered>
+        <EmptyState
+          icon={<PhoneIcon size={24} />}
+          title="No devices yet"
+          message="Phones appear here after a clinician signs in on them."
+        />
       ) : (
         <TableCard>
           <thead>
@@ -76,7 +97,14 @@ export function DevicesPage() {
           <tbody>
             {query.data.map((d) => (
               <tr key={d.deviceId}>
-                <td className="table__mono">{d.deviceId}</td>
+                <td>
+                  <span className="person">
+                    <IconTile>
+                      <PhoneIcon size={18} />
+                    </IconTile>
+                    <span className="table__mono">{d.deviceId}</span>
+                  </span>
+                </td>
                 <td>
                   {d.revokedAt ? (
                     <StatusChip label="Revoked" tone="error" title={`Revoked ${formatDateTime(d.revokedAt)}`} />

@@ -7,6 +7,6 @@
     </style>
     <!-- Window theme while Flutter starts up and behind the Flutter UI. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+        <item name="android:windowBackground">@color/wound_bg</item>
     </style>
 </resources>

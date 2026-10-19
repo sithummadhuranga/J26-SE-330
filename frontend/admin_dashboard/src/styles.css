@@ -1,55 +1,82 @@
-/* One light design: midnight-blue frame, white work surfaces, dark-blue actions, teal accents. */
+/* The WoundAI look, shared with the mobile app (mobile/lib/core/theme.dart): warm paper background, teal actions,
+   slate-blue accent, white cards, Inter. Keep the two in step when either changes. */
+
+/* Inter (SIL Open Font License, public/fonts/inter/LICENSE.txt), served with the app so it needs no network for fonts. */
+@font-face {
+  font-family: 'Inter';
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter/Inter-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter/Inter-Medium.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter/Inter-SemiBold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter/Inter-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/inter/Inter-ExtraBold.ttf') format('truetype');
+}
+
 :root {
-  --midnight: #0b1a33;
-  --midnight-deep: #071225;
-  --dark-blue: #1e3a8a;
-  --teal: #0f9488;
-  --teal-bright: #2dd4bf;
-  --white: #ffffff;
+  /* WoundColors */
+  --accent: #0c6d5e;
+  --accent-dark: #084e44;
+  --accent-soft: #dceeea;
+  --accent-2: #20465f;
+  --bg: #f2f0e9;
+  --surface: #ffffff;
+  --surface-alt: #eae6d9;
+  --surface-sunken: #e7e2d3;
+  --border: #dedacb;
+  --border-strong: #c7c0aa;
+  --text: #1d1c18;
+  --text-secondary: #68655a;
+  --text-tertiary: #9b9585;
+  --success: #3d7a52;
+  --success-soft: #e1f0e5;
+  --warning: #946318;
+  --warning-soft: #f6e9d2;
+  --error: #ad3a33;
+  --error-soft: #f5e0dd;
 
-  --surface: var(--white);
-  --surface-lowest: #f4f7fc;
-  --surface-low: #f8fafd;
-  --surface-high: #e6ecf6;
-  --on-surface: var(--midnight);
-  --on-surface-variant: #4a5a74;
-  --outline: #8a97ad;
-  --outline-variant: #d7dfec;
-  --error: #c62828;
+  /* Fixed tints for hover and pressed states. */
+  --hover-tint: #f7f5ef;
+  --accent-hover: #0a5e51;
 
-  /* Fixed tints: no transparency or color mixing, so every color is exactly the hex shown. */
-  --hover-tint: #f2f3f8;
-  --on-dark-text: #b6bac2;
-  --on-dark-dim: #aaafb8;
-  --on-dark-border: #6d7685;
-  --on-dark-hover: #1f2c43;
-  --chip-teal-bg: #ddf0ee;
-  --chip-teal-border: #87cac4;
-  --chip-teal-text: #0b6e65;
-  --chip-blue-bg: #e0e3ef;
-  --chip-blue-border: #8f9dc5;
-  --chip-blue-text: #1e3a8a;
-  --chip-error-bg: #f7e1e1;
-  --chip-error-border: #e39494;
-  --chip-error-text: #b71c1c;
-  --chip-muted-bg: #eff0f4;
-  --chip-muted-border: #c5cbd6;
-  --chip-muted-text: #4a5a74;
-  --filter-on-bg: #ccf1ec;
-  --filter-on-text: #053b36;
-  --spinner-track: #c3e4e1;
-  --spinner-on-blue: #6d7fb3;
+  /* WoundRadii */
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+  --radius-field: 11px;
+  --radius-pill: 20px;
 
-  --radius: 8px;
-  --radius-small: 6px;
-  --radius-chip: 0;
+  /* WoundShadows */
+  --shadow-card: 0 1px 2px rgba(20, 18, 12, 0.06), 0 1px 1px rgba(20, 18, 12, 0.04);
+  --shadow-raised: 0 8px 24px rgba(20, 18, 12, 0.14);
+  --shadow-accent: 0 10px 22px rgba(12, 109, 94, 0.28);
 
   color-scheme: light;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
   line-height: 1.45;
-  color: var(--on-surface);
-  background: var(--surface-lowest);
+  color: var(--text);
+  background: var(--bg);
 }
 
 *,
@@ -61,7 +88,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--surface-lowest);
+  background: var(--bg);
 }
 
 h1,
@@ -83,40 +110,47 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 42px;
   padding: 0 18px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-small);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-m);
   background: none;
-  color: var(--dark-blue);
-  font-weight: 600;
+  color: var(--accent-dark);
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
 }
 .btn:disabled {
-  opacity: 0.55;
+  background: var(--surface-sunken);
+  border-color: var(--surface-sunken);
+  color: var(--text-tertiary);
   cursor: default;
+}
+.btn--text:disabled {
+  background: none;
+  border-color: transparent;
 }
 .btn:focus-visible,
 .tab:focus-visible,
 .menu__item:focus-visible,
 .segmented button:focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .btn--primary {
-  background: var(--dark-blue);
-  color: var(--white);
+  background: var(--accent);
+  color: #ffffff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: #19307a;
+  background: var(--accent-hover);
 }
 .btn--danger {
   background: var(--error);
-  color: var(--white);
+  color: #ffffff;
 }
 .btn--outline {
-  border-color: var(--outline);
+  background: var(--surface);
+  border-color: var(--border-strong);
 }
 .btn--outline:hover:not(:disabled),
 .btn--text:hover:not(:disabled) {
@@ -128,16 +162,20 @@ button {
 .btn--danger-text {
   color: var(--error);
 }
+/* The sign-out button in the header (the header is light now, like the app's). */
 .btn--on-dark {
   min-height: 36px;
-  color: var(--white);
-  border-color: var(--on-dark-border);
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--accent-dark);
 }
 .btn--on-dark:hover {
-  background: var(--on-dark-hover);
+  background: var(--hover-tint);
 }
 .btn--block {
   width: 100%;
+  min-height: 50px;
+  font-size: 15px;
 }
 
 /* ---- form fields ---- */
@@ -145,42 +183,47 @@ button {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .field__label {
-  color: var(--on-surface-variant);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 .field input,
 .field select {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius-small);
-  background: var(--surface-low);
-  color: var(--on-surface);
-  caret-color: var(--teal);
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--accent);
+}
+.field input::placeholder {
+  color: var(--text-tertiary);
 }
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: var(--teal);
-  box-shadow: 0 0 0 1px var(--teal);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.5px var(--accent);
 }
 .field input:disabled {
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
+  background: var(--surface-alt);
 }
 .field--invalid input {
   border-color: var(--error);
 }
 .field__help {
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 .field__error {
   color: var(--error);
   font-size: 12px;
+  font-weight: 600;
 }
 .form {
   display: flex;
@@ -195,33 +238,38 @@ button {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: linear-gradient(135deg, var(--midnight-deep), var(--midnight), var(--dark-blue));
+  background: var(--bg);
 }
 .login__card {
   width: 100%;
   max-width: 420px;
-  padding: 36px 36px 28px;
+  padding: 36px 32px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-raised);
 }
 .login__brand {
-  text-align: center;
-  color: var(--teal);
-  font-size: 12px;
+  align-self: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.02em;
 }
 .login__title {
   text-align: center;
-  font-size: 24px;
-  font-weight: 600;
-  margin-top: -8px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
 }
 .login__subtitle,
 .login__note {
   text-align: center;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
 }
 .login__subtitle {
   margin: -10px 0 12px;
@@ -231,64 +279,304 @@ button {
   margin-top: 4px;
 }
 
-/* ---- signed-in frame ---- */
+/* ---- signed-in frame: the app's greeting header, and tabs with the bottom-navigation pill ---- */
 
 .appbar {
-  background: var(--midnight);
-  color: var(--white);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
 }
 .appbar__row {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 16px 4px 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 24px 8px;
+}
+.appbar__hello {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 0;
 }
 .appbar__title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 .appbar__badge {
-  margin-left: 6px;
-  color: var(--teal-bright);
-  font-size: 12px;
-  letter-spacing: 0.13em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.appbar__greeting {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+.appbar__name {
+  font-weight: 800;
+}
+.appbar__facility {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 .appbar__user {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  gap: 12px;
 }
-.appbar__name {
-  font-weight: 600;
-}
-.appbar__facility {
-  font-size: 12px;
-  color: var(--on-dark-text);
-}
+/* Tabs: icon and label; the selected one gets the soft-teal pill, like the app's bottom navigation indicator. */
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 12px;
+  gap: 6px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 18px 12px;
   overflow-x: auto;
 }
 .tab {
-  padding: 12px 12px 10px;
-  border-bottom: 3px solid transparent;
-  color: var(--on-dark-dim);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 8px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--text-tertiary);
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
-.tab:hover {
-  color: var(--white);
+.tab__icon {
+  display: inline-flex;
 }
-.tab--active {
-  color: var(--white);
-  border-bottom-color: var(--teal-bright);
+.tab:hover {
+  color: var(--accent-dark);
+  background: var(--hover-tint);
+}
+.tab--active,
+.tab--active:hover {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
 }
 .shell__page {
-  padding-bottom: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-bottom: 32px;
+}
+
+/* ---- shared building blocks (mobile/lib/core/widgets.dart) ---- */
+
+.icon {
+  flex: none;
+}
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.icon-tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+}
+.icon-tile--accent {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+.icon-tile--neutral {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--surface-alt);
+  color: var(--text-tertiary);
+}
+/* Someone or something in a list: avatar or icon, a bold line and a quieter one under it. */
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.person__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.person__name {
+  font-weight: 700;
+  font-size: 14.5px;
+}
+.person__sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 16px;
+  text-align: center;
+}
+.empty .icon-tile {
+  margin-bottom: 8px;
+}
+.empty__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.empty__message {
+  max-width: 420px;
+  color: var(--text-secondary);
+}
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+.section-title__text {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.section-title__count {
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-field);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.notice__icon {
+  display: inline-flex;
+  padding-top: 1px;
+  color: var(--text-tertiary);
+}
+/* The page's main action as the app's teal gradient card ("New Assessment"). */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  padding: 18px;
+  border: none;
+  border-radius: var(--radius-l);
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  box-shadow: var(--shadow-accent);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.hero:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(12, 109, 94, 0.32);
+}
+.hero:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+.hero__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.hero__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hero__title {
+  font-size: 16.5px;
+  font-weight: 800;
+}
+.hero__sub {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+}
+.hero__chevron {
+  flex: none;
+}
+/* Content between the page header and a table, padded like the page. */
+.page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 0 24px 12px;
+}
+.page-body:empty {
+  display: none;
+}
+/* My account: the app's Profile header and setting rows. */
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile .avatar {
+  border-radius: 16px;
+  background: linear-gradient(90deg, var(--accent-soft), #ffffff);
+  box-shadow: var(--shadow-card);
+}
+.profile__name {
+  font-size: 16px;
+  font-weight: 800;
+}
+.profile__sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.setting-row__text {
+  flex: 1;
+  min-width: 0;
+}
+.setting-row__label {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.setting-row__sub {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 /* ---- pages ---- */
@@ -302,12 +590,13 @@ button {
   padding: 24px 24px 16px;
 }
 .page-header__title {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
 }
 .page-header__subtitle {
   margin-top: 4px;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
 }
 .page-header__actions {
   display: flex;
@@ -329,7 +618,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--outline-variant);
+  border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 .toolbar__spacer {
@@ -337,29 +626,29 @@ button {
 }
 .toolbar__count {
   min-width: 130px;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
 
-/* Every toolbar control is the same 36px square-cornered box. */
+/* Every toolbar control is the same 38px rounded box. */
 .search__input,
 .segmented,
 .toolbar__select select {
-  height: 36px;
-  border: 1px solid var(--outline-variant);
-  border-radius: 0;
+  height: 38px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-field);
   background-color: var(--surface);
-  color: var(--on-surface);
+  color: var(--text);
   font-size: 14px;
 }
 .search__input:focus,
 .toolbar__select select:focus {
   outline: none;
-  border-color: var(--teal);
-  box-shadow: 0 0 0 1px var(--teal);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.5px var(--accent);
 }
 
 .search {
@@ -370,62 +659,64 @@ button {
 .search__icon {
   position: absolute;
   top: 50%;
-  left: 11px;
+  left: 12px;
   width: 15px;
   height: 15px;
   transform: translateY(-50%);
   fill: none;
-  stroke: var(--on-surface-variant);
+  stroke: var(--text-tertiary);
   stroke-width: 1.6;
   stroke-linecap: round;
   pointer-events: none;
 }
 .search__input {
   width: 100%;
-  padding: 0 12px 0 34px;
-  caret-color: var(--teal);
+  padding: 0 12px 0 35px;
+  caret-color: var(--accent);
 }
 .search__input::placeholder {
-  color: var(--outline);
+  color: var(--text-tertiary);
 }
 
 .segmented {
   display: inline-flex;
-  padding: 2px;
+  padding: 3px;
   gap: 2px;
-  background-color: var(--surface-lowest);
+  background-color: var(--surface-alt);
+  border-color: var(--surface-alt);
 }
 .segmented button {
-  height: 30px;
+  height: 29px;
   padding: 0 14px;
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: none;
-  color: var(--on-surface-variant);
-  font-weight: 500;
+  color: var(--text-secondary);
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 .segmented button:hover {
-  color: var(--on-surface);
+  color: var(--text);
 }
 .segmented button[aria-pressed='true'] {
-  background: var(--dark-blue);
-  color: var(--white);
-  font-weight: 600;
+  background: var(--surface);
+  color: var(--accent-dark);
+  font-weight: 700;
+  box-shadow: var(--shadow-card);
 }
 
 .toolbar__select {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 .toolbar__select select {
   appearance: none;
   padding: 0 34px 0 12px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%234a5a74' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2368655a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   cursor: pointer;
@@ -443,18 +734,19 @@ button {
   min-height: 200px;
   padding: 24px;
   text-align: center;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
 }
 .load-error {
   color: var(--error);
 }
 
-/* ---- cards and tables ---- */
+/* ---- cards and tables: WoundCard ---- */
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-card);
 }
 .table-card {
   margin: 0 24px;
@@ -464,24 +756,30 @@ button {
 /* ---- my account ---- */
 
 .account {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin: 0 24px;
-  padding: 20px 24px;
+  padding: 20px 24px 24px;
   max-width: 560px;
 }
-.account__title {
-  margin: 0 0 12px;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.account p {
+  color: var(--text-secondary);
 }
 .account__qr img {
   display: block;
   width: 192px;
   height: 192px;
-  background: var(--white);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: #ffffff;
 }
 .account__secret code {
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  background: var(--surface-alt);
+  color: var(--text);
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   word-break: break-all;
 }
@@ -495,23 +793,27 @@ button {
   border-collapse: collapse;
 }
 .table th {
-  background: var(--surface-high);
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
   text-align: left;
   white-space: nowrap;
 }
 .table th,
 .table td {
   padding: 14px 20px;
-  border-bottom: 1px solid var(--outline-variant);
+  border-bottom: 1px solid var(--border);
+}
+.table tbody tr:hover td {
+  background: var(--hover-tint);
 }
 .table tbody tr:last-child td {
   border-bottom: none;
 }
 /* A just-registered clinician: the top row, briefly tinted teal. */
 .table tbody tr.row--new td {
-  background: var(--chip-teal-bg);
+  background: var(--accent-soft);
   transition: background-color 600ms ease-out;
 }
 .table .table__num {
@@ -537,7 +839,7 @@ button {
   text-align: right;
 }
 
-/* ---- chips ---- */
+/* ---- chips: WoundBadge (soft pill, bold label) ---- */
 
 .chips {
   display: inline-flex;
@@ -546,29 +848,25 @@ button {
 }
 .chip {
   display: inline-block;
-  padding: 2px 8px;
-  border: 1px solid var(--chip-teal-border);
-  border-radius: var(--radius-chip);
-  background: var(--chip-teal-bg);
-  color: var(--chip-teal-text);
-  font-size: 12px;
-  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 11.5px;
+  font-weight: 700;
   white-space: nowrap;
 }
 .chip--blue {
-  border-color: var(--chip-blue-border);
-  background: var(--chip-blue-bg);
-  color: var(--chip-blue-text);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
 }
 .chip--error {
-  border-color: var(--chip-error-border);
-  background: var(--chip-error-bg);
-  color: var(--chip-error-text);
+  background: var(--error-soft);
+  color: var(--error);
 }
 .chip--muted {
-  border-color: var(--chip-muted-border);
-  background: var(--chip-muted-bg);
-  color: var(--chip-muted-text);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
 }
 
 /* ---- actions menu ---- */
@@ -580,33 +878,35 @@ button {
 .menu__list {
   position: fixed;
   z-index: 50;
-  min-width: 160px;
+  min-width: 170px;
   margin: 0;
-  padding: 4px 0;
+  padding: 6px;
   list-style: none;
   background: var(--surface);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius-small);
-  box-shadow: 0 6px 18px rgba(11, 26, 51, 0.14);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-raised);
 }
 .menu__item {
   width: 100%;
-  height: 40px;
-  padding: 0 16px;
+  height: 38px;
+  padding: 0 12px;
   border: none;
+  border-radius: var(--radius-s);
   background: none;
-  color: var(--on-surface);
+  color: var(--text);
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .menu__item:hover {
-  background: var(--surface-lowest);
+  background: var(--hover-tint);
 }
 .menu__item--danger {
   color: var(--error);
 }
 .menu__item--danger:hover {
-  background: var(--chip-error-bg);
+  background: var(--error-soft);
 }
 
 /* ---- dialogs ---- */
@@ -618,23 +918,24 @@ button {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(7, 18, 37, 0.45);
+  background: rgba(29, 28, 24, 0.4);
 }
 .modal {
   width: 100%;
   max-width: 480px;
   padding: 24px;
   background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 40px rgba(7, 18, 37, 0.3);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-raised);
 }
 .modal__title {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
   margin-bottom: 16px;
 }
 .modal__content {
-  color: var(--on-surface-variant);
+  color: var(--text-secondary);
 }
 .modal__actions {
   display: flex;
@@ -643,10 +944,10 @@ button {
   margin-top: 24px;
 }
 
-/* ---- toast: above dialogs ---- */
+/* ---- toast: the app's floating snackbar, above dialogs ---- */
 
 .toast {
-  --tone: var(--dark-blue);
+  --tone: var(--accent-soft);
   position: fixed;
   top: 16px;
   right: 16px;
@@ -654,17 +955,24 @@ button {
   display: flex;
   align-items: flex-start;
   width: min(400px, calc(100vw - 32px));
-  background: var(--surface-high);
+  background: var(--text);
+  color: #ffffff;
   border-left: 5px solid var(--tone);
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-raised);
   animation: toast-in 180ms ease-out;
 }
+.toast .btn--text {
+  color: #ffffff;
+}
+.toast .btn--text:hover:not(:disabled) {
+  background: #34322b;
+}
 .toast--success {
-  --tone: var(--teal);
+  --tone: #7cc4a0;
 }
 .toast--error {
-  --tone: var(--error);
+  --tone: #e8968f;
 }
 .toast__body {
   flex: 1;
@@ -676,6 +984,7 @@ button {
 }
 .toast__message {
   margin-top: 4px;
+  font-size: 13.5px;
 }
 @keyframes toast-in {
   from {
@@ -690,8 +999,8 @@ button {
   display: inline-block;
   width: 32px;
   height: 32px;
-  border: 3px solid var(--spinner-track);
-  border-top-color: var(--teal);
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -699,8 +1008,13 @@ button {
   width: 18px;
   height: 18px;
   border-width: 2px;
-  border-color: var(--spinner-on-blue);
-  border-top-color: var(--white);
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+}
+/* A busy button is disabled, so its background is light: show the spinner in teal. */
+.btn:disabled .spinner--small {
+  border-color: var(--accent-soft);
+  border-top-color: var(--accent);
 }
 @keyframes spin {
   to {
@@ -719,15 +1033,57 @@ button {
 
 @media (max-width: 600px) {
   .appbar__row {
-    flex-wrap: wrap;
-    padding-left: 16px;
+    padding: 16px 16px 14px;
   }
-  .page-header {
+  .appbar__greeting {
+    font-size: 18px;
+  }
+  .appbar__user .avatar {
+    display: none;
+  }
+  /* The app's bottom navigation: icons over labels, the pill around the selected icon. */
+  .tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    justify-content: space-around;
+    gap: 0;
+    max-width: none;
+    padding: 6px 4px calc(8px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .tab,
+  .tab:hover,
+  .tab--active,
+  .tab--active:hover {
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 2px;
+    background: none;
+    font-size: 11.5px;
+  }
+  .tab__icon {
+    padding: 4px 18px;
+    border-radius: 16px;
+  }
+  .tab--active .tab__icon {
+    background: var(--accent-soft);
+  }
+  .shell__page {
+    padding-bottom: 96px;
+  }
+  .page-header,
+  .page-body {
     padding-left: 16px;
     padding-right: 16px;
   }
   .table-card,
-  .panel {
+  .panel,
+  .account {
     margin: 0 16px;
   }
   .search {

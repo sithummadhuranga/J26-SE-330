@@ -1,4 +1,5 @@
 import { cloneElement, useEffect, useId, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { initialsOf } from '../core/format';
 import { describeError } from '../core/messages';
 
 /** Page heading with a short explanation and actions on the right. */
@@ -31,6 +32,90 @@ export function Spinner({ small = false }: { small?: boolean }) {
 
 export function Centered({ children }: { children: ReactNode }) {
   return <div className="centered">{children}</div>;
+}
+
+// ---- building blocks shared with the mobile app's look (mobile/lib/core/widgets.dart) ----
+
+/** A round soft-teal avatar with initials. Decorative: the name is always written next to it. */
+export function InitialsAvatar({ name, size = 36 }: { name: string; size?: number }) {
+  return (
+    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.33 }} aria-hidden="true">
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+/** A rounded square holding an icon, like the app's setting rows and empty states. */
+export function IconTile({ children, tone = 'accent' }: { children: ReactNode; tone?: 'accent' | 'neutral' }) {
+  return (
+    <span className={`icon-tile icon-tile--${tone}`} aria-hidden="true">
+      {children}
+    </span>
+  );
+}
+
+/** Nothing to show yet: an icon tile, a bold line and a hint (the app's EmptyState). */
+export function EmptyState({ icon, title, message }: { icon: ReactNode; title: string; message?: string }) {
+  return (
+    <div className="empty">
+      <IconTile tone="neutral">{icon}</IconTile>
+      <p className="empty__title">{title}</p>
+      {message && <p className="empty__message">{message}</p>}
+    </div>
+  );
+}
+
+/** A small bold heading above a group, with an optional count or action on the right (the app's SectionTitle). */
+export function SectionTitle({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
+  return (
+    <div className="section-title">
+      <h2 className="section-title__text">{children}</h2>
+      {trailing}
+    </div>
+  );
+}
+
+/** A quiet grey strip with an icon, for a rule worth knowing (the app's NoticeStrip). */
+export function NoticeStrip({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <p className="notice">
+      <span className="notice__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/**
+ * The main action of a page as a teal gradient card (the app's "New Assessment" card). [label] is the button's
+ * accessible name, so it reads the same as a plain button would.
+ */
+export function HeroAction({
+  label,
+  description,
+  icon,
+  onClick,
+}: {
+  label: string;
+  description: string;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="hero" aria-label={label} onClick={onClick}>
+      <span className="hero__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="hero__text" aria-hidden="true">
+        <span className="hero__title">{label}</span>
+        <span className="hero__sub">{description}</span>
+      </span>
+      <svg className="hero__chevron" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9.5 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
 }
 
 /** A list that failed to load, with a way to try again. */

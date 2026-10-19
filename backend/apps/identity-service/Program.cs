@@ -92,6 +92,11 @@ if (!app.Configuration.GetValue<bool>("SkipSchemaCheck"))
     await SchemaVersionGuard.EnsureAsync(dataSource, ExpectedSchemaVersions.All);
 
 app.UseForwardedHeaders();
+// Only the login page's font (wwwroot/account/fonts), so the page matches the app without a font service.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public, max-age=604800",
+});
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -5,7 +5,8 @@ import { formatDateTime } from '../core/format';
 import { auditActionLabel, auditReasonLabel } from '../core/messages';
 import type { AuthAuditEntry } from '../core/models';
 import { fuzzyMatch } from '../core/search';
-import { Centered, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
+import { Centered, EmptyState, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
+import { HistoryIcon } from '../ui/icons';
 import { useLoadFailureToast } from '../ui/toastContext';
 
 const limits = [100, 250, 500, 1000] as const;
@@ -101,7 +102,11 @@ export function AuditPage() {
             <Spinner />
           </Centered>
         ) : rows.length === 0 ? (
-          <Centered>No matching events.</Centered>
+          <EmptyState
+            icon={<HistoryIcon size={24} />}
+            title="No matching events"
+            message="Try a different search, or show all events."
+          />
         ) : (
           <div className="panel__scroll">
             <table className="table table--fixed">
