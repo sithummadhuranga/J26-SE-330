@@ -103,7 +103,7 @@ def sticker(cond, seed, size=500):
     for name, (cx, cy, s) in layout.patches.items():
         half = int(s * size / 2)
         y0, y1, x0, x1 = int(cy * size) - half, int(cy * size) + half, int(cx * size) - half, int(cx * size) + half
-        colour = camera(lab_to_srgb(LABS[name]), gain, cond.get("curve", 1.0), cond.get("mix", 0.0))
+        colour = camera(lab_to_srgb(cond.get("labs", LABS)[name]), gain, cond.get("curve", 1.0), cond.get("mix", 0.0))
         img[y0:y1, x0:x1] = colour + rng.normal(0, NOISE, (y1 - y0, x1 - x0, 3))
     return np.clip(np.rint(img), 0, 255).astype(np.uint8)
 
