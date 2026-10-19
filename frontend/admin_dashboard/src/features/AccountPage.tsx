@@ -15,7 +15,8 @@ import {
   Spinner,
   StatusChip,
 } from '../ui/components';
-import { EditIcon, ShieldIcon } from '../ui/icons';
+import { EditIcon, KeyIcon, ShieldIcon } from '../ui/icons';
+import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
@@ -28,6 +29,7 @@ export function AccountPage() {
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const myProfile = useQuery({ queryKey: meKey, queryFn: () => session.authorized((t) => session.api.me(t)) });
 
   const query = useQuery({
@@ -81,6 +83,20 @@ export function AccountPage() {
         </div>
         <SectionTitle>Security</SectionTitle>
       </div>
+      <section className="card account" aria-label="Password">
+        <div className="setting-row">
+          <IconTile>
+            <KeyIcon size={20} />
+          </IconTile>
+          <div className="setting-row__text">
+            <h2 className="setting-row__label">Password</h2>
+            <p className="setting-row__sub">Changing it signs you out everywhere, here included</p>
+          </div>
+          <button type="button" className="btn btn--outline" onClick={() => setChangingPassword(true)}>
+            Change password
+          </button>
+        </div>
+      </section>
       {query.isError ? (
         <LoadError error={query.error} onRetry={reload} />
       ) : query.isPending ? (
@@ -121,6 +137,7 @@ export function AccountPage() {
           )}
         </section>
       )}
+      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
       {editing && myProfile.data && <EditProfileDialog fullName={myProfile.data.fullName} onClose={() => setEditing(false)} />}
     </>
   );

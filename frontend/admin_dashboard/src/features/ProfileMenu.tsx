@@ -6,12 +6,13 @@ import { formatDateTime } from '../core/format';
 import { roleLabel } from '../core/models';
 import { meKey } from '../core/queryKeys';
 import { IconTile, InitialsAvatar, Spinner, StatusChip } from '../ui/components';
-import { ChevronRightIcon, EditIcon, PersonIcon, ShieldIcon } from '../ui/icons';
+import { ChevronRightIcon, EditIcon, KeyIcon, PersonIcon, ShieldIcon } from '../ui/icons';
+import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 
 /**
  * The avatar in the header and the small profile panel it opens (plan: profile management, step 2): who you are,
- * your two-step status, editing your name, links to My account, and sign-out.
+ * your two-step status, editing your name and password, links to My account, and sign-out.
  */
 export function ProfileMenu() {
   const session = useSession();
@@ -19,6 +20,7 @@ export function ProfileMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -128,6 +130,20 @@ export function ProfileMenu() {
                 <ChevronRightIcon size={18} className="profile-panel__chevron" />
               </button>
             )}
+            <button
+              type="button"
+              className="profile-panel__row"
+              onClick={() => {
+                setOpen(false);
+                setChangingPassword(true);
+              }}
+            >
+              <IconTile>
+                <KeyIcon size={18} />
+              </IconTile>
+              <span className="profile-panel__label">Change password</span>
+              <ChevronRightIcon size={18} className="profile-panel__chevron" />
+            </button>
             <button type="button" className="profile-panel__row" onClick={() => go('/account')}>
               <IconTile>
                 <PersonIcon size={18} />
@@ -149,6 +165,7 @@ export function ProfileMenu() {
         </div>
       )}
       {editing && profile && <EditProfileDialog fullName={profile.fullName} onClose={() => setEditing(false)} />}
+      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
     </div>
   );
 }

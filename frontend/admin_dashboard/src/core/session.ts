@@ -47,6 +47,7 @@ export class AuthSession {
   private refreshing: Promise<string> | null = null;
   private ended = false;
   private failure: NeedsSignIn | null = null;
+  private passwordChanged = false;
 
   constructor(api: AdminApi, store: TokenStore, now: () => number = Date.now, redirectUri = defaultRedirectUri) {
     this.api = api;
@@ -74,6 +75,13 @@ export class AuthSession {
     const ended = this.ended;
     this.ended = false;
     return ended;
+  }
+
+  /** True once after you changed your own password, so the sign-in screen can ask for the new one. */
+  takePasswordChangedNotice(): boolean {
+    const changed = this.passwordChanged;
+    this.passwordChanged = false;
+    return changed;
   }
 
   /** Why the last sign-in did not complete, once, so the sign-in screen can say so. */
@@ -150,6 +158,15 @@ export class AuthSession {
       this.refreshing = null;
     });
     return this.refreshing;
+  }
+
+  /**
+   * After a successful POST /v1/me/password: the server has already ended every session, this one included, so end
+   * it here too without calling the server, and tell the sign-in screen why.
+   */
+  endAfterPasswordChange(): void {
+    this.passwordChanged = true;
+    this.clear();
   }
 
   async signOut(): Promise<void> {

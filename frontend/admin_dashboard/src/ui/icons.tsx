@@ -92,3 +92,10 @@ export const EditIcon = (p: IconProps) => (
     <path d="M13.8 7l3.2 3.2" />
   </Icon>
 );
+
+export const KeyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="8" cy="14.5" r="3.8" />
+    <path d="M10.8 11.8L19.5 3.5M16 7l2.6 2.6M14 9l2 2" />
+  </Icon>
+);
