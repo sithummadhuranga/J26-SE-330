@@ -32,7 +32,7 @@ import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "integration"))
-from client import REPO_ROOT  # noqa: E402
+from client import REPO_ROOT, compose  # noqa: E402
 
 import metrics  # noqa: E402
 import toxiproxy  # noqa: E402
@@ -41,11 +41,6 @@ sys.stdout.reconfigure(encoding="utf-8")
 RESULTS = os.path.join(REPO_ROOT, "tests", "evaluation", "results")
 PROXIED_GATEWAY = "http://localhost:18080"
 DIRECT_GATEWAY = "http://localhost:8080"   # setup only (registering clinicians): not part of what is measured
-
-
-def compose(*args, env=None):
-    return subprocess.run(["docker", "compose", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=300,
-                          env={**os.environ, **(env or {})})
 
 
 def wait(fn, seconds, interval=1.0):

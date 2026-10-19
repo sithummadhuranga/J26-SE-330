@@ -1,9 +1,8 @@
 """Housekeeping must never archive a change some active device hasn't pulled yet; safe to re-run."""
 import secrets
-import subprocess
 import sys
 
-from client import REPO_ROOT, Checks, create_clinician, dashboard_login, http, login, pull_all, sql, uuid7
+from client import Checks, compose, create_clinician, dashboard_login, http, login, pull_all, sql, uuid7
 
 suffix = secrets.token_hex(3)
 FAC = f"fac-hk-{suffix}"
@@ -16,8 +15,7 @@ check = t.check
 
 
 def run_cycle():
-    out = subprocess.run(["docker", "compose", "run", "--rm", "--no-deps", "housekeeping", "run-once"],
-                         cwd=REPO_ROOT, capture_output=True, text=True)
+    out = compose("run", "--rm", "--no-deps", "housekeeping", "run-once")
     lines = [l for l in out.stdout.splitlines() if l.startswith(("ran=", "held_back "))]
     if out.returncode != 0 or not lines:
         raise SystemExit(f"housekeeping run-once failed:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}")

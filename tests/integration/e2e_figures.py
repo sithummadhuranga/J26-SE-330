@@ -7,7 +7,7 @@ import time
 import urllib.error
 import urllib.request
 
-from client import GATEWAY, REPO_ROOT, Checks, dashboard_login, http, login
+from client import GATEWAY, Checks, compose, dashboard_login, http, login
 
 sys.stdout.reconfigure(encoding="utf-8")
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -28,8 +28,7 @@ def get(path, token=None, headers=None):
 
 
 def stub(mode):
-    subprocess.run(["docker", "compose", "up", "-d", "--no-deps", "--force-recreate", "rag-stub"], cwd=REPO_ROOT,
-                   capture_output=True, env={**os.environ, "STUB_FAIL_MODE": mode})
+    compose("up", "-d", "--no-deps", "--force-recreate", "rag-stub", env={"STUB_FAIL_MODE": mode})
     for _ in range(60):
         if subprocess.run(["curl", "-s", "-o", os.devnull, "-w", "%{http_code}", "http://localhost:5080/health"],
                           capture_output=True, text=True).stdout == "200":

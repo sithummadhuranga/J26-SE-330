@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-from client import REPO_ROOT, Checks, create_clinician, http, login, sql, uuid7, wait_for, wound_event
+from client import Checks, compose, create_clinician, http, login, sql, uuid7, wait_for, wound_event
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -17,11 +17,6 @@ NURSE = "retry.nurse." + secrets.token_hex(3)
 
 t = Checks()
 check = t.check
-
-
-def compose(*args, env=None):
-    return subprocess.run(["docker", "compose", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=300,
-                          env={**os.environ, **(env or {})})
 
 
 def wait(fn, seconds=60, interval=1.0):

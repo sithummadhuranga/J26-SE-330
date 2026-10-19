@@ -75,6 +75,34 @@ def pull_all(token, cursor=0, limit=500):
     raise AssertionError("pull never reached hasMore=false: the cursor is not advancing")
 
 
+_project = None
+
+
+def compose_project():
+    """The Compose project the running gateway belongs to, so stop/start/recreate act on that stack and never start a
+    second one under the default name (e.g. after `docker compose -p cdss-oidc up`). COMPOSE_PROJECT_NAME wins."""
+    global _project
+    if _project is None:
+        if os.environ.get("COMPOSE_PROJECT_NAME"):
+            _project = os.environ["COMPOSE_PROJECT_NAME"]
+        else:
+            out = subprocess.run(["docker", "ps", "--filter", "label=com.docker.compose.service=api-gateway",
+                                  "--format", '{{.Label "com.docker.compose.project"}}'],
+                                 capture_output=True, text=True, timeout=60).stdout.split()
+            projects = sorted(set(out))
+            if len(projects) != 1:
+                raise SystemExit(f"Found {len(projects) or 'no'} running stacks {projects}: "
+                                 "set COMPOSE_PROJECT_NAME to the one to test.")
+            _project = projects[0]
+    return _project
+
+
+def compose(*args, env=None, timeout=300):
+    """`docker compose` on the running stack's project; [env] adds variables for the compose file (e.g. STUB_FAIL_MODE)."""
+    return subprocess.run(["docker", "compose", "-p", compose_project(), *args], cwd=REPO_ROOT, capture_output=True,
+                          text=True, timeout=timeout, env={**os.environ, **(env or {})})
+
+
 def sql(query):
     out = subprocess.run(["docker", "exec", "postgres", "psql", "-U", "cdss", "-d", "cdss", "-tAc", query],
                          capture_output=True, text=True, check=True)
