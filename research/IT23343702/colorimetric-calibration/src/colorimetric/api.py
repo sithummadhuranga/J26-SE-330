@@ -84,6 +84,7 @@ class CalibrationResult:
     ita_angle: float | None
     ccm_applied: bool
     marker_used: bool
+    marker_label: str | None                # what the skin type rests on when a marker was used
     stage_timing: dict[str, float]          # ms; keys as in ProcessResult plus "7_final", "total"
     model_tensor: np.ndarray | None = None  # float32 (size, size, 3) when stage 7 is on
     letterbox_info: LetterboxInfo | None = None
@@ -96,6 +97,7 @@ class CalibrationResult:
             "ita_angle": None if self.ita_angle is None else round(self.ita_angle, 2),
             "ccm_applied": self.ccm_applied,
             "marker_used": self.marker_used,
+            "marker_label": self.marker_label,
             "stage_timing_ms": {k: round(v, 2) for k, v in self.stage_timing.items()},
             "notes": list(self.notes),
         }
@@ -150,6 +152,7 @@ class CalibrationPipeline:
             ita_angle=res.ita_angle,
             ccm_applied=res.ccm_applied,
             marker_used=res.marker_used,
+            marker_label=res.marker_label,
             stage_timing=timing,
             model_tensor=tensor,
             letterbox_info=info,

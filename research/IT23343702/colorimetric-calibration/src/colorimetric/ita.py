@@ -88,13 +88,24 @@ def classify_fitzpatrick(ita: float) -> FitzpatrickType:
     return FitzpatrickType.VI
 
 
+# Lower brightness limit (HSV V, percent) of the skin mask. The research guide gives 35, which
+# drops the darkest skin: on Fitzpatrick17k + ISIC images labelled FST VI the median image loses
+# 17% of its skin-hued pixels below V=35 (1-4% for FST I-V), so the mean L* of what is left is
+# too high. 20 keeps those pixels; below that, black frames, hair and deep shadow start to
+# qualify. Chosen from a sweep over 35/30/25/20/15/10 (see docs/phase03_notes.md).
+SKIN_V_MIN_GUIDE = 35.0
+SKIN_V_MIN = 20.0
+
+
 def skin_mask_hsv(
     rgb_image: np.ndarray,
     wound_bbox: tuple[int, int, int, int] | None = None,
+    v_min: float = SKIN_V_MIN,
 ) -> np.ndarray:
     """Build a boolean skin mask per Step 3 of the pipeline.
 
-    HSV thresholds: H in [0, 25], S in [15%, 80%], V in [35%, 100%].
+    HSV thresholds: H in [0, 25], S in [15%, 80%], V in [`v_min`, 100%] (`v_min` percent;
+    default `SKIN_V_MIN`, the guide's 35 is `SKIN_V_MIN_GUIDE`).
     wound_bbox, if given, is (x, y, w, h) in pixel coords and is excluded
     from the mask so wound tissue never contaminates the skin-tone sample.
     """
@@ -110,7 +121,7 @@ def skin_mask_hsv(
     s_pct = s.astype(np.float32) / 255.0 * 100.0
     v_pct = v.astype(np.float32) / 255.0 * 100.0
 
-    mask = (h_deg >= 0) & (h_deg <= 25) & (s_pct >= 15) & (s_pct <= 80) & (v_pct >= 35) & (v_pct <= 100)
+    mask = (h_deg >= 0) & (h_deg <= 25) & (s_pct >= 15) & (s_pct <= 80) & (v_pct >= v_min) & (v_pct <= 100)
 
     if wound_bbox is not None:
         x, y, w, h_box = wound_bbox
@@ -133,6 +144,7 @@ def classify_image(
     rgb_image: np.ndarray,
     wound_bbox: tuple[int, int, int, int] | None = None,
     min_skin_pixels: int = 100,
+    v_min: float = SKIN_V_MIN,
 ) -> ITAResult:
     """Run the full ITA classification stage on a single RGB image.
 
@@ -140,7 +152,7 @@ def classify_image(
     2. Convert to LAB and average L*, b* over the masked skin pixels.
     3. Compute ITA and classify into a Fitzpatrick type.
     """
-    mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox)
+    mask = skin_mask_hsv(rgb_image, wound_bbox=wound_bbox, v_min=v_min)
     skin_pixel_count = int(mask.sum())
     if skin_pixel_count < min_skin_pixels:
         raise ValueError(

@@ -101,3 +101,38 @@ def test_gate_matches_fst_bands_at_standard_cutoff():
 def test_fitted_gate_is_stricter_than_standard():
     assert GATE_CUTOFF_FITTED < GATE_CUTOFF_STANDARD
     assert needs_ccm(20.0) and not needs_ccm(20.0, GATE_CUTOFF_FITTED)
+
+
+# ---- skin mask lower brightness limit (V) ---------------------------------------------------
+
+def _patch(rgb, n=40):
+    return np.full((n, n, 3), rgb, dtype=np.uint8)
+
+
+def test_very_dark_skin_is_kept_by_default_but_not_by_the_guides_limit():
+    from colorimetric.ita import SKIN_V_MIN_GUIDE, SKIN_V_MIN, skin_mask_hsv
+    deep = _patch((69, 49, 41))  # HSV V = 27%: the darkest skin we care about
+    assert skin_mask_hsv(deep).all()
+    assert not skin_mask_hsv(deep, v_min=SKIN_V_MIN_GUIDE).any()
+    assert SKIN_V_MIN < SKIN_V_MIN_GUIDE
+
+
+def test_light_skin_mask_is_unchanged_by_the_lower_limit():
+    from colorimetric.ita import SKIN_V_MIN_GUIDE, skin_mask_hsv
+    for rgb in [(194, 150, 130), (230, 190, 170), (115, 82, 68)]:
+        img = _patch(rgb)
+        assert np.array_equal(skin_mask_hsv(img), skin_mask_hsv(img, v_min=SKIN_V_MIN_GUIDE))
+
+
+def test_black_frame_and_deep_shadow_stay_out_of_the_mask():
+    from colorimetric.ita import skin_mask_hsv
+    for rgb in [(20, 20, 20), (30, 22, 18), (0, 0, 0)]:
+        assert not skin_mask_hsv(_patch(rgb)).any()
+
+
+def test_very_dark_skin_now_gets_a_class():
+    from colorimetric.ita import classify_image, SKIN_V_MIN_GUIDE
+    deep = _patch((69, 49, 41), 64)
+    assert classify_image(deep).fitzpatrick_type.value in ("V", "VI")
+    with pytest.raises(ValueError):
+        classify_image(deep, v_min=SKIN_V_MIN_GUIDE)
