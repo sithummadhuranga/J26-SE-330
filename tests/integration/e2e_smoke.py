@@ -61,7 +61,10 @@ eid = good["eventId"]
 check("assessment persisted once",
       wait_for(f"select count(*) from clinical.wound_assessment where event_id = '{eid}'", "1"))
 stages = sql(f"select string_agg(stage, ',' order by provenance_id) from audit.provenance where event_id = '{eid}'")
-check("provenance GATEWAY_ACCEPTED,PERSISTED", stages.startswith("GATEWAY_ACCEPTED,PERSISTED"), stages)
+# Each stage once. Not in row order: the gateway records GATEWAY_ACCEPTED after Kafka's ack, and the persister can
+# consume the event and record PERSISTED first.
+check("provenance has GATEWAY_ACCEPTED and PERSISTED, once each",
+      stages.split(",").count("GATEWAY_ACCEPTED") == 1 and stages.split(",").count("PERSISTED") == 1, stages)
 
 print("Phase 4: outbox relay")
 check("outbox row published", wait_for(
