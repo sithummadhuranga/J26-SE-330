@@ -74,6 +74,7 @@ export const codes: Record<string, string> = {
   PASSWORD_TOO_SHORT: `The password must be at least ${minPasswordLength} characters.`,
   INVALID_ROLE: 'Choose a role: nurse, wound specialist or admin.',
   MISSING_FULL_NAME: 'Enter the full name.',
+  FULL_NAME_TOO_LONG: 'The full name can be at most 120 characters.',
   UNKNOWN_FACILITY: 'Your facility is not registered. Contact the system administrator.',
   CANNOT_DEACTIVATE_SELF: 'You cannot deactivate your own account. Ask another admin.',
   ALREADY_ACTIVE: 'This account is already active. Refresh the list.',

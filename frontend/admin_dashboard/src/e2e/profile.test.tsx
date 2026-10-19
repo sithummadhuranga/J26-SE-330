@@ -1,8 +1,23 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { demoAdmin, newSession, renderDashboard, requireBackend, signInOnScreen, slow } from './backend';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  adminSession,
+  cleanUp,
+  demoAdmin,
+  findToast,
+  newSession,
+  ownPassword,
+  registerClinician,
+  renderDashboard,
+  requireBackend,
+  signInOnScreen,
+  slow,
+  strongPassword,
+  uniqueName,
+} from './backend';
 
 beforeAll(requireBackend);
+afterAll(cleanUp);
 
 async function signedIn() {
   const session = newSession();
@@ -10,6 +25,31 @@ async function signedIn() {
   await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
   await screen.findByRole('heading', { name: 'Clinicians' }, slow);
   return user;
+}
+
+/** A new admin, so a rename never changes the demo admin's name that other tests look for. */
+async function signedInAsNewAdmin(path = '/') {
+  const name = uniqueName('prof');
+  await registerClinician(await adminSession(), name, 'admin');
+  const session = newSession();
+  const user = renderDashboard(session, path);
+  await signInOnScreen(user, session, name, strongPassword, undefined, ownPassword);
+  await screen.findByRole('button', { name: 'Your profile' }, slow);
+  return { user, name };
+}
+
+/**
+ * The clinicians-table row with [text], paging with the arrows: other test files register clinicians at the same
+ * time, so this one may not be on page 1. Looks inside the table only (the header shows your username too).
+ */
+async function rowInTable(user: Awaited<ReturnType<typeof signedInAsNewAdmin>>['user'], text: string) {
+  for (;;) {
+    const cell = within(await screen.findByRole('table', {}, slow)).queryByText(text);
+    if (cell) return cell.closest('tr')!;
+    const next = screen.getByRole('button', { name: 'Next page' });
+    if ((next as HTMLButtonElement).disabled) throw new Error(`"${text}" is on no page`);
+    await user.click(next);
+  }
 }
 
 describe('profile panel from the avatar (real identity service)', () => {
@@ -37,6 +77,49 @@ describe('profile panel from the avatar (real identity service)', () => {
     await screen.findByRole('dialog', { name: 'Your profile' });
     await user.click(screen.getByRole('heading', { name: 'Clinicians' }));
     expect(screen.queryByRole('dialog', { name: 'Your profile' })).not.toBeInTheDocument();
+  });
+
+  it('Edit profile from the panel renames you, and the panel and the clinicians list show it at once', async () => {
+    const { user, name } = await signedInAsNewAdmin();
+    await screen.findByRole('heading', { name: 'Clinicians' }, slow);
+    await user.click(screen.getByRole('button', { name: 'Your profile' }));
+    const panel = await screen.findByRole('dialog', { name: 'Your profile' });
+    await user.click(await within(panel).findByRole('button', { name: 'Edit profile' }, slow));
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit profile' });
+    const field = within(dialog).getByLabelText('Full name');
+    expect(field).toHaveValue(`E2E ${name}`);
+    await user.clear(field);
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(within(dialog).getByText('Enter your full name')).toBeInTheDocument();
+
+    await user.type(field, '  Renamed In Test  ');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(await findToast('Your name is now Renamed In Test.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Edit profile' })).not.toBeInTheDocument();
+
+    // The clinicians list (another admin's view of you) refreshes without a reload.
+    const row = await rowInTable(user, `${name} (you)`); // your own row is marked "(you)"
+    await waitFor(() => expect(within(row).getByText('Renamed In Test')).toBeInTheDocument(), slow);
+    await user.click(screen.getByRole('button', { name: 'Your profile' }));
+    expect(within(await screen.findByRole('dialog', { name: 'Your profile' })).getByText('Renamed In Test')).toBeInTheDocument();
+
+    // Saved on the server: a fresh read of the profile has it.
+    const admin = await adminSession();
+    expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.fullName).toBe(
+      'Renamed In Test',
+    );
+  });
+
+  it('My account shows your full name and has its own Edit profile button', async () => {
+    const { user, name } = await signedInAsNewAdmin('/account');
+    expect(await screen.findByText(`E2E ${name}`, {}, slow)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit profile' }));
+    const field = within(screen.getByRole('dialog', { name: 'Edit profile' })).getByLabelText('Full name');
+    await user.clear(field);
+    await user.type(field, 'From My Account');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('From My Account', { selector: '.profile__name' }, slow)).toBeInTheDocument();
   });
 
   it('links to My account, and signs you out', async () => {

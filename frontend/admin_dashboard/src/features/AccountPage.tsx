@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAdmin, useSession } from '../app/sessionContext';
 import type { MfaEnrollment } from '../core/models';
-import { meKey } from '../core/queryKeys';
+import { cliniciansKey, meKey } from '../core/queryKeys';
 import {
   Centered,
   Field,
@@ -15,11 +15,9 @@ import {
   Spinner,
   StatusChip,
 } from '../ui/components';
-import { ShieldIcon } from '../ui/icons';
+import { EditIcon, ShieldIcon } from '../ui/icons';
+import { EditProfileDialog } from './EditProfileDialog';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
-
-/** The same list as the clinicians page, so turning MFA on here updates the chip there too. */
-const cliniciansKey = ['clinicians'];
 
 /** The signed-in admin's own account: turning on two-step sign-in (architecture §7.3). */
 export function AccountPage() {
@@ -29,6 +27,8 @@ export function AccountPage() {
   const queryClient = useQueryClient();
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const myProfile = useQuery({ queryKey: meKey, queryFn: () => session.authorized((t) => session.api.me(t)) });
 
   const query = useQuery({
     queryKey: cliniciansKey,
@@ -66,10 +66,18 @@ export function AccountPage() {
       <div className="page-body">
         <div className="profile">
           <InitialsAvatar name={admin?.username ?? '?'} size={54} />
-          <div>
-            <p className="profile__name">{admin?.username}</p>
-            <p className="profile__sub">Admin · Facility {admin?.facilityId}</p>
+          <div className="profile__who">
+            <p className="profile__name">{myProfile.data?.fullName ?? admin?.username}</p>
+            <p className="profile__sub">
+              {admin?.username} · Admin · Facility {admin?.facilityId}
+            </p>
           </div>
+          {myProfile.data && (
+            <button type="button" className="btn btn--outline" onClick={() => setEditing(true)}>
+              <EditIcon size={16} />
+              Edit profile
+            </button>
+          )}
         </div>
         <SectionTitle>Security</SectionTitle>
       </div>
@@ -113,6 +121,7 @@ export function AccountPage() {
           )}
         </section>
       )}
+      {editing && myProfile.data && <EditProfileDialog fullName={myProfile.data.fullName} onClose={() => setEditing(false)} />}
     </>
   );
 }

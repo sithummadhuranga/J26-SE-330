@@ -111,6 +111,15 @@ export class AdminApi {
     return this.get('v1/me', token) as Promise<MyProfile>;
   }
 
+  /** Changes your own full name; answers the updated profile. Throws ApiError 400 MISSING_FULL_NAME, FULL_NAME_TOO_LONG. */
+  updateProfile(token: string, fullName: string): Promise<MyProfile> {
+    return this.send('v1/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fullName }),
+    }) as Promise<MyProfile>;
+  }
+
   // ---- own account: two-step sign-in ----
 
   /** Starts two-step setup with a new secret; MFA turns on only after confirmMfa. Throws ApiError 409 MFA_ALREADY_ENABLED. */

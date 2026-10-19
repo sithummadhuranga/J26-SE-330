@@ -6,17 +6,19 @@ import { formatDateTime } from '../core/format';
 import { roleLabel } from '../core/models';
 import { meKey } from '../core/queryKeys';
 import { IconTile, InitialsAvatar, Spinner, StatusChip } from '../ui/components';
-import { ChevronRightIcon, PersonIcon, ShieldIcon } from '../ui/icons';
+import { ChevronRightIcon, EditIcon, PersonIcon, ShieldIcon } from '../ui/icons';
+import { EditProfileDialog } from './EditProfileDialog';
 
 /**
  * The avatar in the header and the small profile panel it opens (plan: profile management, step 2): who you are,
- * your two-step status, links to My account, and sign-out. Read only for now.
+ * your two-step status, editing your name, links to My account, and sign-out.
  */
 export function ProfileMenu() {
   const session = useSession();
   const admin = useAdmin();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -110,6 +112,22 @@ export function ProfileMenu() {
             </>
           )}
           <div className="profile-panel__rows">
+            {profile && (
+              <button
+                type="button"
+                className="profile-panel__row"
+                onClick={() => {
+                  setOpen(false);
+                  setEditing(true);
+                }}
+              >
+                <IconTile>
+                  <EditIcon size={18} />
+                </IconTile>
+                <span className="profile-panel__label">Edit profile</span>
+                <ChevronRightIcon size={18} className="profile-panel__chevron" />
+              </button>
+            )}
             <button type="button" className="profile-panel__row" onClick={() => go('/account')}>
               <IconTile>
                 <PersonIcon size={18} />
@@ -130,6 +148,7 @@ export function ProfileMenu() {
           </button>
         </div>
       )}
+      {editing && profile && <EditProfileDialog fullName={profile.fullName} onClose={() => setEditing(false)} />}
     </div>
   );
 }

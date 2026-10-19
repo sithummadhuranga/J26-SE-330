@@ -4,6 +4,7 @@ import { useAdmin, useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import { roleLabel, type ClinicianSummary } from '../core/models';
 import { usePaged } from '../core/paging';
+import { cliniciansKey } from '../core/queryKeys';
 import {
   ActionsMenu,
   Centered,
@@ -23,8 +24,6 @@ import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 import { RegisterClinicianDialog } from './RegisterClinicianDialog';
 import { ResetPasswordDialog } from './ResetPasswordDialog';
-
-const cliniciansKey = ['clinicians'];
 
 type Action = 'unlock' | 'resetMfa' | 'deactivate' | 'reactivate';
 
