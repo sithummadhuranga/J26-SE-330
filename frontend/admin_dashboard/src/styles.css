@@ -85,6 +85,13 @@
   box-sizing: border-box;
 }
 
+/* Room for the scrollbar is always kept, so switching between a short and a long page never shifts it sideways. */
+html {
+  scrollbar-gutter: stable;
+  /* Jumping to a section (My account's #sessions) stops below the sticky header, not under it. */
+  scroll-padding-top: 180px;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -282,6 +289,10 @@ button {
 /* ---- signed-in frame: the app's greeting header, and tabs with the bottom-navigation pill ---- */
 
 .appbar {
+  /* Stays at the top while the page scrolls, so the tabs are always one click away. */
+  position: sticky;
+  top: 0;
+  z-index: 30;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   color: var(--text);
@@ -993,7 +1004,6 @@ button {
 /* A section heading on My account: as wide as the 560px card under it, so "End all sessions" sits over the card. */
 .page-body--section {
   max-width: 608px;
-  scroll-margin-top: 16px;
 }
 /* Focused only when a profile-panel link jumps here: no ring around the heading. */
 .page-body--section:focus,
@@ -1312,6 +1322,13 @@ button {
 }
 
 @media (max-width: 600px) {
+  /* On a phone the tabs are the bottom bar, so the header can scroll away and leave room for the page. */
+  .appbar {
+    position: static;
+  }
+  html {
+    scroll-padding-top: 16px;
+  }
   .appbar__row {
     padding: 16px 16px 14px;
   }
