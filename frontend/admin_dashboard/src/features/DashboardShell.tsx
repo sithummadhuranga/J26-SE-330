@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router';
+import { useEffect, type ReactNode } from 'react';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
 import { useAdmin, useSession } from '../app/sessionContext';
 import { greeting } from '../core/format';
 import { HistoryIcon, PeopleIcon, PersonIcon, PhoneIcon } from '../ui/icons';
@@ -23,6 +23,12 @@ const tabs: { path: string; label: string; icon: ReactNode }[] = [
 export function DashboardShell() {
   const session = useSession();
   const admin = useAdmin();
+  const { pathname, hash } = useLocation();
+
+  // Each tab opens at the top; a link to a section (#sessions) scrolls there itself.
+  useEffect(() => {
+    if (!hash) window.scrollTo?.({ top: 0 });
+  }, [pathname, hash]);
 
   return (
     <div className="shell">
