@@ -6,27 +6,20 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.Account;
 
-/// <summary>
-/// The sign-in page, as an MVC controller (ADR 0006). It's the only place a clinician types a password. The steps are
-/// password, then the authenticator code if MFA is on, then a new password if an admin set the current one. The rules
-/// and audit live in <see cref="ISignInRules"/>; this controller only moves the clinician between the steps.
-/// </summary>
+// The sign-in page: password, then the MFA code, then a new password if an admin set it.
 [Route("account")]
 public sealed class AccountController(ISignInRules rules, OidcClients clients, IDataProtectionProvider protection)
     : Controller
 {
     private static readonly TimeSpan StepLifetime = TimeSpan.FromMinutes(5);
 
-    /// <summary>
-    /// What one step hands to the next. It's sealed (encrypted and time-limited), and it carries the authorize request
-    /// it belongs to, so the request can't be swapped between steps.
-    /// </summary>
+    // Passed between steps, encrypted. Holds the return URL so it can't be swapped mid sign-in.
     private sealed record Ticket(string Username, string PasswordHash, string ReturnUrl);
 
     private ITimeLimitedDataProtector MfaProtector =>
         protection.CreateProtector("IdentityService.Login.MfaTicket").ToTimeLimitedDataProtector();
 
-    // A different purpose from the MFA ticket, so an MFA ticket can never be used to skip the code.
+    // Separate key so an MFA ticket can't be used to skip the code.
     private ITimeLimitedDataProtector ChangeProtector =>
         protection.CreateProtector("IdentityService.Login.ChangeTicket").ToTimeLimitedDataProtector();
 
@@ -53,7 +46,7 @@ public sealed class AccountController(ISignInRules rules, OidcClients clients, I
             if (error is "PASSWORD_TOO_SHORT" or "PASSWORD_UNCHANGED")
                 return Form(target, changeTicket: form.ChangeTicket, error: error);
             if (error is not null) return Form(target, error: error);
-            // The code was already checked before this step, so sign in with the new password without asking again.
+            // MFA was already checked before this step.
             attempt = new SignInAttempt(ticket.Username, null, null, target.Client.Id, target.DeviceId, newHash,
                 EnforcePasswordChange: true, MfaAlreadyVerified: true);
         }
@@ -86,9 +79,7 @@ public sealed class AccountController(ISignInRules rules, OidcClients clients, I
                 mfaTicket: Seal(MfaProtector, new Ticket(attempt.Username, result.PasswordHash!, target.ReturnUrl))),
             "PASSWORD_CHANGE_REQUIRED" => Form(target,
                 changeTicket: Seal(ChangeProtector, new Ticket(attempt.Username, result.PasswordHash!, target.ReturnUrl))),
-            // Keep the ticket after a wrong code, so the clinician can try the code again.
             "INVALID_TOTP" when mfaTicket is not null => Form(target, mfaTicket: mfaTicket, error: "INVALID_TOTP"),
-            // Anything else starts again. Only the password step puts the username back in the box.
             _ => Form(target, username: passwordStep ? attempt.Username : null, error: result.ReasonCode!),
         };
     }

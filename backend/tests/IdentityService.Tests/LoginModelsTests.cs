@@ -4,10 +4,6 @@ using IdentityService.Oidc;
 
 namespace IdentityService.Tests;
 
-/// <summary>
-/// The models behind the MVC sign-in page: which return addresses the page accepts (LoginTarget), which step the
-/// view shows (LoginViewModel) and what the clinician reads for each reason code (LoginMessages).
-/// </summary>
 public class LoginModelsTests
 {
     private static readonly OidcClients Clients = new(

@@ -4,24 +4,18 @@ using Microsoft.AspNetCore.WebUtilities;
 
 namespace IdentityService.Account;
 
-/// <summary>What the sign-in form posts. Which fields are filled in depends on the step the clinician is on.</summary>
 public sealed class LoginForm
 {
     public string? Username { get; set; }
     public string? Password { get; set; }
     public string? Totp { get; set; }
-
-    /// <summary>The sealed result of the password step, carried into the authenticator-code step.</summary>
     public string? MfaTicket { get; set; }
-
-    /// <summary>The sealed result of a sign-in whose password an admin set, carried into the new-password step.</summary>
     public string? ChangeTicket { get; set; }
 
     public string? NewPassword { get; set; }
     public string? ConfirmPassword { get; set; }
 }
 
-/// <summary>What the sign-in view shows. Passwords are never put back into the page.</summary>
 public sealed class LoginViewModel
 {
     public required string ClientName { get; init; }
@@ -36,20 +30,16 @@ public sealed class LoginViewModel
     public bool AskForNewPassword => ChangeTicket is not null;
 }
 
-/// <summary>
-/// The authorize request a sign-in belongs to. It comes only from the page's query string, never from the form,
-/// and it has to be our own /connect/authorize for a known client, so the sign-in can never redirect anywhere else.
-/// </summary>
+// Where the sign-in returns to. Only our own /connect/authorize for a known client is allowed.
 public sealed record LoginTarget(string ReturnUrl, OidcClient Client, string? DeviceId)
 {
     private const string AuthorizePrefix = "/connect/authorize?";
 
     public string ClientName => Client.Id == Clients.AdminDashboard ? "Admin dashboard" : "Mobile app";
 
-    /// <summary>Null unless <paramref name="returnUrl"/> is our own authorize request for a client we know.</summary>
     public static LoginTarget? Parse(string? returnUrl, OidcClients clients)
     {
-        // Starting with "/connect/authorize?" also rules out "//host" and "/\host", which browsers treat as other sites.
+        // This prefix check also blocks "//host" and "/\host".
         if (string.IsNullOrEmpty(returnUrl) || !returnUrl.StartsWith(AuthorizePrefix, StringComparison.Ordinal))
             return null;
         var query = QueryHelpers.ParseQuery(returnUrl[(AuthorizePrefix.Length - 1)..]);
@@ -59,7 +49,6 @@ public sealed record LoginTarget(string ReturnUrl, OidcClient Client, string? De
     }
 }
 
-/// <summary>What the clinician reads for each reason code. The code itself goes in data-code for the tests.</summary>
 public static class LoginMessages
 {
     public static string For(string code, bool onCodeStep) => code switch

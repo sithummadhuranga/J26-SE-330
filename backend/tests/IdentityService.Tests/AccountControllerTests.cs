@@ -12,10 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IdentityService.Tests;
 
-/// <summary>
-/// The MVC sign-in page (AccountController): how it moves a clinician through the password, authenticator-code and
-/// new-password steps. The sign-in rules themselves are faked here; the end-to-end suites test them for real.
-/// </summary>
+// The sign-in rules are faked here; the end-to-end suites test them for real.
 public class AccountControllerTests
 {
     private const string MobileReturnUrl =
@@ -231,8 +228,7 @@ public class AccountControllerTests
         Assert.NotNull(post.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
     }
 
-    /// <summary>Hands out the results a test queues, and remembers every attempt and password change.</summary>
-    private sealed class FakeRules : ISignInRules
+        private sealed class FakeRules : ISignInRules
     {
         public Queue<CredentialResult> Results { get; } = new();
         public List<SignInAttempt> Attempts { get; } = [];
@@ -254,15 +250,14 @@ public class AccountControllerTests
         }
     }
 
-    /// <summary>The page never uses TempData, but MVC's View() asks for it.</summary>
+    // View() needs TempData even though the page doesn't use it.
     private sealed class NoTempData : ITempDataProvider
     {
         public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
         public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
     }
 
-    /// <summary>Records the cookie sign-in instead of writing a cookie.</summary>
-    private sealed class FakeAuthentication : IAuthenticationService
+        private sealed class FakeAuthentication : IAuthenticationService
     {
         public string? Scheme { get; private set; }
         public ClaimsPrincipal? Principal { get; private set; }

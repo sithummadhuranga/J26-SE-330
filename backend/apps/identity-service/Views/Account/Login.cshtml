@@ -10,8 +10,7 @@
     <p class="error" role="alert" data-code="@Model.ErrorCode">@Model.ErrorMessage</p>
 }
 
-@* No action: the form posts back to this page's own address, so the returnUrl stays in the query string and is
-   never a form field anyone could edit. The form tag helper adds the anti-forgery token. *@
+@* No action, so returnUrl stays in the query string instead of a form field. *@
 <form method="post" autocomplete="off">
     @if (Model.AskForNewPassword)
     {

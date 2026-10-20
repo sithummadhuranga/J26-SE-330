@@ -64,7 +64,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 // and anti-forgery), so a restart just means signing in again. Codes and refresh tokens use a key from
 // Secrets:EncryptionKey.
 builder.Services.AddInMemoryDataProtection();
-// MVC for the sign-in page (AccountController and Views/Account); everything else is minimal APIs.
+// MVC for the sign-in page, minimal APIs for the rest.
 builder.Services.AddControllersWithViews();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
