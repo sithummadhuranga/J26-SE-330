@@ -3,16 +3,17 @@ using Sync.Common.Contracts;
 
 namespace Orchestrator.Graph;
 
-// Workflow messages: InboxCheck → SupersedeCheck → BuildContext → CallRag → ValidateResponse → PersistResult.
+// The messages passed along the workflow, in this order:
+// InboxCheck → SupersedeCheck → BuildContext → CallRag → ValidateResponse → PersistResult.
 
-/// <summary>Workflow input: the persisted event plus the trace it belongs to (from the Kafka headers).</summary>
+/// <summary>What the workflow starts with: the persisted event and the trace it belongs to (from the Kafka headers).</summary>
 public sealed record OrchestrationJob(PersistedEvent Event, string? TraceId);
 
 public sealed record InboxChecked(OrchestrationJob Job, bool AlreadyProcessed);
 
 public sealed record SupersedeChecked(OrchestrationJob Job, bool Superseded);
 
-/// <summary>Request is null when the stored assessment cannot be found (should never happen: same transaction).</summary>
+/// <summary>Request is null if the stored assessment can't be found. That should never happen, since they're saved in the same transaction.</summary>
 public sealed record ContextBuilt(OrchestrationJob Job, RecommendationRequest? Request);
 
 public sealed record RagCallResult(OrchestrationJob Job, RecommendationRequest Request, RagCallStatus Status,
@@ -20,15 +21,15 @@ public sealed record RagCallResult(OrchestrationJob Job, RecommendationRequest R
 
 public enum RagCallStatus
 {
-    /// <summary>200 (generated or extractive: both are successes, §10.3).</summary>
+    /// <summary>A 200. Both generated and extractive answers count as a success (§10.3).</summary>
     Ok,
-    /// <summary>Timeout, 503, open circuit or unreachable: ADVICE_DEFERRED, then the retry topics.</summary>
+    /// <summary>A timeout, 503, open circuit or unreachable service. The advice is deferred and the message goes to the retry topics.</summary>
     Deferred,
-    /// <summary>422 or 409: a contract or ordering bug. No retry; straight to the DLQ.</summary>
+    /// <summary>A 422 or 409, which means a contract or ordering bug. There's no retry; it goes straight to the DLQ.</summary>
     ContractError,
 }
 
-/// <summary>Error is set when the response failed validation; Response is then null.</summary>
+/// <summary>Error is set if the response failed validation, and then Response is null.</summary>
 public sealed record ValidatedRecommendation(OrchestrationJob Job, RecommendationResponse? Response, JsonElement RawBody,
     string? Error);
 

@@ -3,12 +3,12 @@ using Confluent.Kafka;
 
 namespace Sync.Common.Kafka;
 
-/// <summary>The client settings that matter (architecture §8.2), in one place so no service drifts.</summary>
+/// <summary>The client settings that matter (architecture §8.2), kept in one place so no service drifts from them.</summary>
 public static class KafkaDefaults
 {
     public const string DefaultBootstrapServers = "localhost:29092";
 
-    /// <param name="deliveryTimeoutMs">How long a produce waits for acks; short in the gateway for a quick 503.</param>
+    /// <param name="deliveryTimeoutMs">How long a produce waits for acks. The gateway keeps it short so it can answer 503 quickly.</param>
     public static ProducerConfig Producer(string bootstrapServers, int deliveryTimeoutMs = 30_000) => new()
     {
         BootstrapServers = bootstrapServers,
@@ -17,7 +17,7 @@ public static class KafkaDefaults
         MessageTimeoutMs = deliveryTimeoutMs,
     };
 
-    /// <summary>Offsets are committed by hand, only after the database transaction commits.</summary>
+    /// <summary>Offsets are committed by hand, and only after the database transaction has committed.</summary>
     public static ConsumerConfig Consumer(string bootstrapServers, string groupId) => new()
     {
         BootstrapServers = bootstrapServers,

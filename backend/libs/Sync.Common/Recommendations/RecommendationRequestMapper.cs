@@ -4,7 +4,7 @@ using Sync.Common.Contracts;
 
 namespace Sync.Common.Recommendations;
 
-/// <summary>Builds the RAG request field by field so patient, device, facility and skin-type data never leave.</summary>
+/// <summary>Builds the RAG request one field at a time, so patient, device, facility and skin-type data never leave.</summary>
 public static class RecommendationRequestMapper
 {
     public const string NotRecorded = "not_recorded";
@@ -42,7 +42,7 @@ public static class RecommendationRequestMapper
                 pipeline.GetProperty("segmentation").GetString()!));
     }
 
-    /// <summary>Copies recorded fields as-is; fields the app doesn't collect yet are sent as not_recorded.</summary>
+    /// <summary>Copies recorded fields as they are. Fields the app doesn't collect yet are sent as not_recorded.</summary>
     private static JsonElement Clinical(JsonElement stored)
     {
         var result = new JsonObject();

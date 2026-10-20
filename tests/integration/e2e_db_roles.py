@@ -15,7 +15,7 @@ check = t.check
 
 
 def as_role(role, statement, password=None):
-    """Runs one statement as `role` over TCP (scram-sha-256), like the services do. Returns (ok, output)."""
+    """Runs one statement as `role` over TCP (scram-sha-256), the same way the services connect. Returns (ok, output)."""
     out = subprocess.run(
         ["docker", "exec", "-e", f"PGPASSWORD={password or PASSWORDS[role]}", "postgres", "psql", "-h", "postgres",
          "-U", role, "-d", "cdss", "-v", "ON_ERROR_STOP=1", "-tAc", statement],

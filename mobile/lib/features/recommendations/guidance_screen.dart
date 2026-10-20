@@ -4,7 +4,7 @@ import '../../app/app_services.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 
-/// Shows the Recommendation Service's guidance as-is; Member 3 owns the final design.
+/// Shows the guidance from the Recommendation Service as it arrives. Member 3 owns the final design.
 class GuidanceScreen extends StatelessWidget {
   const GuidanceScreen({super.key, required this.services, required this.payload, required this.receivedAt});
 
@@ -139,7 +139,7 @@ class GuidanceScreen extends StatelessWidget {
     );
   }
 
-  /// "pedalPulses" → "Pedal pulses".
+  /// Turns a key into a readable label, so "pedalPulses" becomes "Pedal pulses".
   static String _fieldLabel(String field) {
     final words = field.replaceAllMapped(RegExp('([A-Z])'), (m) => ' ${m[1]!.toLowerCase()}').trim();
     return words.isEmpty ? 'More detail' : words[0].toUpperCase() + words.substring(1);

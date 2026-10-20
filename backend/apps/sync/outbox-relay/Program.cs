@@ -5,7 +5,7 @@ using Sync.Common.Kafka;
 using Sync.Common.Persistence;
 using Sync.Common.Telemetry;
 
-// Outbox relay: publishes outbox rows to Kafka.
+// The outbox relay publishes outbox rows to Kafka.
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddSyncTelemetry("outbox-relay");
 

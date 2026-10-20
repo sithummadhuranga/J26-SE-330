@@ -4,8 +4,11 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../features/account/account_api.dart';
+import '../features/assessment/analysis/wound_analyzer.dart';
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
+import '../features/sync/auth/browser_sign_in.dart';
 import '../features/sync/data/app_database.dart';
 import '../features/sync/data/figure_repository.dart';
 import '../features/sync/data/patient_repository.dart';
@@ -13,13 +16,15 @@ import '../features/sync/data/queue_repository.dart';
 import '../features/sync/engine/sync_engine.dart';
 import '../features/sync/engine/sync_scheduler.dart';
 
-/// Backend address, set with --dart-define=SYNC_BASE_URL=...; defaults to the emulator's host address.
+/// The backend address. Set it with --dart-define=SYNC_BASE_URL=... ; by default it points at the
+/// emulator's view of your computer.
 const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://10.0.2.2:8080');
 
-/// Sync services wired once at start-up: save with [queue], then call [scheduler].onSaved(); show figures with [figures].
+/// The sync services, set up once when the app starts. To save, write to [queue] and then call
+/// [scheduler].onSaved(). Use [figures] to show guideline figures, and [analyzer] to analyse a captured wound.
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
-      required this.auth, required this.engine, required this.scheduler});
+      required this.auth, required this.engine, required this.scheduler, required this.analyzer, required this.account});
 
   final AppDatabase db;
   final QueueRepository queue;
@@ -30,13 +35,22 @@ class AppServices {
   final SyncEngine engine;
   final SyncScheduler scheduler;
 
-  /// Real phone setup: encrypted DB, Keystore secrets and platform connectivity; tests pass fakes.
+  /// The on-device wound analysis. It's [SampleWoundAnalyzer] until the real pipeline from Members 1–2 is ready.
+  final WoundAnalyzer analyzer;
+
+  /// Your own account on the server (name, password, sessions). Needs a connection, unlike the rest of the app.
+  final AccountApi account;
+
+  /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
     SecretStore? secrets,
     SyncApi? api,
+    BrowserSignIn? browser,
     Stream<bool>? online,
     DateTime Function()? clock,
+    WoundAnalyzer? analyzer,
+    AccountApi? account,
   }) async {
     final store = secrets ?? const KeystoreSecretStore();
     final database = db ??
@@ -45,11 +59,11 @@ class AppServices {
           await DatabaseKeyStore.getOrCreate(store),
         );
     final queue = QueueRepository(database, clock: clock);
-    // A killed app leaves rows leased: they go back to pending at start (§6.2).
+    // If the app was killed mid-sync, some rows are still leased. Put them back to pending now (§6.2).
     await queue.releaseExpiredLeases();
 
     final client = api ?? HttpSyncApi(Uri.parse(syncBaseUrl));
-    final auth = AuthSession(client, store, clock: clock);
+    final auth = AuthSession(client, store, browser: browser ?? AppAuthSignIn(Uri.parse(syncBaseUrl)), clock: clock);
     final figures = FigureRepository(database, client, auth, clock: clock);
     final patients = PatientRepository(database, client, clock: clock);
     final engine =
@@ -66,13 +80,15 @@ class AppServices {
         api: client,
         auth: auth,
         engine: engine,
-        scheduler: scheduler);
+        scheduler: scheduler,
+        analyzer: analyzer ?? SampleWoundAnalyzer(),
+        account: account ?? HttpAccountApi(Uri.parse(syncBaseUrl), auth));
   }
 
-  /// Signs in with this phone's device id and caches who's signed in for offline display.
-  Future<Clinician> signIn({required String username, required String password, String? totp}) async {
-    final clinician =
-        await auth.signIn(username: username, password: password, deviceId: await queue.deviceId(), totp: totp);
+  /// Signs in on the identity service's page with this phone's device id, and remembers who signed in
+  /// so we can show it offline. Throws [SignInCancelled] if the clinician closes the page.
+  Future<Clinician> signIn() async {
+    final clinician = await auth.signIn(deviceId: await queue.deviceId());
     await db.delete(db.authLocal).go();
     await db.into(db.authLocal).insert(AuthLocalCompanion.insert(
           clinicianId: clinician.id,
@@ -84,7 +100,7 @@ class AppServices {
     return clinician;
   }
 
-  /// Who was signed in last, available offline.
+  /// Who signed in last. This works offline.
   Future<AuthLocalData?> cachedClinician() => db.select(db.authLocal).getSingleOrNull();
 
   Future<void> signOut() async {

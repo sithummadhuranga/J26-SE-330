@@ -10,7 +10,7 @@ public static class Totp
     public const int StepSeconds = 30;
     public const int Digits = 6;
 
-    /// <summary>Accept the previous and next step as well, to allow for phone clock drift.</summary>
+    /// <summary>Also accept the step before and after, in case the phone's clock is a little off.</summary>
     public const int WindowSteps = 1;
 
     public static byte[] NewSecret() => RandomNumberGenerator.GetBytes(20);
@@ -29,7 +29,7 @@ public static class Totp
         return (binary % modulo).ToString().PadLeft(digits, '0');
     }
 
-    /// <summary>Returns the matching step or null; steps already used are refused to stop replays.</summary>
+    /// <summary>Returns the matching step, or null. A step that's already been used is refused, to stop replays.</summary>
     public static long? Verify(byte[] secret, string? code, DateTimeOffset now, long? lastUsedStep)
     {
         if (code is null || code.Length != Digits || !code.All(char.IsAsciiDigit)) return null;
@@ -43,6 +43,9 @@ public static class Totp
         }
         return null;
     }
+
+    /// <summary>The name authenticator apps show next to the code. Not the token issuer, which is now a URL.</summary>
+    public const string AppName = "melanin-wound-cdss";
 
     public static string OtpAuthUri(byte[] secret, string username, string issuer) =>
         $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(username)}" +

@@ -5,7 +5,7 @@ using Sync.Common.Kafka;
 using Sync.Common.Persistence;
 using Sync.Common.Telemetry;
 
-// Housekeeping service; run with "-- run-once" to do a single cycle and exit.
+// The housekeeping service. Run it with "-- run-once" to do a single cycle and then exit.
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddSyncTelemetry("housekeeping");
 

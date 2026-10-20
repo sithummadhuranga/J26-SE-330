@@ -10,7 +10,7 @@ import '../features/sync/ui/sign_in_screen.dart';
 import 'app_services.dart';
 import 'connection.dart';
 
-/// The signed-in app with Home, Patients, History and Profile tabs, plus an offline banner.
+/// The app once someone is signed in: the Home, Patients, History and Profile tabs, plus an offline banner.
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.services, required this.onSignedOut});
 
@@ -47,7 +47,7 @@ class _AppShellState extends State<AppShell> {
                 connection: connection,
                 onTap: connection == Connection.signInNeeded ? () => SignInScreen.again(context, s) : null,
               ),
-              // The banner already sits under the status bar; the page below must not pad for it again.
+              // The banner already sits below the status bar, so the page underneath shouldn't add that padding again.
               Expanded(
                 child: MediaQuery.removePadding(
                   context: context,

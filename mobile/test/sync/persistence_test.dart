@@ -11,7 +11,7 @@ import 'package:melanin_wound_cdss/features/sync/data/tables.dart';
 
 import 'support/fakes.dart';
 
-/// Saves 1,000 events and kills the isolate mid-sync to simulate the app dying.
+/// Saves 1,000 events, then kills the isolate mid-sync to act out the app dying.
 Future<void> _saveThenDie((String path, String key, SendPort done) args) async {
   final (path, key, done) = args;
   final db = AppDatabase(NativeDatabase(File(path), setup: (raw) => AppDatabase.applyKey(raw, key)));
@@ -41,7 +41,7 @@ void main() {
     expect(await done.first, 'saved');
     isolate.kill(priority: Isolate.immediate);
 
-    // Next app start: same file, same key from the keystore.
+    // The next time the app starts, it opens the same file with the same key from the keystore.
     var now = DateTime.now();
     final db = AppDatabase.encrypted(File(path), key);
     final queue = QueueRepository(db, clock: () => now);

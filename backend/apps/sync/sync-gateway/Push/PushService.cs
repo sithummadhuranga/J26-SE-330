@@ -17,10 +17,10 @@ public sealed record PushEventResult(string EventId, string Status, string? Code
 
 public sealed record PushResponse(string? BatchId, List<PushEventResult> Results);
 
-/// <summary>Thrown when Kafka did not acknowledge every event; the endpoint turns it into 503 + Retry-After.</summary>
+/// <summary>Thrown when Kafka didn't acknowledge every event. The endpoint turns it into a 503 with Retry-After.</summary>
 public sealed class BackboneUnavailableException(Exception inner) : Exception("Kafka did not acknowledge the batch", inner);
 
-/// <summary>Push: ACCEPTED only after Kafka acks, DUPLICATE for repeats, and invalid events rejected one by one.</summary>
+/// <summary>Handles push. An event is only ACCEPTED once Kafka acks it, repeats get DUPLICATE, and invalid events are rejected one by one.</summary>
 public sealed class PushService(
     NpgsqlDataSource db, IProducer<string, byte[]> producer, WoundEventValidator validator, AblationOptions ablation,
     ILogger<PushService> logger)
@@ -56,7 +56,8 @@ public sealed class PushService(
             candidates.Add((i, Guid.Parse(eventIdText), evt.GetProperty("woundId").GetGuid(), evt));
         }
 
-        // Already accepted or persisted means DUPLICATE, so reconnects don't re-produce (off in the ablation).
+        // Anything already accepted or persisted gets DUPLICATE, so reconnecting doesn't produce it again
+        // (this is turned off in the ablation).
         var known = ablation.Enabled ? [] : await KnownEventIdsAsync(candidates.Select(c => c.EventId).ToArray(), ct);
         var toProduce = new List<(int Index, Guid EventId, Guid WoundId, JsonElement Json)>();
         foreach (var c in candidates)
@@ -65,7 +66,7 @@ public sealed class PushService(
             else toProduce.Add(c);
         }
 
-        // Produce the rest (also de-duplicating repeats inside one batch) and wait for every ack.
+        // Produce the rest (also dropping repeats within the same batch) and wait for every ack.
         var traceParent = Activity.Current?.Id;
         var deliveries = new List<(int Index, Guid EventId, Task<DeliveryResult<string, byte[]>> Task)>();
         var seenInBatch = new HashSet<Guid>();
@@ -98,7 +99,8 @@ public sealed class PushService(
         }
         catch (Exception ex) when (ex is ProduceException<string, byte[]> or KafkaException)
         {
-            // Only report ACCEPTED if every produce was acked; otherwise the device retries and gets DUPLICATEs for what landed.
+            // Only say ACCEPTED if every produce was acked. Otherwise the phone retries, and gets DUPLICATE for the
+            // ones that did get through.
             throw new BackboneUnavailableException(ex);
         }
 
@@ -147,7 +149,7 @@ public sealed class PushService(
         }
         catch (NpgsqlException ex)
         {
-            // The events are already safe in Kafka, so still answer ACCEPTED; the gap shows up in the audit metric.
+            // The events are already safe in Kafka, so still answer ACCEPTED. The gap shows up in the audit metric.
             logger.LogError(ex, "Could not record GATEWAY_ACCEPTED provenance for {Count} events", accepted.Count);
         }
     }

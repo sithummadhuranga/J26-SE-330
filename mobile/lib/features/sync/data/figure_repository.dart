@@ -8,20 +8,20 @@ import 'app_database.dart';
 
 /// Why a figure could not be shown.
 enum FigureMiss {
-  /// Not cached and the gateway is unreachable. Shown once the phone is back online.
+  /// It isn't cached and we can't reach the gateway. It will show once the phone is back online.
   offline,
 
-  /// The service has no such figure (404). Not retried in this app session.
+  /// The service doesn't have this figure (404). We won't ask again until the app restarts.
   notFound,
 
-  /// Not cached and nobody is signed in; figures need a device token like pull.
+  /// It isn't cached and nobody is signed in. Like pull, fetching a figure needs a device token.
   needsSignIn,
 
-  /// The gateway answered with an error (e.g. 502 FIGURE_UNAVAILABLE); try again later.
+  /// The gateway answered with an error, such as 502 FIGURE_UNAVAILABLE. Worth trying again later.
   unavailable,
 }
 
-/// The answer to [FigureRepository.figureFor]: the cached figure, or why there is none.
+/// What [FigureRepository.figureFor] gives back: the cached figure, or the reason there isn't one.
 class FigureLookup {
   const FigureLookup.found(FiguresLocalData this.figure) : miss = null;
   const FigureLookup.missing(FigureMiss this.miss) : figure = null;
@@ -32,7 +32,8 @@ class FigureLookup {
   bool get isFound => figure != null;
 }
 
-/// Cached guideline figures (with license and attribution); prefetched after each pull so they work offline.
+/// Guideline figures cached on the phone, along with their license and attribution.
+/// We fetch them after each pull so they're available offline.
 class FigureRepository {
   FigureRepository(this._db, this._api, this._auth, {DateTime Function()? clock}) : _now = clock ?? DateTime.now;
 
@@ -41,17 +42,17 @@ class FigureRepository {
   final AuthSession _auth;
   final DateTime Function() _now;
 
-  /// Figures the service answered 404 for, so they are not asked for again on every sync in this app session.
+  /// Figures the service said it doesn't have (404), so we don't keep asking on every sync while the app is open.
   final Set<String> _notFound = {};
 
   static String _key(String corpusVersion, String figureId) => '$corpusVersion/$figureId';
 
-  /// The cached figure, or null. Never touches the network.
+  /// Returns the cached figure, or null. This never goes to the network.
   Future<FiguresLocalData?> cached(String corpusVersion, String figureId) => (_db.select(_db.figuresLocal)
         ..where((f) => f.corpusVersion.equals(corpusVersion) & f.figureId.equals(figureId)))
       .getSingleOrNull();
 
-  /// The figure to show: from the cache, or fetched (and cached) when it is not there yet.
+  /// The figure to show. It comes from the cache, or gets fetched and cached if it isn't there yet.
   Future<FigureLookup> figureFor(String corpusVersion, String figureId) async {
     final hit = await cached(corpusVersion, figureId);
     if (hit != null) return FigureLookup.found(hit);
@@ -70,7 +71,7 @@ class FigureRepository {
     return _fetch(corpusVersion, figureId, token, mayRefresh: true);
   }
 
-  /// Figures cited by stored advice that are not cached yet, oldest advice first.
+  /// Figures that stored advice refers to but that aren't cached yet, starting with the oldest advice.
   Future<List<({String corpusVersion, String figureId})>> missingReferences() async {
     final cachedKeys = {
       for (final f in await _db.select(_db.figuresLocal).get()) _key(f.corpusVersion, f.figureId),
@@ -88,7 +89,7 @@ class FigureRepository {
     return missing;
   }
 
-  /// Caches up to [limit] missing figures; best effort, returns how many were cached.
+  /// Tries to cache up to [limit] missing figures and returns how many it managed.
   Future<int> prefetchMissing(String accessToken, {int limit = 20}) async {
     var cachedCount = 0;
     for (final ref in (await missingReferences()).take(limit)) {
@@ -102,7 +103,7 @@ class FigureRepository {
     return cachedCount;
   }
 
-  /// The `figures` array of a recommendation (contracts/rag-response.schema.json); malformed entries are skipped.
+  /// Reads the `figures` array of a recommendation (contracts/rag-response.schema.json), skipping broken entries.
   static List<({String corpusVersion, String figureId})> figureReferences(String payloadJson) {
     final Object? payload;
     try {
@@ -127,7 +128,7 @@ class FigureRepository {
       return const FigureLookup.missing(FigureMiss.offline);
     } on ApiException catch (e) {
       if (e.status == 401 && mayRefresh) {
-        // The access token lapsed between check and use: refresh once, as push and pull do (§7.1).
+        // The access token expired between checking it and using it. Refresh once, like push and pull do (§7.1).
         try {
           return await _fetch(corpusVersion, figureId, await _auth.refresh(), mayRefresh: false);
         } on NeedsSignIn {
@@ -159,7 +160,8 @@ class FigureRepository {
         _notFound.add(_key(corpusVersion, figureId));
         return const FigureLookup.missing(FigureMiss.notFound);
       default:
-        // 304 cannot happen (nothing is cached, so no If-None-Match was sent); treat anything else as transient.
+        // A 304 can't happen here, because nothing is cached so we sent no If-None-Match.
+        // Anything else is treated as a temporary problem.
         return const FigureLookup.missing(FigureMiss.unavailable);
     }
   }

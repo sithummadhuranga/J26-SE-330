@@ -1,4 +1,4 @@
-"""Generates the Grafana sync-pipeline dashboard JSON; edit this file, not the JSON, then run it."""
+"""Builds the JSON for the Grafana sync-pipeline dashboard. Make changes here rather than in the JSON, then run it."""
 import json
 import os
 

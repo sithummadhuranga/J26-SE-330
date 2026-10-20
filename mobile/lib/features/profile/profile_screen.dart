@@ -4,6 +4,7 @@ import '../../app/app_services.dart';
 import '../../app/connection.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../account/account_screen.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/queue_repository.dart';
 import '../sync/engine/sync_scheduler.dart';
@@ -34,130 +35,151 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+    child: Column(
       children: [
-        FutureBuilder<AuthLocalData?>(
-          future: services.cachedClinician(),
-          builder: (context, snap) {
-            final who = snap.data;
-            return Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [WoundColors.accentSoft, Colors.white]),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: WoundShadows.card,
-                  ),
-                  child: Text(
-                    InitialsAvatar.initialsOf(who?.username ?? '?'),
-                    style: const TextStyle(color: WoundColors.accentDark, fontWeight: FontWeight.w800, fontSize: 18),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        who?.username ?? 'Not signed in',
-                        key: const Key('profileName'),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        who == null ? '' : '${roleLabel(who.role)} · Facility ${who.facilityId}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 26),
-        const SectionTitle('Settings'),
-        WoundCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          child: Column(
-            children: [
-              ValueListenableBuilder<SyncStatus>(
-                valueListenable: services.scheduler.status,
-                builder: (context, status, _) => StreamBuilder<QueueCounts>(
-                  stream: services.queue.watchCounts(),
-                  builder: (context, counts) {
-                    final waiting = counts.data?.waitingToSend ?? 0;
-                    return _SettingRow(
-                      icon: Icons.storage_rounded,
-                      label: 'Data synchronization',
-                      sub:
-                          '${syncSummary(status)}${waiting > 0 ? ' · $waiting waiting on this phone' : ''}'
-                          '${status.lastRunAt == null ? '' : ' · checked ${formatTime(status.lastRunAt!)}'}',
-                      trailing: status.running
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : connectionOf(status) == Connection.signInNeeded
-                          ? TextButton(
-                              key: const Key('signInAgain'),
-                              onPressed: () => SignInScreen.again(context, services),
-                              child: const Text('Sign in'),
-                            )
-                          : TextButton(
-                              key: const Key('syncNow'),
-                              onPressed: services.scheduler.syncNow,
-                              child: const Text('Sync now'),
-                            ),
-                    );
-                  },
-                ),
-              ),
-              const Divider(),
-              _SettingRow(
-                icon: Icons.shield_outlined,
-                label: 'Privacy',
-                onTap: () => _info(
-                  context,
-                  'Privacy',
-                  'Wound images stay on this phone. Only measurements and your clinical answers are synced, under a '
-                      'pseudonymous patient ID; no names or images reach the guidance service. Saved assessments are '
-                      'encrypted on the phone until the server confirms them.',
-                ),
-              ),
-              const Divider(),
-              _SettingRow(
-                icon: Icons.info_outline_rounded,
-                label: 'About',
-                onTap: () => _info(
-                  context,
-                  'About WoundAI',
-                  'Clinical wound assessment support for melanin-rich skin (project J26-SE-330). '
-                      'Research prototype — decision support only; clinical decisions remain with the clinician.\n\n'
-                      'Server: $syncBaseUrl',
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 22),
-        OutlinedButton.icon(
-          key: const Key('signOut'),
-          onPressed: () async {
-            if (!await _confirmSignOut(context, services)) return;
-            await services.signOut();
-            onSignedOut();
-          },
-          icon: const Icon(Icons.logout_rounded, size: 18),
-          label: const Text('Sign out'),
-        ),
+        // Who is signed in stays at the top, and the settings below it scroll.
+        Padding(padding: const EdgeInsets.fromLTRB(20, 22, 20, 12), child: _identity()),
+        Expanded(child: _settings(context)),
       ],
     ),
   );
+
+  Widget _identity() => FutureBuilder<AuthLocalData?>(
+    future: services.cachedClinician(),
+    builder: (context, snap) {
+      final who = snap.data;
+      return Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [WoundColors.accentSoft, Colors.white]),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: WoundShadows.card,
+            ),
+            child: Text(
+              InitialsAvatar.initialsOf(who?.username ?? '?'),
+              style: const TextStyle(color: WoundColors.accentDark, fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  who?.username ?? 'Not signed in',
+                  key: const Key('profileName'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  who == null ? '' : '${roleLabel(who.role)} · Facility ${who.facilityId}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  Widget _settings(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+    children: [
+      const SectionTitle('Settings'),
+      WoundCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        child: Column(
+          children: [
+            _SettingRow(
+              key: const Key('account'),
+              icon: Icons.manage_accounts_outlined,
+              label: 'Account',
+              sub: 'Name, password and where you\'re signed in',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AccountScreen(services: services, onSignedOut: onSignedOut),
+                ),
+              ),
+            ),
+            const Divider(),
+            ValueListenableBuilder<SyncStatus>(
+              valueListenable: services.scheduler.status,
+              builder: (context, status, _) => StreamBuilder<QueueCounts>(
+                stream: services.queue.watchCounts(),
+                builder: (context, counts) {
+                  final waiting = counts.data?.waitingToSend ?? 0;
+                  return _SettingRow(
+                    icon: Icons.storage_rounded,
+                    label: 'Data synchronization',
+                    sub:
+                        '${syncSummary(status)}${waiting > 0 ? ' · $waiting waiting on this phone' : ''}'
+                        '${status.lastRunAt == null ? '' : ' · checked ${formatTime(status.lastRunAt!)}'}',
+                    trailing: status.running
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : connectionOf(status) == Connection.signInNeeded
+                        ? TextButton(
+                            key: const Key('signInAgain'),
+                            onPressed: () => SignInScreen.again(context, services),
+                            child: const Text('Sign in'),
+                          )
+                        : TextButton(
+                            key: const Key('syncNow'),
+                            onPressed: services.scheduler.syncNow,
+                            child: const Text('Sync now'),
+                          ),
+                  );
+                },
+              ),
+            ),
+            const Divider(),
+            _SettingRow(
+              icon: Icons.shield_outlined,
+              label: 'Privacy',
+              onTap: () => _info(
+                context,
+                'Privacy',
+                'Wound images stay on this phone. Only measurements and your clinical answers are synced, under a '
+                    'pseudonymous patient ID; no names or images reach the guidance service. Saved assessments are '
+                    'encrypted on the phone until the server confirms them.',
+              ),
+            ),
+            const Divider(),
+            _SettingRow(
+              icon: Icons.info_outline_rounded,
+              label: 'About',
+              onTap: () => _info(
+                context,
+                'About WoundAI',
+                'Clinical wound assessment support for melanin-rich skin (project J26-SE-330). '
+                    'Research prototype — decision support only; clinical decisions remain with the clinician.\n\n'
+                    'Server: $syncBaseUrl',
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 22),
+      OutlinedButton.icon(
+        key: const Key('signOut'),
+        onPressed: () async {
+          if (!await _confirmSignOut(context, services)) return;
+          await services.signOut();
+          onSignedOut();
+        },
+        icon: const Icon(Icons.logout_rounded, size: 18),
+        label: const Text('Sign out'),
+      ),
+    ],
+  );
 }
 
-/// Warns before signing out with unsynced assessments; true if the sign-out should go ahead.
+/// Warns the clinician before signing out if some assessments haven't synced yet.
+/// Returns true if the sign-out should go ahead.
 Future<bool> _confirmSignOut(BuildContext context, AppServices services) async {
   final waiting = (await services.queue.counts()).waitingToSend;
   if (waiting == 0 || !context.mounted) return true;
@@ -174,13 +196,15 @@ Future<bool> _confirmSignOut(BuildContext context, AppServices services) async {
       actions: [
         TextButton(onPressed: () => Navigator.of(dialog).pop('cancel'), child: const Text('Cancel')),
         TextButton(
-            key: const Key('signOutSyncFirst'),
-            onPressed: () => Navigator.of(dialog).pop('sync'),
-            child: const Text('Sync now')),
+          key: const Key('signOutSyncFirst'),
+          onPressed: () => Navigator.of(dialog).pop('sync'),
+          child: const Text('Sync now'),
+        ),
         TextButton(
-            key: const Key('signOutAnyway'),
-            onPressed: () => Navigator.of(dialog).pop('signOut'),
-            child: const Text('Sign out anyway')),
+          key: const Key('signOutAnyway'),
+          onPressed: () => Navigator.of(dialog).pop('signOut'),
+          child: const Text('Sign out anyway'),
+        ),
       ],
     ),
   );
@@ -189,7 +213,7 @@ Future<bool> _confirmSignOut(BuildContext context, AppServices services) async {
 }
 
 class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.icon, required this.label, this.sub, this.trailing, this.onTap});
+  const _SettingRow({super.key, required this.icon, required this.label, this.sub, this.trailing, this.onTap});
 
   final IconData icon;
   final String label;

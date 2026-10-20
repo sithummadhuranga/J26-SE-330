@@ -1,8 +1,9 @@
 import { AdminApi, ApiError } from './api';
+import { redirectUri as defaultRedirectUri } from './config';
 import type { TokenPair } from './models';
 import type { TokenStore } from './tokenStore';
 
-/** No usable session: the admin has to sign in again. */
+/** There's no usable session, so the admin has to sign in again. */
 export class NeedsSignIn extends Error {
   readonly reason: string;
 
@@ -13,7 +14,10 @@ export class NeedsSignIn extends Error {
   }
 }
 
-/** The signed-in admin, read from the access token plus the username typed at login. */
+/** The signed-in admin, read from the tokens. It's only for display, since the backend does the real checking. */
+/** How you ended your own session from My account. */
+export type EndedHere = 'passwordChanged' | 'sessionsEnded';
+
 export interface Admin {
   id: string;
   username: string;
@@ -23,15 +27,22 @@ export interface Admin {
 
 const refreshKey = 'cdss_admin_refresh_v1';
 const usernameKey = 'cdss_admin_username_v1';
+/** The PKCE verifier and state of a sign-in in progress. They have to survive the trip to the login page and back. */
+const pendingKey = 'cdss_admin_pending_v1';
 
-/** Refresh a little before expiry so a request never leaves with a token about to lapse. */
+/** We refresh a little early so a request never goes out with a token that's about to expire. */
 export const refreshMarginMs = 60_000;
 
-/** Keeps the admin signed in: access token in memory, refresh token in the tab's session storage. */
+/**
+ * Keeps the admin signed in through the identity service's OpenID Connect login (ADR 0006). It uses the
+ * authorization code flow with PKCE, keeps the access token in memory and the refresh token in the tab's
+ * session storage.
+ */
 export class AuthSession {
   readonly api: AdminApi;
   private readonly store: TokenStore;
   private readonly now: () => number;
+  private readonly redirectUri: string;
   private readonly listeners = new Set<() => void>();
 
   private accessToken: string | null = null;
@@ -39,11 +50,14 @@ export class AuthSession {
   private current: Admin | null = null;
   private refreshing: Promise<string> | null = null;
   private ended = false;
+  private failure: NeedsSignIn | null = null;
+  private endedHere: EndedHere | null = null;
 
-  constructor(api: AdminApi, store: TokenStore, now: () => number = Date.now) {
+  constructor(api: AdminApi, store: TokenStore, now: () => number = Date.now, redirectUri = defaultRedirectUri) {
     this.api = api;
     this.store = store;
     this.now = now;
+    this.redirectUri = redirectUri;
   }
 
   get admin(): Admin | null {
@@ -67,7 +81,21 @@ export class AuthSession {
     return ended;
   }
 
-  /** After a reload, swap the refresh token for a new access token; false if there's no session. */
+  /** Why you ended your own session from My account, once, so the sign-in screen can say so. */
+  takeEndedHereNotice(): EndedHere | null {
+    const reason = this.endedHere;
+    this.endedHere = null;
+    return reason;
+  }
+
+  /** Why the last sign-in did not complete, once, so the sign-in screen can say so. */
+  takeSignInFailure(): NeedsSignIn | null {
+    const failure = this.failure;
+    this.failure = null;
+    return failure;
+  }
+
+  /** After a reload, swaps the refresh token for a new access token. Returns false if there's no session. */
   async restore(): Promise<boolean> {
     if (this.store.read(refreshKey) === null) return false;
     try {
@@ -79,14 +107,46 @@ export class AuthSession {
     }
   }
 
-  /** Throws ApiError with the backend's reason code (401 MFA_REQUIRED: ask for a code). */
-  async signIn(username: string, password: string, totp?: string): Promise<Admin> {
-    const tokens = await this.api.login(username, password, totp);
-    this.store.write(usernameKey, username);
-    return this.accept(tokens);
+  /** Starts a sign-in and returns the URL of the identity service's login page for the browser to open. */
+  async beginSignIn(): Promise<string> {
+    const verifier = randomUrlSafe(48);
+    const state = randomUrlSafe(16);
+    this.store.write(pendingKey, JSON.stringify({ verifier, state }));
+    return this.api.authorizeUrl({ redirectUri: this.redirectUri, state, codeChallenge: await sha256UrlSafe(verifier) });
   }
 
-  /** Runs an admin call, refreshing once on a 401; throws NeedsSignIn if that fails too. */
+  /**
+   * Finishes a sign-in from the URL the identity service sent the browser back to (/callback?code=…&state=…).
+   * Throws NeedsSignIn if it isn't the answer to this tab's own request, or if the server said no.
+   */
+  async completeSignIn(callbackUrl: string): Promise<Admin> {
+    try {
+      return await this.exchange(callbackUrl);
+    } catch (e) {
+      if (e instanceof NeedsSignIn) this.failure = e;
+      throw e;
+    }
+  }
+
+  private async exchange(callbackUrl: string): Promise<Admin> {
+    const params = new URL(callbackUrl).searchParams;
+    const pending = readPending(this.store.read(pendingKey));
+    this.store.delete(pendingKey);
+
+    // The state must be the one this tab sent, so nobody can slip their own code into our session.
+    if (!pending || params.get('state') !== pending.state) throw new NeedsSignIn('STATE_MISMATCH');
+    const code = params.get('code');
+    if (!code) throw new NeedsSignIn(params.get('error') ?? 'NO_CODE');
+
+    try {
+      return this.accept(await this.api.exchangeCode(code, pending.verifier, this.redirectUri));
+    } catch (e) {
+      if (e instanceof ApiError && e.status < 500) throw new NeedsSignIn(e.code ?? 'CODE_REFUSED');
+      throw e;
+    }
+  }
+
+  /** Runs an admin call. On a 401 it refreshes once and tries again, and throws NeedsSignIn if that fails too. */
   async authorized<T>(call: (accessToken: string) => Promise<T>): Promise<T> {
     try {
       return await call(await this.validAccessToken());
@@ -96,12 +156,21 @@ export class AuthSession {
     }
   }
 
-  /** Rotates both tokens, sharing one request between concurrent callers. */
+  /** Swaps both tokens for new ones. If several callers ask at once, they share one request. */
   refresh(): Promise<string> {
     this.refreshing ??= this.doRefresh().finally(() => {
       this.refreshing = null;
     });
     return this.refreshing;
+  }
+
+  /**
+   * Used after you change your password or end all your sessions. The server has already ended every session,
+   * including this one, so we end it here too without calling the server, and tell the sign-in screen why.
+   */
+  endHere(reason: EndedHere): void {
+    this.endedHere = reason;
+    this.clear();
   }
 
   async signOut(): Promise<void> {
@@ -110,7 +179,7 @@ export class AuthSession {
       try {
         await this.api.logout(refreshToken);
       } catch {
-        // The local session ends anyway; the server-side one expires on its own.
+        // The session here ends anyway, and the server's copy will expire on its own.
       }
     }
     this.clear();
@@ -132,8 +201,9 @@ export class AuthSession {
       this.accept(tokens);
       return tokens.accessToken;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        // Expired, logged out elsewhere, deactivated, or already rotated: only a new sign-in helps.
+      // invalid_grant means the token expired, was signed out elsewhere, the account was deactivated, or the
+      // token was already used. Only a fresh sign-in can fix that.
+      if (e instanceof ApiError && (e.code === 'invalid_grant' || e.status === 401)) {
         this.ended = this.signedIn;
         this.clear();
         throw new NeedsSignIn(e.code ?? 'INVALID_REFRESH_TOKEN');
@@ -148,6 +218,7 @@ export class AuthSession {
     this.expiresAt = 0;
     this.current = null;
     this.store.delete(refreshKey);
+    this.store.delete(usernameKey);
     if (wasSignedIn) this.notify();
   }
 
@@ -157,10 +228,12 @@ export class AuthSession {
     this.accessToken = tokens.accessToken;
     this.expiresAt = this.now() + tokens.expiresIn * 1000;
     const claims = readClaims(tokens.accessToken);
+    const username = tokens.idToken ? str(readClaims(tokens.idToken).preferred_username) : '';
+    if (username) this.store.write(usernameKey, username);
     const wasSignedIn = this.signedIn;
     this.current = {
       id: str(claims.sub),
-      username: this.store.read(usernameKey) ?? '',
+      username: username || (this.store.read(usernameKey) ?? ''),
       role: str(claims.role),
       facilityId: str(claims.facility_id),
     };
@@ -175,7 +248,30 @@ export class AuthSession {
 
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-/** Reads the token's contents for display only; the backend is the one that checks it's genuine. */
+function readPending(raw: string | null): { verifier: string; state: string } | null {
+  try {
+    const value: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof value !== 'object' || value === null) return null;
+    const { verifier, state } = value as Record<string, unknown>;
+    return typeof verifier === 'string' && typeof state === 'string' ? { verifier, state } : null;
+  } catch {
+    return null;
+  }
+}
+
+const base64Url = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+function randomUrlSafe(bytes: number): string {
+  return base64Url(crypto.getRandomValues(new Uint8Array(bytes)));
+}
+
+/** The PKCE S256 challenge for a verifier (RFC 7636 §4.2). */
+export async function sha256UrlSafe(text: string): Promise<string> {
+  return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))));
+}
+
+/** Reads what's inside the token, only for display. The backend is the one that checks it's genuine. */
 function readClaims(jwt: string): Record<string, unknown> {
   const parts = jwt.split('.');
   if (parts.length !== 3 || !parts[1]) return {};

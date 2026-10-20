@@ -10,7 +10,7 @@ using System.Diagnostics;
 
 namespace IngestPersister.Consumers;
 
-/// <summary>Saves each wound event, committing the offset only after the DB commit; bad ones go to the DLQ.</summary>
+/// <summary>Saves each wound event, and only commits the offset after the database commit. Bad events go to the DLQ.</summary>
 public sealed class WoundEventsConsumer(
     PersisterTransaction persister, IProducer<string, byte[]> producer, IConfiguration config, ILogger<WoundEventsConsumer> logger)
     : BackgroundService
@@ -47,7 +47,7 @@ public sealed class WoundEventsConsumer(
             catch (OperationCanceledException) { break; }
             catch (Exception ex) when (ex is NpgsqlException or TimeoutException)
             {
-                // Transient: leave the offset uncommitted and read the message again after a pause.
+                // A temporary problem. Leave the offset uncommitted and read the message again after a pause.
                 logger.LogError(ex, "Database write failed for {Ref}; will redeliver", result.TopicPartitionOffset.KafkaRef());
                 consumer.Seek(result.TopicPartitionOffset);
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
@@ -59,7 +59,7 @@ public sealed class WoundEventsConsumer(
 
     private async Task HandleAsync(ConsumeResult<string, byte[]> result, CancellationToken ct)
     {
-        // Continues the trace the gateway started (traceparent in the Kafka headers, §13).
+        // Carry on the trace the gateway started (traceparent is in the Kafka headers, §13).
         using var activity = SyncTelemetry.StartConsume(SyncTelemetry.Persister, "persist", result.Message.Headers);
         var traceId = result.Message.Headers.GetHeader(HeaderNames.TraceParent);
 

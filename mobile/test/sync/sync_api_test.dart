@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:melanin_wound_cdss/features/sync/api/sync_api.dart';
 
-/// The HTTP client's reachability probe (§6.2: reachability, not just being on a network).
+/// The HTTP client's reachability check. Being on a network isn't enough; the server has to answer (§6.2).
 void main() {
   Future<bool> probe(int status, String body, {String type = 'application/json'}) =>
       HttpSyncApi(Uri.parse('http://gateway'),
