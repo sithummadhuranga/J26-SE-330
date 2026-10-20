@@ -9,8 +9,13 @@ import { sessionStorageStore } from './core/tokenStore';
 import './styles.css';
 
 const session = new AuthSession(new AdminApi(apiBaseUrl), sessionStorageStore);
-// A reload keeps the tab's refresh token; resume that session instead of asking for a password again.
-const restoring = session.restore();
+// If we're back from the identity service's sign-in page, finish signing in and remove the code from the
+// address bar. Otherwise it's a reload, and the tab still has its refresh token, so carry on with that session
+// instead of asking to sign in again.
+const restoring =
+  window.location.pathname === '/callback'
+    ? session.completeSignIn(window.location.href).finally(() => window.history.replaceState(null, '', '/'))
+    : session.restore();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

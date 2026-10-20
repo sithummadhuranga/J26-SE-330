@@ -1,9 +1,12 @@
-/** Lower-case words of a text: letters and digits, everything else separates. */
+/** Splits text into lower-case words. Letters and digits make up words, and anything else separates them. */
 export function words(text: string): string[] {
   return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 }
 
-/** Counts spelling differences (a missing, extra, wrong or swapped letter is one each), stopping above [max]. */
+/**
+ * Counts spelling differences, where a missing, extra, wrong or swapped letter counts as one each.
+ * It stops counting once it goes past [max].
+ */
 function distance(a: string, b: string, max: number): number {
   if (Math.abs(a.length - b.length) > max) return max + 1;
   let before: number[] = [];
@@ -25,7 +28,7 @@ function distance(a: string, b: string, max: number): number {
   return prev[b.length]!;
 }
 
-/** Spelling mistakes tolerated: none for short words, one from 4 letters, two from 8. */
+/** How many spelling mistakes we allow: none for short words, one from 4 letters, and two from 8. */
 const allowedTypos = (word: string) => (word.length >= 8 ? 2 : word.length >= 4 ? 1 : 0);
 
 /** True when [term] appears as typed, or matches a word apart from a small spelling mistake. */
@@ -33,7 +36,7 @@ function termMatches(term: string, haystack: string, candidates: string[]): bool
   if (haystack.includes(term)) return true;
   const max = allowedTypos(term);
   if (max === 0) return false;
-  // Compare against whole words and against the start of longer words ("deactvat" still finds "deactivated").
+  // Compare with whole words and with the start of longer words, so "deactvat" still finds "deactivated".
   return candidates.some((c) => distance(term, c, max) <= max || (c.length > term.length && distance(term, c.slice(0, term.length), max) <= max));
 }
 

@@ -9,7 +9,7 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using Sync.Common.Web;
 
-// API gateway: the one public entry point; routes requests and handles JWT, rate limits, CORS and body size.
+// The API gateway is the only public way in. It routes requests and deals with JWTs, rate limits, CORS and body size.
 var builder = WebApplication.CreateBuilder(args);
 builder.AddSyncTelemetry("api-gateway")
     .WithTracing(t => t.AddAspNetCoreInstrumentation())
@@ -20,7 +20,8 @@ var limits = builder.Configuration.GetSection("RateLimits");
 
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-// Reject bad tokens at the edge too (services still check them); keys come from the identity service's cached JWKS.
+// Turn away bad tokens here at the edge too, even though the services check them again. The keys come from the
+// identity service's JWKS, which we cache.
 builder.Services.AddInMemoryDataProtection();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -32,8 +33,8 @@ builder.Services
         o.MapInboundClaims = false;
         o.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = jwt["Issuer"] ?? "melanin-wound-cdss",
-            // Device and admin-dashboard tokens; the Sync Gateway itself accepts only the device audience.
+            ValidIssuer = jwt["Issuer"] ?? "https://identity.melanin-wound-cdss/",
+            // Both phone and admin-dashboard tokens are fine here. The Sync Gateway itself only accepts the phone audience.
             ValidAudiences = jwt.GetSection("Audiences").Get<string[]>()
                 ?? ["melanin-wound-cdss-devices", "melanin-wound-cdss-admin"],
             ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
@@ -50,7 +51,10 @@ builder.Services.AddCors(o => o.AddPolicy("dashboard", p => p
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
-// Rate limits: "auth" per client IP, "api" per signed-in device; rejected requests get 429 with Retry-After.
+// Rate limits. "auth" is per client IP and "api" is per signed-in device. Anything over the limit gets a 429 with
+// Retry-After. "auth" covers the login form, where people type passwords, so a sign-in only costs one request.
+// The OIDC redirects and /connect/token use "api", because codes and refresh tokens can't be guessed and the lockout
+// already protects passwords.
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -75,7 +79,7 @@ builder.Services.AddRateLimiter(o =>
 
 var app = builder.Build();
 
-// Answer 413 early for oversized bodies (YARP would say 400); the device splits batches on 413.
+// Answer 413 straight away for bodies that are too big (YARP would say 400). On a 413, the phone splits its batch.
 var maxBody = app.Configuration.GetValue<long?>("Kestrel:Limits:MaxRequestBodySize");
 app.Use((context, next) =>
 {

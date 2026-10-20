@@ -1,4 +1,4 @@
-# OTel collector: traces go to Jaeger, metrics to Prometheus on :8889.
+# The OpenTelemetry collector. Traces go to Jaeger, and metrics go to Prometheus on port 8889.
 receivers:
   otlp:
     protocols:
@@ -13,7 +13,7 @@ processors:
 exporters:
   prometheus:
     endpoint: ${env:HOSTNAME}:8889
-    # service_name etc. become labels, so dashboards can split by service.
+    # Things like service_name become labels, so dashboards can split by service.
     resource_to_telemetry_conversion:
       enabled: true
   otlp/jaeger:

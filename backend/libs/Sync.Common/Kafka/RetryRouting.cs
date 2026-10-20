@@ -1,6 +1,6 @@
 namespace Sync.Common.Kafka;
 
-/// <summary>Retry chain: retry.30s → retry.5m → DLQ; contract errors skip straight to the DLQ.</summary>
+/// <summary>The retry chain goes retry.30s → retry.5m → DLQ. Contract errors skip straight to the DLQ.</summary>
 public static class RetryRouting
 {
     public const string RetryCountHeader = "retry-count";

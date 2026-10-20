@@ -2,7 +2,7 @@ using Npgsql;
 
 namespace IdentityService.Auth;
 
-/// <summary>Small SQL helper shared by the auth, admin and patient code.</summary>
+/// <summary>A small SQL helper that the auth, admin and patient code all use.</summary>
 public static class Sql
 {
     public static async Task<int> ExecAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string sql, CancellationToken ct,

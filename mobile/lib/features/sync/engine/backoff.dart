@@ -1,6 +1,7 @@
 import 'dart:math';
 
-/// Retry delay: 2 s doubling to 5 min with full jitter, reset on success; longer Retry-After wins.
+/// How long to wait before retrying. It starts at 2 seconds and doubles up to 5 minutes, with random jitter,
+/// and resets after a success. If the server's Retry-After is longer, we use that instead.
 class Backoff {
   Backoff([Random? random]) : _random = random ?? Random();
 
@@ -14,7 +15,7 @@ class Backoff {
 
   void reset() => _failures = 0;
 
-  /// Records a failure and returns how long to wait before the next try.
+  /// Notes a failure and returns how long to wait before trying again.
   Duration next({Duration? retryAfter}) {
     final ceiling = Duration(microseconds: min(max.inMicroseconds, initial.inMicroseconds * (1 << min(_failures, 20))));
     _failures++;

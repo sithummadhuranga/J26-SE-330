@@ -7,7 +7,7 @@ using Sync.Common.Kafka;
 
 namespace Orchestrator.Consumers;
 
-/// <summary>Makes a run's outcome durable (retry topic, DLQ or nothing) before the offset is committed.</summary>
+/// <summary>Makes sure a run's outcome is saved (a retry topic, the DLQ, or nothing) before the offset is committed.</summary>
 public sealed class OutcomeRouter(IProducer<string, byte[]> producer, IOrchestratorStore store, ILogger<OutcomeRouter> logger)
 {
     public async Task RouteAsync(ConsumeResult<string, byte[]> source, OrchestrationOutcome outcome, CancellationToken ct)
@@ -16,7 +16,7 @@ public sealed class OutcomeRouter(IProducer<string, byte[]> producer, IOrchestra
 
         try
         {
-            // Tell the device advice is deferred; best effort, the retry still goes ahead if this fails.
+            // Tell the phone the advice is delayed. This is best effort, and the retry still goes ahead if it fails.
             await store.RecordDeferredAsync(outcome.Event, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

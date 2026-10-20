@@ -2,15 +2,15 @@ namespace DeviceSimulator;
 
 public enum SimMode { EventDriven, Baseline }
 
-/// <summary>Command-line options; each run's id tags its devices so metrics can pick out one run.</summary>
+/// <summary>The command-line options. Each run's id tags its devices, so the metrics can pick out a single run.</summary>
 public sealed record SimOptions
 {
     public string Gateway { get; init; } = "http://localhost:8080/";
-    /// <summary>Where the admin registers clinicians; setup only, so it can skip the faulty network.</summary>
+    /// <summary>Where the admin registers clinicians. It's only used for setup, so it can skip the faulty network.</summary>
     public string? SetupGateway { get; init; }
-    /// <summary>How long a device keeps a TCP connection; 0 means a new one per request.</summary>
+    /// <summary>How long a device keeps a TCP connection open. 0 means a new one for every request.</summary>
     public int ConnectionLifetimeSeconds { get; init; } = 120;
-    /// <summary>Starting pull cursor; 0 downloads the whole history, experiments pass the current head.</summary>
+    /// <summary>The pull cursor to start from. 0 downloads the whole history, and experiments pass the current head.</summary>
     public long StartCursor { get; init; }
     public int Devices { get; init; } = 10;
     public int EventsPerDevice { get; init; } = 20;
@@ -20,7 +20,7 @@ public sealed record SimOptions
     /// <summary>Admin who registers one clinician per device (POST /v1/admin/clinicians), as in a real ward.</summary>
     public string AdminUsername { get; init; } = "admin.demo";
     public string AdminPassword { get; init; } = "Demo-Admin-2026!";
-    /// <summary>When set, every device logs in as this one clinician instead (stress case: one account, many phones).</summary>
+    /// <summary>If set, every device logs in as this one clinician instead. It's a stress case: one account on many phones.</summary>
     public string? SharedUsername { get; init; }
     public string SharedPassword { get; init; } = "Demo-Pass-2026!";
     public TimeSpan CaptureInterval { get; init; } = TimeSpan.FromMilliseconds(500);
@@ -30,10 +30,10 @@ public sealed record SimOptions
     public int Seed { get; init; } = 42;
     public string Output { get; init; } = "tests/device-simulator/results";
 
-    /// <summary>Device ids look like sim-&lt;run&gt;-007: the run id is how SQL finds this run's rows.</summary>
+    /// <summary>Device ids look like sim-&lt;run&gt;-007. The run id is how SQL finds this run's rows.</summary>
     public string DeviceId(int index) => $"sim-{RunId}-{index:D3}";
 
-    /// <summary>The clinician on device <paramref name="index"/>; lower-case to satisfy the username rule.</summary>
+    /// <summary>The clinician on device <paramref name="index"/>, in lower case to fit the username rule.</summary>
     public string ClinicianUsername(int index) => $"sim.{RunId}.{index:D3}".ToLowerInvariant();
     public string ClinicianPassword => $"Sim-{RunId}-Pass!";
 

@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_scheduler.dart';
 
-/// When the sync runs (architecture §6.2), with a fake clock.
+/// Checks when the sync runs (architecture §6.2), using a fake clock.
 void main() {
   late List<bool> calls; // force flag of each run
   late SyncReport Function() next;
@@ -46,6 +46,46 @@ void main() {
         s.dispose();
       }));
 
+  test('losing the network runs a quick check, so the app shows offline straight away', () => fakeAsync((async) {
+        final s = build(async)..start();
+        async.flushMicrotasks();
+        expect(s.status.value.last!.outcome, SyncOutcome.success);
+        calls.clear();
+        next = () => SyncReport(SyncOutcome.offline);
+        online.add(false);
+        async.flushMicrotasks();
+        expect(calls, [false], reason: 'one check, not forced past a backoff');
+        expect(s.status.value.last!.outcome, SyncOutcome.offline);
+        online.add(false);
+        async.flushMicrotasks();
+        expect(calls, [false], reason: 'staying offline does not check again');
+        s.dispose();
+      }));
+
+  test('losing the network during a run checks again once that run is done, not with its old result', () =>
+      fakeAsync((async) {
+        build(async).dispose(); // only for the online stream; this test needs a run it can hold open
+        calls = [];
+        final slow = Completer<SyncReport>();
+        final scheduler = SyncScheduler(
+          ({bool force = false}) {
+            calls.add(force);
+            return calls.length == 1 ? slow.future : Future.value(SyncReport(SyncOutcome.offline));
+          },
+          online: online.stream,
+          clock: () => DateTime.utc(2026).add(async.elapsed),
+        )..start();
+        async.flushMicrotasks();
+        online.add(false);
+        async.flushMicrotasks();
+        expect(calls, [false], reason: 'nothing extra while the start-up run is still going');
+        slow.complete(SyncReport(SyncOutcome.success));
+        async.flushMicrotasks();
+        expect(calls, [false, false], reason: 'the check runs right after it');
+        expect(scheduler.status.value.last!.outcome, SyncOutcome.offline);
+        scheduler.dispose();
+      }));
+
   test('connectivity regained triggers a sync; staying online does not', () => fakeAsync((async) {
         final s = build(async)..start();
         async.flushMicrotasks();
@@ -54,6 +94,8 @@ void main() {
         async.flushMicrotasks();
         expect(calls, isEmpty, reason: 'already online');
         online.add(false);
+        async.flushMicrotasks();
+        calls.clear();
         online.add(true);
         async.flushMicrotasks();
         expect(calls, [false]);

@@ -4,7 +4,7 @@ using Orchestrator.Persistence;
 
 namespace Orchestrator.Executors;
 
-/// <summary>Stores the recommendation, change, provenance, outbox and inbox rows in one locked transaction.</summary>
+/// <summary>Stores the recommendation, change, provenance, outbox and inbox rows together in one locked transaction.</summary>
 [YieldsOutput(typeof(OrchestrationOutcome))]
 public sealed class PersistResultExecutor(IOrchestratorStore store) : Executor<ValidatedRecommendation>("PersistResult")
 {

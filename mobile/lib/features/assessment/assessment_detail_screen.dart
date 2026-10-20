@@ -11,7 +11,8 @@ import '../sync/data/app_database.dart';
 import '../sync/data/tables.dart';
 import 'assessment_view.dart';
 
-/// Assessment summary: measurements, answers, sync status and a link to guidance, all updating live.
+/// The assessment summary, with measurements, answers, sync status and a link to the guidance.
+/// Everything updates live.
 class AssessmentDetailScreen extends StatefulWidget {
   const AssessmentDetailScreen({
     super.key,
@@ -23,7 +24,8 @@ class AssessmentDetailScreen extends StatefulWidget {
   final AppServices services;
   final String assessmentId;
 
-  /// Reached from "View results" at the end of a new assessment: offers "Done" back to Home.
+  /// True when we got here from "View results" at the end of a new assessment. Then we offer a "Done" button
+  /// that goes back to Home.
   final bool fromNewAssessment;
 
   @override
@@ -360,7 +362,7 @@ class _OverlayChip extends StatelessWidget {
   );
 }
 
-/// The segmentation boundary drawn over the illustration (same geometry as its wound).
+/// Draws the segmentation outline over the illustration, using the same shape as its wound.
 class _OutlinePainter extends CustomPainter {
   _OutlinePainter(this.seed);
 

@@ -1,0 +1,7 @@
+{
+  "response_type": "code",
+  "client_id": "admin-dashboard",
+  "redirect_uri": "http://localhost:3001/callback",
+  "code_challenge": "LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE",
+  "code_challenge_method": "plain"
+}

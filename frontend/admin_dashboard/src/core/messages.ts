@@ -18,7 +18,7 @@ export function describeError(error: unknown): string {
     return 'The request could not be completed. Please try again.';
   }
   if (error instanceof TransportError) return 'Cannot reach the server. Check your connection and try again.';
-  if (error instanceof NeedsSignIn) return 'Your session has ended. Please sign in again.';
+  if (error instanceof NeedsSignIn) return codes[error.reason] ?? 'Your session has ended. Please sign in again.';
   return 'Something went wrong. Please try again.';
 }
 
@@ -30,10 +30,14 @@ const actionLabels: Record<string, string> = {
   REGISTER: 'Account created',
   UNLOCK: 'Account unlocked',
   DEACTIVATE: 'Account deactivated',
+  REACTIVATE: 'Account reactivated',
   MFA_ENROLL: 'Two-step setup started',
   MFA_CONFIRM: 'Two-step turned on',
   MFA_RESET: 'Two-step reset',
   DEVICE_REVOKE: 'Device revoked',
+  PASSWORD_RESET: 'Password reset',
+  PASSWORD_CHANGE: 'Password changed',
+  PROFILE_UPDATE: 'Profile updated',
 };
 
 /** An audit action as an admin would say it. */
@@ -43,6 +47,7 @@ const reasonLabels: Record<string, string> = {
   INVALID_CREDENTIALS: 'Wrong password',
   CREDENTIAL_LOCKED: 'Locked',
   MFA_REQUIRED: 'Code requested',
+  PASSWORD_CHANGE_REQUIRED: 'New password requested',
   INVALID_TOTP: 'Wrong code',
   CLIENT_NOT_ALLOWED: 'Not an admin',
   DEVICE_NOT_ALLOWED: 'Device revoked',
@@ -53,17 +58,14 @@ const reasonLabels: Record<string, string> = {
 export const auditReasonLabel = (reason: string | null): string => (reason && reasonLabels[reason]) || 'Failed';
 
 export const codes: Record<string, string> = {
-  // Sign-in
-  INVALID_CREDENTIALS: 'The username or password is incorrect.',
-  CREDENTIAL_LOCKED: 'This account is locked after too many failed attempts. Another admin can unlock it.',
-  MFA_REQUIRED: 'Enter the 6-digit code from your authenticator app.',
-  INVALID_TOTP: 'That code is not valid. Check your authenticator app and try again.',
-  CLIENT_NOT_ALLOWED: 'Only admins can sign in to the dashboard. Nurses and wound specialists use the mobile app.',
-  MISSING_FIELDS: 'Enter your username and password.',
-  DEVICE_NOT_EXPECTED: 'This sign-in is not allowed from the dashboard.',
-  DEVICE_NOT_ALLOWED: 'This device has been revoked and can no longer be used.',
-  UNKNOWN_CLIENT: 'This version of the dashboard is not recognized. Reload the page.',
+  // Sign-in. Wrong passwords, codes and locked accounts are explained on the identity service's login page.
+  invalid_grant: 'Your session has ended. Please sign in again.',
   INVALID_REFRESH_TOKEN: 'Your session has ended. Please sign in again.',
+  STATE_MISMATCH: 'That sign-in did not start in this tab. Please sign in again.',
+  access_denied: 'Sign-in was cancelled. Please try again.',
+  login_required: 'Please sign in again.',
+  CODE_REFUSED: 'Sign-in could not be completed. Please try again.',
+  NO_CODE: 'Sign-in could not be completed. Please try again.',
   // Clinicians
   USERNAME_TAKEN: 'That username is already in use. Choose another one.',
   INVALID_USERNAME:
@@ -72,9 +74,20 @@ export const codes: Record<string, string> = {
   PASSWORD_TOO_SHORT: `The password must be at least ${minPasswordLength} characters.`,
   INVALID_ROLE: 'Choose a role: nurse, wound specialist or admin.',
   MISSING_FULL_NAME: 'Enter the full name.',
+  FULL_NAME_TOO_LONG: 'The full name can be at most 120 characters.',
   UNKNOWN_FACILITY: 'Your facility is not registered. Contact the system administrator.',
   CANNOT_DEACTIVATE_SELF: 'You cannot deactivate your own account. Ask another admin.',
+  ALREADY_ACTIVE: 'This account is already active. Refresh the list.',
+  // Your own password (My account)
+  INVALID_CREDENTIALS: 'Your current password is not right.',
+  PASSWORD_UNCHANGED: 'Choose a password different from your current one.',
+  CREDENTIAL_LOCKED: 'Too many wrong passwords. Your account is locked for 15 minutes, or until another admin unlocks it.',
+  CANNOT_RESET_OWN_PASSWORD: 'You cannot reset your own password here. Ask another admin.',
   NOT_FOUND: 'This item could not be found. It may have been changed by someone else; refresh the list.',
+  // Two-step sign-in
+  INVALID_TOTP: 'That code is not right. Check the time on your phone and enter the newest code.',
+  MFA_ALREADY_ENABLED: 'Two-step sign-in is already on for your account.',
+  MFA_NOT_ENROLLED: 'Setup was not started or has expired. Start again.',
   // Devices
   DEVICE_ALREADY_REVOKED: 'This device is already revoked.',
 };

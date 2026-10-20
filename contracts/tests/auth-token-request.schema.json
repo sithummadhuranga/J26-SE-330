@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/tests/auth-token-request",
+  "description": "CI entry point: validates contracts/examples/auth.token.*.json against auth.schema.json $defs/tokenRequest (ajv-cli can only target a whole schema).",
+  "$ref": "https://j26-se-330/contracts/auth/2.0#/$defs/tokenRequest"
+}

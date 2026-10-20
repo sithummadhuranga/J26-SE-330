@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#f2f0e9">
+    <title>@ViewData["Title"] · WoundAI</title>
+    @* The WoundAI look, as in the mobile app (mobile/lib/core/theme.dart) and the admin dashboard: warm paper
+       background, white card, teal actions, Inter. Light only, like the app this page opens from. *@
+    <style>
+        @@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/account/fonts/inter/Inter-Regular.ttf") format("truetype"); }
+        @@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/account/fonts/inter/Inter-SemiBold.ttf") format("truetype"); }
+        @@font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("/account/fonts/inter/Inter-Bold.ttf") format("truetype"); }
+        @@font-face { font-family: "Inter"; font-weight: 800; font-display: swap; src: url("/account/fonts/inter/Inter-ExtraBold.ttf") format("truetype"); }
+        :root {
+            --accent: #0c6d5e; --accent-hover: #0a5e51; --accent-dark: #084e44; --accent-soft: #dceeea;
+            --bg: #f2f0e9; --surface: #ffffff; --surface-alt: #eae6d9;
+            --border: #dedacb; --border-strong: #c7c0aa;
+            --text: #1d1c18; --text-secondary: #68655a; --text-tertiary: #9b9585;
+            --error: #ad3a33; --error-soft: #f5e0dd;
+            color-scheme: light;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+               background: var(--bg); color: var(--text);
+               font: 15px/1.45 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+        main { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border);
+               border-radius: 22px; padding: 30px 26px 28px; box-shadow: 0 8px 24px rgba(20, 18, 12, 0.14); }
+        .brand { display: inline-block; margin: 0 0 14px; padding: 3px 10px; border-radius: 20px;
+                 background: var(--accent-soft); color: var(--accent-dark); font-size: 11.5px; font-weight: 700; letter-spacing: .02em; }
+        h1 { font-size: 23px; font-weight: 800; letter-spacing: -0.4px; margin: 0 0 4px; }
+        .sub { color: var(--text-secondary); margin: 0 0 18px; font-size: 13.5px; }
+        p { color: var(--text-secondary); font-size: 13.5px; }
+        label { display: block; color: var(--text-secondary); font-weight: 700; font-size: 12.5px; margin: 14px 0 6px; }
+        input { width: 100%; min-height: 50px; padding: 12px 13px; font: inherit; font-size: 15px;
+                border: 1.5px solid var(--border-strong); border-radius: 11px; background: var(--surface); color: var(--text);
+                caret-color: var(--accent); }
+        input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 0.5px var(--accent); }
+        button { width: 100%; min-height: 50px; margin-top: 22px; padding: 12px; font: inherit; font-size: 15px; font-weight: 700;
+                 border: 0; border-radius: 14px; background: var(--accent); color: #fff; cursor: pointer;
+                 box-shadow: 0 10px 22px rgba(12, 109, 94, 0.28); }
+        button:hover { background: var(--accent-hover); }
+        button:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+        .error { color: var(--error); background: var(--error-soft); border-radius: 11px; padding: 10px 12px; margin: 0 0 8px;
+                 font-size: 13.5px; font-weight: 600; }
+    </style>
+</head>
+<body>
+<main>
+    <p class="brand">WoundAI</p>
+    @RenderBody()
+</main>
+</body>
+</html>

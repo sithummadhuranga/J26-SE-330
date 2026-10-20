@@ -3,9 +3,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Npgsql;
 
-// Applies db/migrations in order (add -- --seed for dev data); role passwords come from ServiceRoles__<role> env vars.
+// Applies db/migrations in order (add -- --seed for dev data). Role passwords come from the ServiceRoles__<role>
+// environment variables.
 
-// _roles runs first so later migrations can grant to the service roles; grants runs last, when every table exists.
+// _roles runs first so later migrations can grant to the service roles, and grants runs last, once every table exists.
 string[] schemaOrder = ["_bootstrap", "_roles", "clinical", "messaging", "audit", "sync", "rag", "baseline", "ablation", "grants"];
 
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres")
@@ -65,7 +66,7 @@ foreach (var schema in schemaOrder)
     }
 }
 
-// Set each service role's password from ServiceRoles__<role>. A role without one cannot log in.
+// Set each service role's password from ServiceRoles__<role>. A role without one can't log in.
 var rolesSet = new List<string>();
 foreach (var (key, password) in Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
              .Select(e => ((string)e.Key, (string?)e.Value))
@@ -94,7 +95,7 @@ if (args.Contains("--seed"))
     }
 }
 
-// One line per run: each applied migration is listed above it, everything routine is summarized here.
+// One line per run. Each migration we applied is listed above it, and everything routine is summed up here.
 Console.WriteLine(string.Join("; ", new[]
 {
     count == 0 ? "Database is up to date" : $"Applied {count} migration(s)",

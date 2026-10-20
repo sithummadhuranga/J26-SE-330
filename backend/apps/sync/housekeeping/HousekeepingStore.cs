@@ -4,13 +4,13 @@ namespace Housekeeping;
 
 public sealed record HeldBackFacility(string FacilityId, string DeviceId, long DeviceCursor, DateTime? LastPullAt);
 
-/// <summary>Retention rules as SQL; each method handles one batch and returns the row count.</summary>
+/// <summary>The retention rules written as SQL. Each method handles one batch and returns how many rows it touched.</summary>
 public static class HousekeepingStore
 {
-    /// <summary>Session-level advisory lock: with several replicas, only one runs a cycle at a time.</summary>
+    /// <summary>A session-level advisory lock, so that with several replicas only one runs a cycle at a time.</summary>
     public const long LockKey = 0x484B_5F53_594E_43; // "HK_SYNC"
 
-    /// <summary>A2: published rows older than the retention. Rows not yet published are never touched.</summary>
+    /// <summary>A2: published rows older than the retention period. Rows that haven't been published are never touched.</summary>
     public const string DeleteOutboxSql = """
         DELETE FROM messaging.outbox
         WHERE outbox_id IN (
@@ -29,7 +29,7 @@ public static class HousekeepingStore
         WHERE i.consumer_name = old.consumer_name AND i.event_id = old.event_id
         """;
 
-    /// <summary>Archives rows every active device in the facility has already pulled and that are old enough.</summary>
+    /// <summary>Archives rows that are old enough and that every active device in the facility has already pulled.</summary>
     public const string ArchiveChangeLogSql = """
         WITH floor AS (
             SELECT f.facility_id,
@@ -59,7 +59,7 @@ public static class HousekeepingStore
         SELECT * FROM moved
         """;
 
-    /// <summary>Per facility, finds the device with the lowest cursor that is holding archival back.</summary>
+    /// <summary>For each facility, finds the device with the lowest cursor, which is the one holding archiving back.</summary>
     public const string HeldBackSql = """
         SELECT DISTINCT ON (d.facility_id) d.facility_id, d.device_id, COALESCE(dc.last_seq, 0), dc.updated_at
         FROM clinical.device d

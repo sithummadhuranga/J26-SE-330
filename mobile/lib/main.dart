@@ -12,7 +12,7 @@ Future<void> main() async {
   // The app lives as long as its process, so the listener is never cancelled.
   BackgroundSync.listen(services.db);
   runApp(WoundCdssApp(services: services));
-  // Not awaited: the first frame must not wait on WorkManager.
+  // We don't await this, so the first frame doesn't have to wait for WorkManager.
   BackgroundSync.schedule().ignore();
 }
 
@@ -32,7 +32,7 @@ class _WoundCdssAppState extends State<WoundCdssApp> {
   @override
   void initState() {
     super.initState();
-    // §6.2: the app coming back to the foreground is a sync trigger.
+    // When the app comes back to the foreground, that's a good moment to sync (§6.2).
     _lifecycle = AppLifecycleListener(onResume: widget.services.scheduler.onForeground);
     widget.services.auth.hasSession().then((has) {
       if (!mounted) return;
@@ -50,19 +50,20 @@ class _WoundCdssAppState extends State<WoundCdssApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'WoundAI',
-        debugShowCheckedModeBanner: false,
-        theme: woundTheme(),
-        home: switch (_signedIn) {
-          null => const Scaffold(body: Center(child: CircularProgressIndicator())),
-          true => AppShell(services: widget.services, onSignedOut: () => setState(() => _signedIn = false)),
-          false => SignInScreen(
-              services: widget.services,
-              onSignedIn: () {
-                setState(() => _signedIn = true);
-                widget.services.scheduler.syncNow();
-              },
-            ),
+    title: 'WoundAI',
+    debugShowCheckedModeBanner: false,
+    theme: woundTheme(),
+    scrollBehavior: const WoundScrollBehavior(),
+    home: switch (_signedIn) {
+      null => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      true => AppShell(services: widget.services, onSignedOut: () => setState(() => _signedIn = false)),
+      false => SignInScreen(
+        services: widget.services,
+        onSignedIn: () {
+          setState(() => _signedIn = true);
+          widget.services.scheduler.syncNow();
         },
-      );
+      ),
+    },
+  );
 }

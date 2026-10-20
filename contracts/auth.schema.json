@@ -1,79 +1,155 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://j26-se-330/contracts/auth/1.1",
-  "title": "Auth (login / refresh / logout / MFA / discovery)",
-  "description": "Request and response bodies for /v1/auth/* (architecture §7.3) and the identity service's OpenID Connect metadata (ADR 0003). Each operation is a named definition under $defs. All requests go through the API gateway (ADR 0004). The access token is a 15-minute RS256 JWT (see accessTokenClaims); the refresh token is opaque and stored server-side only as a SHA-256 hash.",
+  "$id": "https://j26-se-330/contracts/auth/2.0",
+  "title": "Auth (OpenID Connect: authorize / token / revocation / MFA / discovery)",
+  "description": "Standard OpenID Connect and OAuth 2.1 served by the identity service through the API gateway (ADR 0006, replacing the custom /v1/auth/login|refresh|logout of version 1.x). Clients are public (no secret) and use authorization code + PKCE S256; the mobile app signs in through the system browser (RFC 8252) and names its device with device_id. The access token is a 15-minute RS256 JWT with the same claims as 1.x; only the issuer changed, to a URL. Refresh tokens are opaque to clients, rotate on every use, and stop working when the session is revoked, the clinician deactivated or the device revoked. Request bodies of /connect/token and /connect/revocation are application/x-www-form-urlencoded; the definitions below describe their fields.",
   "$defs": {
-    "loginRequest": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["username", "password"],
-      "properties": {
-        "username": { "type": "string", "minLength": 3, "maxLength": 64 },
-        "password": { "type": "string", "minLength": 1 },
-        "deviceId": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "totp": { "type": ["string", "null"], "pattern": "^[0-9]{6}$", "description": "Required once MFA is enabled" },
-        "clientId": {
-          "enum": ["mobile", "admin-dashboard"],
-          "default": "mobile",
-          "description": "Who the session is for (ADR 0005). mobile: the app on a registered device. admin-dashboard: a browser, role admin only."
-        }
-      },
-      "if": { "properties": { "clientId": { "const": "admin-dashboard" } }, "required": ["clientId"] },
-      "then": { "not": { "required": ["deviceId"] } },
-      "else": { "required": ["deviceId"] }
+    "clients": {
+      "description": "Registered clients. admin-dashboard: browser, role admin only, audience melanin-wound-cdss-admin, refresh token 12 h, redirect <dashboard origin>/callback. mobile: the app on a registered device, audience melanin-wound-cdss-devices, refresh token 30 days, redirect lk.sliit.cdss:/oauth2redirect. The password grant exists only on mobile and only where Oidc:AllowPasswordGrant is on (device simulator and tests, never production).",
+      "enum": ["mobile", "admin-dashboard"]
     },
-    "refreshRequest": {
+    "authorizeRequest": {
       "type": "object",
+      "description": "Query of GET /connect/authorize. The identity service shows its login page (username and password, then the authenticator code when MFA is on), then redirects to redirect_uri with code and state. Errors before redirect_uri is verified are shown, never redirected.",
       "additionalProperties": false,
-      "required": ["refreshToken"],
-      "properties": { "refreshToken": { "type": "string", "minLength": 1 } },
-      "description": "Body of POST /v1/auth/refresh (rotates both tokens, same client) and POST /v1/auth/logout (revokes the session)"
+      "required": ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method"],
+      "properties": {
+        "response_type": { "const": "code" },
+        "client_id": { "$ref": "#/$defs/clients" },
+        "redirect_uri": { "type": "string", "description": "Must exactly match one registered for the client" },
+        "scope": {
+          "type": "string",
+          "pattern": "^(openid|profile|offline_access)( (openid|profile|offline_access))*$",
+          "description": "offline_access is needed for a refresh token"
+        },
+        "state": { "type": "string" },
+        "nonce": { "type": "string" },
+        "code_challenge": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43,128}$" },
+        "code_challenge_method": { "const": "S256" },
+        "prompt": { "enum": ["login", "none"] },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 64, "description": "mobile only, required" }
+      },
+      "if": { "properties": { "client_id": { "const": "mobile" } } },
+      "then": { "required": ["device_id"] },
+      "else": { "not": { "required": ["device_id"] } }
+    },
+    "tokenRequest": {
+      "description": "Fields of POST /connect/token (form-encoded). A code is single use and lives 5 minutes. A refresh token is single use: each refresh returns the next one.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["grant_type", "client_id", "code", "redirect_uri", "code_verifier"],
+          "properties": {
+            "grant_type": { "const": "authorization_code" },
+            "client_id": { "$ref": "#/$defs/clients" },
+            "code": { "type": "string" },
+            "redirect_uri": { "type": "string" },
+            "code_verifier": { "type": "string", "pattern": "^[A-Za-z0-9._~-]{43,128}$" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["grant_type", "client_id", "refresh_token"],
+          "properties": {
+            "grant_type": { "const": "refresh_token" },
+            "client_id": { "$ref": "#/$defs/clients" },
+            "refresh_token": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["grant_type", "client_id", "username", "password", "device_id"],
+          "description": "Device simulator and tests only; refused unless Oidc:AllowPasswordGrant is on.",
+          "properties": {
+            "grant_type": { "const": "password" },
+            "client_id": { "const": "mobile" },
+            "username": { "type": "string", "minLength": 3, "maxLength": 64 },
+            "password": { "type": "string", "minLength": 1 },
+            "device_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "totp": { "type": "string", "pattern": "^[0-9]{6}$", "description": "Required once MFA is enabled" },
+            "scope": { "type": "string" }
+          }
+        }
+      ]
     },
     "tokenResponse": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["accessToken", "refreshToken", "expiresIn"],
+      "required": ["access_token", "token_type", "expires_in"],
       "properties": {
-        "accessToken": { "type": "string" },
-        "refreshToken": { "type": "string", "description": "Valid 30 days for mobile, 12 hours for admin-dashboard" },
-        "expiresIn": { "type": "integer", "description": "Access token lifetime in seconds (900)" }
+        "access_token": { "type": "string", "description": "RS256 JWT, see accessTokenClaims" },
+        "token_type": { "const": "Bearer" },
+        "expires_in": { "type": "integer", "description": "Seconds, about 900" },
+        "refresh_token": { "type": "string", "description": "Opaque; present when offline_access was granted" },
+        "id_token": { "type": "string", "description": "Present when openid was granted; see idTokenClaims" }
+      }
+    },
+    "tokenError": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "enum": ["invalid_request", "invalid_client", "invalid_grant", "unauthorized_client", "unsupported_grant_type", "invalid_scope"]
+        },
+        "error_description": {
+          "type": "string",
+          "description": "For the password grant, the reason code: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED. For a refresh: INVALID_REFRESH_TOKEN (expired, rotated, revoked, clinician deactivated or device revoked: sign in again). The device's offline queue is never affected by any auth error."
+        },
+        "error_uri": { "type": "string" }
+      },
+      "description": "HTTP 400 (401 for invalid_client). The API gateway may also answer 429 with Retry-After."
+    },
+    "revocationRequest": {
+      "type": "object",
+      "description": "Fields of POST /connect/revocation (form-encoded), used at sign-out. Revoking a refresh token ends its session. Always 200, even for an unknown token.",
+      "additionalProperties": false,
+      "required": ["client_id", "token"],
+      "properties": {
+        "client_id": { "$ref": "#/$defs/clients" },
+        "token": { "type": "string" },
+        "token_type_hint": { "enum": ["refresh_token", "access_token"] }
       }
     },
     "accessTokenClaims": {
       "type": "object",
-      "description": "Payload of the access JWT, signed RS256 by the identity service. Resource servers validate it locally with the keys from jwks. The Sync Gateway accepts only the device audience, so admin-dashboard tokens cannot push, pull or read patient records.",
+      "description": "Payload of the access JWT, signed RS256 by the identity service. Resource servers validate it locally with the keys from jwks. The Sync Gateway accepts only the device audience, so admin-dashboard tokens cannot push, pull or read patient records. oi_prst is OpenIddict's record of the presenting client.",
       "required": ["iss", "aud", "exp", "sub", "facility_id", "role", "client_id"],
       "properties": {
-        "iss": { "const": "melanin-wound-cdss" },
+        "iss": { "const": "https://identity.melanin-wound-cdss/" },
         "aud": { "enum": ["melanin-wound-cdss-devices", "melanin-wound-cdss-admin"] },
         "exp": { "type": "integer" },
+        "iat": { "type": "integer" },
+        "jti": { "type": "string" },
+        "scope": { "type": "string" },
         "sub": { "type": "string", "format": "uuid", "description": "clinician_id" },
         "facility_id": { "type": "string" },
         "role": { "enum": ["nurse", "wound_specialist", "admin"] },
-        "client_id": { "enum": ["mobile", "admin-dashboard"] },
+        "client_id": { "$ref": "#/$defs/clients" },
+        "oi_prst": { "type": "string" },
         "device_id": { "type": "string", "description": "Mobile tokens only" }
       },
       "if": { "properties": { "client_id": { "const": "mobile" } } },
       "then": { "required": ["device_id"], "properties": { "aud": { "const": "melanin-wound-cdss-devices" } } },
       "else": { "not": { "required": ["device_id"] }, "properties": { "aud": { "const": "melanin-wound-cdss-admin" }, "role": { "const": "admin" } } }
     },
-    "authError": {
+    "idTokenClaims": {
       "type": "object",
-      "required": ["code"],
+      "description": "Payload of the ID token, for display only (who is signed in). Never send it to an API.",
+      "required": ["iss", "aud", "exp", "sub"],
       "properties": {
-        "code": {
-          "enum": [
-            "INVALID_CREDENTIALS", "CREDENTIAL_LOCKED", "MFA_REQUIRED", "INVALID_TOTP",
-            "DEVICE_NOT_ALLOWED", "CLIENT_NOT_ALLOWED", "INVALID_REFRESH_TOKEN",
-            "MISSING_FIELDS", "DEVICE_NOT_EXPECTED", "UNKNOWN_CLIENT"
-          ]
-        }
-      },
-      "description": "Error body. 401: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED, CLIENT_NOT_ALLOWED (dashboard login by a non-admin), INVALID_REFRESH_TOKEN. 400: MISSING_FIELDS, DEVICE_NOT_EXPECTED, UNKNOWN_CLIENT. The API gateway may also answer 429 with Retry-After. The device's offline queue is never affected by any auth error."
+        "iss": { "const": "https://identity.melanin-wound-cdss/" },
+        "aud": { "$ref": "#/$defs/clients" },
+        "sub": { "type": "string", "format": "uuid" },
+        "preferred_username": { "type": "string" },
+        "facility_id": { "type": "string" },
+        "role": { "enum": ["nurse", "wound_specialist", "admin"] }
+      }
     },
     "mfaEnrollResponse": {
       "type": "object",
+      "description": "POST /v1/auth/mfa/enroll with an access token. The authenticator app shows the account as melanin-wound-cdss.",
       "additionalProperties": false,
       "required": ["secret", "otpauthUri"],
       "properties": {
@@ -83,25 +159,30 @@
     },
     "mfaConfirmRequest": {
       "type": "object",
+      "description": "POST /v1/auth/mfa/confirm with an access token; MFA is on once a first code is confirmed.",
       "additionalProperties": false,
       "required": ["code"],
       "properties": { "code": { "type": "string", "pattern": "^[0-9]{6}$" } }
     },
     "openidConfiguration": {
       "type": "object",
-      "description": "GET /.well-known/openid-configuration. URLs follow the address the caller used (the API gateway for clients).",
-      "required": ["issuer", "jwks_uri", "id_token_signing_alg_values_supported"],
+      "description": "GET /.well-known/openid-configuration. The issuer is fixed; endpoint URLs follow the address the caller used (the API gateway for clients, the identity service inside Docker).",
+      "required": ["issuer", "authorization_endpoint", "token_endpoint", "revocation_endpoint", "end_session_endpoint", "jwks_uri", "code_challenge_methods_supported"],
       "properties": {
-        "issuer": { "const": "melanin-wound-cdss" },
-        "jwks_uri": { "type": "string", "format": "uri" },
+        "issuer": { "const": "https://identity.melanin-wound-cdss/" },
+        "authorization_endpoint": { "type": "string", "format": "uri" },
         "token_endpoint": { "type": "string", "format": "uri" },
+        "revocation_endpoint": { "type": "string", "format": "uri" },
+        "end_session_endpoint": { "type": "string", "format": "uri" },
+        "jwks_uri": { "type": "string", "format": "uri" },
+        "code_challenge_methods_supported": { "const": ["S256"] },
         "grant_types_supported": { "type": "array", "items": { "type": "string" } },
         "id_token_signing_alg_values_supported": { "type": "array", "contains": { "const": "RS256" } }
       }
     },
     "jwks": {
       "type": "object",
-      "description": "GET /.well-known/jwks.json. Public keys only; cache it and refetch when a token carries an unknown kid.",
+      "description": "GET /.well-known/jwks (the jwks_uri). Public keys only; cache it and refetch when a token carries an unknown kid.",
       "additionalProperties": false,
       "required": ["keys"],
       "properties": {
@@ -110,7 +191,6 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "additionalProperties": false,
             "required": ["kty", "use", "alg", "kid", "n", "e"],
             "properties": {
               "kty": { "const": "RSA" },

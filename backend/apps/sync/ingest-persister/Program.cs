@@ -7,7 +7,7 @@ using Sync.Common.Kafka;
 using Sync.Common.Persistence;
 using Sync.Common.Telemetry;
 
-// Ingest persister: reads wound-events and writes them to PostgreSQL.
+// The ingest persister reads wound-events and writes them to PostgreSQL.
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddSyncTelemetry("ingest-persister");
 

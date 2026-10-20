@@ -7,7 +7,7 @@ namespace SyncGateway.Endpoints;
 
 public sealed record PatientAliasRequest(string? DisplayAlias);
 
-/// <summary>Lets clinicians label patients locally; the label never leaves this service.</summary>
+/// <summary>Lets clinicians give patients a label. The label never leaves this service.</summary>
 public static partial class PatientEndpoints
 {
     public const int MaxAliasLength = 64;
@@ -40,7 +40,7 @@ public static partial class PatientEndpoints
             });
         });
 
-        // Create the patient if needed; a null or empty alias clears the label.
+        // Create the patient if needed. A null or empty alias clears the label.
         patients.MapPut("/{patientRef}/alias", async (string patientRef, PatientAliasRequest req, ClaimsPrincipal user,
             NpgsqlDataSource db, CancellationToken ct) =>
         {
@@ -58,7 +58,7 @@ public static partial class PatientEndpoints
             cmd.Parameters.AddWithValue("f", user.FindFirstValue(ClaimNames.FacilityId)!);
             cmd.Parameters.AddWithValue("a", (object?)alias ?? DBNull.Value);
 
-            // No row back means the patient belongs to another facility: report it as not found.
+            // Getting no row back means the patient belongs to another facility, so report it as not found.
             return await cmd.ExecuteScalarAsync(ct) is null
                 ? Results.NotFound(new { code = "NOT_FOUND" })
                 : Results.Ok(new { patientRef, displayAlias = alias });

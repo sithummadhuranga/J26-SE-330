@@ -4,7 +4,7 @@ import '../../app/app_services.dart';
 import '../home/home_screen.dart';
 import '../../core/widgets.dart';
 
-/// Every assessment on this phone, newest first, with where each is in the sync.
+/// Every assessment on this phone, newest first, showing how far each one has got in the sync.
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, required this.services});
 

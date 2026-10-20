@@ -1,8 +1,8 @@
 """
 The evaluation metrics from architecture §13, for one simulator run (device ids sim-<run>-NNN).
 
-Device-side timestamps come from the simulator's CSV; server-side ones from audit.provenance (and the baseline
-tables). Both clocks are this host's, which is why the simulator runs on the same machine as the stack.
+Phone-side timestamps come from the simulator's CSV, and server-side ones from audit.provenance (and the baseline
+tables). Both use this computer's clock, which is why the simulator has to run on the same machine as the stack.
 
     sync latency          device enqueue → PERSISTED (§13 definition); also → accepted, → advice stored, → delivered
     duplicates            rows per event_id in the store (0 by construction) and DEDUPLICATED provenance rows
@@ -41,7 +41,7 @@ def _ms(later, earlier):
 
 
 def collect(run_id, mode, sim_csv_path, started_at, finished_at):
-    """Returns (metrics dict, per-event rows) for one run."""
+    """Returns the metrics dict and the per-event rows for one run."""
     from datetime import datetime
     parse = lambda s: datetime.fromisoformat(s) if s else None
 
@@ -103,7 +103,7 @@ def collect(run_id, mode, sim_csv_path, started_at, finished_at):
                            "accept_ms": d["accept_ms"] or None,
                            "persisted_ms": _ms(at("PERSISTED"), enq),
                            "advice_stored_ms": _ms(at("RECOMMENDATION_STORED"), enq),
-                           # Use the originating phone's own completion time, since another phone may pull the advice first.
+                           # Use the time the phone that sent it finished, since another phone might pull the advice first.
                            "delivered_ms": d["complete_ms"] or None,
                            "deduplicated": st.get("DEDUPLICATED", (None, 0))[1],
                            "audit_complete": has_all})
@@ -150,7 +150,7 @@ def collect(run_id, mode, sim_csv_path, started_at, finished_at):
 
 
 def auth_health(since, until):
-    """Auth-health metrics for [since, until]: login failure rate, lockouts per day and session lifetimes."""
+    """Auth-health metrics between since and until: the login failure rate, lockouts per day and session lifetimes."""
     window = f"'{since.isoformat()}' and '{until.isoformat()}'"
     a = psql_csv(f"""
         select count(*) filter (where action = 'LOGIN' and success) as logins,

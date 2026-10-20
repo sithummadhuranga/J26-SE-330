@@ -9,7 +9,7 @@ export function useSession(): AuthSession {
   return session;
 }
 
-/** The signed-in admin; re-renders on sign-in and sign-out. */
+/** The signed-in admin. Components using it re-render when someone signs in or out. */
 export function useAdmin(): Admin | null {
   const session = useSession();
   return useSyncExternalStore(session.subscribe, () => session.admin);

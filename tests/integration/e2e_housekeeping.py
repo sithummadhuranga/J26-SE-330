@@ -1,9 +1,8 @@
-"""Housekeeping must never archive a change some active device hasn't pulled yet; safe to re-run."""
+"""Housekeeping must never archive a change that an active device hasn't pulled yet. Safe to run again."""
 import secrets
-import subprocess
 import sys
 
-from client import REPO_ROOT, Checks, create_clinician, http, login, pull_all, sql, uuid7
+from client import Checks, compose, create_clinician, dashboard_login, http, login, pull_all, sql, uuid7
 
 suffix = secrets.token_hex(3)
 FAC = f"fac-hk-{suffix}"
@@ -16,8 +15,7 @@ check = t.check
 
 
 def run_cycle():
-    out = subprocess.run(["docker", "compose", "run", "--rm", "--no-deps", "housekeeping", "run-once"],
-                         cwd=REPO_ROOT, capture_output=True, text=True)
+    out = compose("run", "--rm", "--no-deps", "housekeeping", "run-once")
     lines = [l for l in out.stdout.splitlines() if l.startswith(("ran=", "held_back "))]
     if out.returncode != 0 or not lines:
         raise SystemExit(f"housekeeping run-once failed:\n{out.stdout[-2000:]}\n{out.stderr[-2000:]}")
@@ -53,19 +51,19 @@ create_clinician(ADMIN, PASSWORD, "admin", FAC, "HK Admin")
 phone_a = login(NURSE, PASSWORD, PHONE_A)[1]["accessToken"]
 phone_b = login(NURSE, PASSWORD, PHONE_B)[1]["accessToken"]
 login(NURSE, PASSWORD, LOST)
-# The admin dashboard has no device, so it holds nothing back.
-status, body = http("POST", "/v1/auth/login", {"username": ADMIN, "password": PASSWORD, "clientId": "admin-dashboard"})
+# The admin dashboard isn't a device, so it doesn't hold anything back.
+status, body = dashboard_login(ADMIN, PASSWORD)
 admin = body["accessToken"]
 
 old = [change_row() for _ in range(6)]
 recent = change_row(age="1 minute")
 everything = old + [recent]
 
-# Phone A has everything and says so (pull records the cursor the phone sends, i.e. what it already has).
+# Phone A has everything and says so. Pull records the cursor the phone sends, which is what it already has.
 status, got_a, cursor_a = pull_all(phone_a)
 pull_page(phone_a, cursor_a, 1)
 check("phone A received all of the facility's rows", set(everything) <= {c["seq"] for c in got_a})
-# Phone B pulls two pages of two, so it has acknowledged only the first two rows (it sent cursor old[1] last).
+# Phone B pulls two pages of two rows, so it has only acknowledged the first two (the last cursor it sent was old[1]).
 seen_b, cursor_b = pull_page(phone_b, 0, 2)
 seen_b2, _ = pull_page(phone_b, cursor_b, 2)
 check("phone B's pages were the first rows", seen_b == old[:2] and seen_b2 == old[2:4], (seen_b, seen_b2))

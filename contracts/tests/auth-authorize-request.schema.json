@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/tests/auth-authorize-request",
+  "description": "CI entry point: validates contracts/examples/auth.authorize.*.json against auth.schema.json $defs/authorizeRequest (ajv-cli can only target a whole schema).",
+  "$ref": "https://j26-se-330/contracts/auth/2.0#/$defs/authorizeRequest"
+}

@@ -4,7 +4,7 @@ using Sync.Common.Recommendations;
 
 namespace Orchestrator.Executors;
 
-/// <summary>Checks the response matches the schema, the requested case and its citations; invalid means deferred.</summary>
+/// <summary>Checks the response matches the schema, the case we asked about and its citations. If it doesn't, the advice is deferred.</summary>
 [YieldsOutput(typeof(OrchestrationOutcome))]
 public sealed class ValidateResponseExecutor(RecommendationResponseValidator validator)
     : Executor<RagCallResult, ValidatedRecommendation>("ValidateResponse")

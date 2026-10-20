@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'sync_models.dart';
 
-/// No HTTP response at all; safe to retry since every event is idempotent.
+/// We got no HTTP response at all. It's safe to retry, because sending an event twice does no harm.
 class TransportException implements Exception {
   TransportException(this.message);
 
@@ -17,7 +17,8 @@ class TransportException implements Exception {
   String toString() => 'TransportException: $message';
 }
 
-/// An HTTP error answer, with the reason code the backend sends (contracts/auth.schema.json authError).
+/// The server answered with an HTTP error, along with the reason code the backend sends
+/// (authError in contracts/auth.schema.json).
 class ApiException implements Exception {
   ApiException(this.status, [this.code, this.retryAfter]);
 
@@ -29,7 +30,8 @@ class ApiException implements Exception {
   String toString() => 'ApiException($status${code == null ? '' : ' $code'})';
 }
 
-/// Result of one push; non-200 codes are returned, not thrown, so the engine can decide what to do.
+/// The result of one push. Status codes other than 200 are returned rather than thrown,
+/// so the engine can decide what to do.
 class PushResponse {
   const PushResponse(this.status, this.results, {this.retryAfter, this.code});
 
@@ -47,11 +49,14 @@ class FigureResponse {
   final Map<String, String> headers;
 }
 
-/// The device's side of the sync protocol (§7), always through the API gateway (ADR 0004).
+/// The phone's side of the sync protocol (§7). Everything goes through the API gateway (ADR 0004).
 abstract class SyncApi {
   Future<bool> health();
-  Future<TokenPair> login({required String username, required String password, required String deviceId, String? totp});
+  /// Swaps both tokens for new ones through /connect/token. Once the session is over,
+  /// this throws [ApiException] 400 invalid_grant.
   Future<TokenPair> refresh(String refreshToken);
+
+  /// Ends the session on the server through /connect/revocation. Signing in is handled by [BrowserSignIn].
   Future<void> logout(String refreshToken);
   Future<PushResponse> push(String accessToken, String deviceId, List<String> eventJson);
   Future<PullPage> pull(String accessToken, int cursor, {int limit});
@@ -70,10 +75,10 @@ class HttpSyncApi implements SyncApi {
   static const healthTimeout = Duration(seconds: 3); // §6.2: probe with a short timeout
   static const requestTimeout = Duration(seconds: 30);
 
-  /// Bodies above this are gzip-compressed on a separate isolate, so the UI isolate never does the work (§6.2).
+  /// Bodies bigger than this are gzipped on a separate isolate, so the UI never has to do that work (§6.2).
   static const isolateGzipThreshold = 32 * 1024;
 
-  /// Pull pages bigger than this are decoded off the UI isolate to avoid dropped frames.
+  /// Pull pages bigger than this are decoded away from the UI isolate, so the app doesn't drop frames.
   static const isolateDecodeThreshold = 32 * 1024;
 
   Uri _uri(String path, [Map<String, String>? query]) =>
@@ -87,7 +92,7 @@ class HttpSyncApi implements SyncApi {
     }
   }
 
-  /// Only the gateway's {"status":"ok"} counts as reachable, not a captive-portal 200.
+  /// We only count the gateway as reachable if it answers {"status":"ok"}. A 200 from a Wi-Fi login page doesn't count.
   @override
   Future<bool> health() async {
     try {
@@ -102,36 +107,27 @@ class HttpSyncApi implements SyncApi {
     }
   }
 
-  @override
-  Future<TokenPair> login({required String username, required String password, required String deviceId, String? totp}) =>
-      _tokens(_uri('v1/auth/login'), {
-        'username': username,
-        'password': password,
-        'deviceId': deviceId,
-        if (totp != null && totp.isNotEmpty) 'totp': totp,
-      });
+  /// The OAuth endpoints take form fields, not JSON.
+  Future<http.Response> _form(String path, Map<String, String> fields) => _send(
+      _http.post(_uri(path),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: {'client_id': 'mobile', ...fields}),
+      requestTimeout);
 
   @override
-  Future<TokenPair> refresh(String refreshToken) => _tokens(_uri('v1/auth/refresh'), {'refreshToken': refreshToken});
-
-  Future<TokenPair> _tokens(Uri uri, Map<String, Object> body) async {
-    final r = await _send(
-        _http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body)), requestTimeout);
+  Future<TokenPair> refresh(String refreshToken) async {
+    final r = await _form('connect/token', {'grant_type': 'refresh_token', 'refresh_token': refreshToken});
     if (r.statusCode == 200) return TokenPair.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
     throw ApiException(r.statusCode, _code(r), _retryAfter(r));
   }
 
   @override
   Future<void> logout(String refreshToken) async {
-    await _send(
-        _http.post(_uri('v1/auth/logout'),
-            headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refreshToken': refreshToken})),
-        requestTimeout);
+    await _form('connect/revocation', {'token': refreshToken, 'token_type_hint': 'refresh_token'});
   }
 
   @override
   Future<PushResponse> push(String accessToken, String deviceId, List<String> eventJson) async {
-    // The queue stores each event as JSON already; splice them in rather than decoding and re-encoding.
+    // The queue already stores each event as JSON, so we drop them straight in instead of decoding and re-encoding.
     final body = '{"deviceId":${jsonEncode(deviceId)},"batchId":"${const Uuid().v4()}",'
         '"events":[${eventJson.join(',')}]}';
     final raw = utf8.encode(body);
@@ -191,9 +187,11 @@ class HttpSyncApi implements SyncApi {
     if (r.statusCode != 200) throw ApiException(r.statusCode, _code(r), _retryAfter(r));
   }
 
+  /// Our own API puts the reason in {"code"}, while the OAuth endpoints use {"error"}.
   static String? _code(http.Response r) {
     try {
-      return (jsonDecode(r.body) as Map<String, dynamic>)['code'] as String?;
+      final body = jsonDecode(r.body) as Map<String, dynamic>;
+      return (body['code'] ?? body['error']) as String?;
     } catch (_) {
       return null;
     }

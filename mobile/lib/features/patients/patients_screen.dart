@@ -7,7 +7,7 @@ import '../sync/data/app_database.dart';
 import 'add_patient_screen.dart';
 import 'patient_detail_screen.dart';
 
-/// Patients on this phone, shown by the clinician's label (no personal details).
+/// The patients on this phone, shown by the label the clinician gave them. No personal details are kept.
 class PatientsScreen extends StatefulWidget {
   const PatientsScreen({super.key, required this.services});
 
@@ -39,6 +39,18 @@ class _PatientsScreenState extends State<PatientsScreen> {
             icon: const Icon(Icons.add_rounded),
           ),
         ),
+        // Search stays under the title so it's always within reach. The notice and the list scroll.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          child: TextField(
+            key: const Key('patientSearch'),
+            decoration: const InputDecoration(
+              hintText: 'Search label or ID',
+              prefixIcon: Icon(Icons.search_rounded, color: WoundColors.textTertiary),
+            ),
+            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+          ),
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
@@ -47,15 +59,6 @@ class _PatientsScreenState extends State<PatientsScreen> {
                 'Patients are shown by a label you choose, such as initials or a bed number. '
                 'No names or contact details are stored.',
                 icon: Icons.lock_outline_rounded,
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                key: const Key('patientSearch'),
-                decoration: const InputDecoration(
-                  hintText: 'Search label or ID',
-                  prefixIcon: Icon(Icons.search_rounded, color: WoundColors.textTertiary),
-                ),
-                onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
               ),
               const SizedBox(height: 14),
               StreamBuilder<List<PatientLocalData>>(

@@ -1,6 +1,6 @@
 namespace Sync.Common.Kafka;
 
-/// <summary>Topic names from architecture §8.1. Keep in sync with infra/kafka/create-topics.sh.</summary>
+/// <summary>The topic names from architecture §8.1. Keep these matching infra/kafka/create-topics.sh.</summary>
 public static class Topics
 {
     public const string WoundEvents = "wound-events";                     // key: woundId
@@ -15,7 +15,7 @@ public static class ConsumerGroups
 {
     public const string Persister = "persister";
     public const string Orchestrator = "orchestrator";
-    /// <summary>Delayed retries (§8.3), kept apart so pausing for minutes never stalls the main orchestrator consumer.</summary>
+    /// <summary>Delayed retries (§8.3). They're kept separate so waiting for minutes never holds up the main orchestrator consumer.</summary>
     public const string OrchestratorRetry = "orchestrator-retry";
     public const string GatewayNotifier = "gateway-notifier";
 }

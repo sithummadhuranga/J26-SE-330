@@ -1,6 +1,6 @@
 namespace Housekeeping;
 
-/// <summary>Retention rules (architecture §9.4). Section "Housekeeping" in configuration.</summary>
+/// <summary>How long things are kept (architecture §9.4). Set in the "Housekeeping" section of the configuration.</summary>
 public sealed class HousekeepingOptions
 {
     public const string Section = "Housekeeping";
@@ -8,18 +8,18 @@ public sealed class HousekeepingOptions
     /// <summary>How often a cleanup cycle runs.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>A published outbox row is kept this long (for debugging), then deleted. Unpublished rows never are.</summary>
+    /// <summary>How long a published outbox row is kept for debugging before it's deleted. Unpublished rows are never deleted.</summary>
     public TimeSpan OutboxRetention { get; set; } = TimeSpan.FromHours(1);
 
-    /// <summary>Minimum age before a change-log row can be archived, well above pull's 60 s re-send window.</summary>
+    /// <summary>How old a change-log row has to be before it can be archived. This is well past pull's 60-second re-send window.</summary>
     public TimeSpan ChangeLogMargin { get; set; } = TimeSpan.FromHours(24);
 
-    /// <summary>Minimum age before an inbox row is deleted; never shorter than Kafka could still redeliver.</summary>
+    /// <summary>How old an inbox row has to be before it's deleted. It's never shorter than the time Kafka could still redeliver it.</summary>
     public TimeSpan InboxRetention { get; set; } = TimeSpan.FromDays(8);
 
     public TimeSpan InboxSafetyMargin { get; set; } = TimeSpan.FromDays(1);
 
-    /// <summary>Rows per DELETE statement, so no single statement holds locks for long.</summary>
+    /// <summary>How many rows each DELETE handles, so no single statement holds locks for long.</summary>
     public int BatchSize { get; set; } = 5000;
 
     public static readonly TimeSpan MinChangeLogMargin = TimeSpan.FromMinutes(10);

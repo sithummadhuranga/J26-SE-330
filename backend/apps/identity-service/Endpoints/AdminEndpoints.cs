@@ -37,9 +37,20 @@ public static class AdminEndpoints
             ClinicianAdminService service, CancellationToken ct) =>
             ToHttp(await service.DeactivateAsync(AuthEndpoints.ClinicianId(user), Facility(user), username, ct)));
 
+        admin.MapPost("/clinicians/{username}/reactivate", async (string username, ClaimsPrincipal user,
+            ClinicianAdminService service, CancellationToken ct) =>
+            ToHttp(await service.ReactivateAsync(AuthEndpoints.ClinicianId(user), Facility(user), username, ct)));
+
         admin.MapPost("/clinicians/{username}/reset-mfa", async (string username, ClaimsPrincipal user,
             ClinicianAdminService service, CancellationToken ct) =>
             ToHttp(await service.ResetMfaAsync(AuthEndpoints.ClinicianId(user), Facility(user), username, ct)));
+
+        admin.MapPost("/clinicians/{username}/reset-password", async (string username, ResetPasswordRequest req,
+            ClaimsPrincipal user, ClinicianAdminService service, CancellationToken ct) =>
+        {
+            var error = await service.ResetPasswordAsync(AuthEndpoints.ClinicianId(user), Facility(user), username, req.Password, ct);
+            return error == "PASSWORD_TOO_SHORT" ? Results.BadRequest(new { code = error }) : ToHttp(error);
+        });
 
         admin.MapGet("/devices", async (ClaimsPrincipal user, DeviceAdminService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(Facility(user), ct)));

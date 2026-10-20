@@ -7,7 +7,7 @@ using Sync.Common.Telemetry;
 
 namespace OutboxRelay;
 
-/// <summary>Publishes outbox rows to Kafka and marks them sent; SKIP LOCKED lets several relays run safely.</summary>
+/// <summary>Publishes outbox rows to Kafka and marks them as sent. SKIP LOCKED means several relays can run safely at once.</summary>
 public sealed class RelayWorker(
     NpgsqlDataSource db, IProducer<string, byte[]> producer, ILogger<RelayWorker> logger) : BackgroundService
 {
@@ -36,7 +36,7 @@ public sealed class RelayWorker(
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                // Nothing was marked published, so the same rows are retried on the next poll.
+                // Nothing was marked as published, so the same rows get tried again on the next poll.
                 logger.LogError(ex, "Outbox relay batch failed; retrying");
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
@@ -62,7 +62,7 @@ public sealed class RelayWorker(
             return 0;
         }
 
-        // Produce in order; acks=all + idempotence keep per-key ordering within the batch.
+        // Produce in order. acks=all plus idempotence keeps each key's messages in order within the batch.
         var deliveries = rows.Select(row => producer.ProduceAsync(row.Topic, new Message<string, byte[]>
         {
             Key = row.Key,
