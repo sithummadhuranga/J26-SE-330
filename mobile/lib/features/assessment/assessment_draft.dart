@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../sync/data/app_database.dart';
+import 'analysis/wound_analyzer.dart';
 import '../sync/ui/sample_assessment.dart';
 
 /// An assessment being filled in. Its UUIDv7 ids are made on the phone and don't change,
@@ -23,8 +24,10 @@ class AssessmentDraft {
   String pedalPulses = 'not_recorded';
   String protectiveSensation = 'not_recorded';
 
-  /// Filled in by the analysis step. For now that's a stand-in ([sampleAnalytics]) until the pipeline
-  /// from Members 1–2 replaces it.
+  /// The photo from the capture step. It's empty until Member 1's camera module is plugged in.
+  WoundCapture capture = const WoundCapture();
+
+  /// Filled in by the analysis step ([WoundAnalyzer]), already checked against the contract.
   Map<String, dynamic>? analytics;
 
   final DateTime startedAt = DateTime.now();

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/app/app_services.dart';
 import 'package:melanin_wound_cdss/app/app_shell.dart';
 import 'package:melanin_wound_cdss/core/theme.dart';
+import 'package:melanin_wound_cdss/features/assessment/analysis/wound_analyzer.dart';
 import 'package:melanin_wound_cdss/features/sync/auth/auth_session.dart';
 import 'package:melanin_wound_cdss/features/sync/data/app_database.dart';
 
@@ -22,7 +23,7 @@ void main() {
     }
   }
 
-  Future<void> open(WidgetTester tester, {bool signIn = true}) async {
+  Future<void> open(WidgetTester tester, {bool signIn = true, WoundAnalyzer? analyzer}) async {
     tester.view
       ..physicalSize = const Size(1080, 2340)
       ..devicePixelRatio = 2.6;
@@ -34,6 +35,7 @@ void main() {
       api: gateway,
       browser: FakeBrowserSignIn(gateway),
       online: const Stream.empty(),
+      analyzer: analyzer,
     );
     if (signIn) await services.signIn();
     await tester.pumpWidget(
@@ -168,6 +170,28 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('a failed analysis says why on its step and saves nothing', (tester) async {
+    await open(tester, analyzer: _FailingAnalyzer());
+    await tapAndSettle(tester, find.byKey(const Key('newAssessment')));
+    await tapAndSettle(tester, find.byKey(const Key('takePhoto')));
+    await tapAndSettle(tester, find.byKey(const Key('shutter')));
+    await tapAndSettle(tester, find.byKey(const Key('useImage')));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+    }
+    expect(find.text('Not saved'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget, reason: 'calibration finished before segmentation failed');
+    expect(
+      find.text('Needs attention — Wound not found in the frame. Retake the photo.'),
+      findsOneWidget,
+      reason: 'the message sits on the segmentation step',
+    );
+    expect(await services.queue.all(), isEmpty, reason: 'nothing reaches the queue');
+    expect(gateway.storedEvents, isEmpty);
+    await close(tester);
+  });
+
   testWidgets('when the session ends, tapping the banner signs in again in place and syncs', (tester) async {
     await open(tester, signIn: false);
     await services.queue.enqueue(sampleEvent());
@@ -203,4 +227,16 @@ void main() {
     expect((await services.queue.counts()).waitingToSend, 1, reason: 'kept for the next sign-in');
     await close(tester);
   });
+}
+
+/// Gets through calibration, then can't find the wound, the way a real segmentation model might fail.
+class _FailingAnalyzer implements WoundAnalyzer {
+  @override
+  Future<Map<String, dynamic>> analyze(WoundCapture capture, {void Function(AnalysisStage stage)? onStage}) async {
+    onStage?.call(AnalysisStage.calibration);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    onStage?.call(AnalysisStage.segmentation);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    throw AnalysisFailed('Wound not found in the frame. Retake the photo.', stage: AnalysisStage.segmentation);
+  }
 }
