@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../features/assessment/analysis/wound_analyzer.dart';
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
 import '../features/sync/auth/browser_sign_in.dart';
@@ -19,10 +20,10 @@ import '../features/sync/engine/sync_scheduler.dart';
 const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://10.0.2.2:8080');
 
 /// The sync services, set up once when the app starts. To save, write to [queue] and then call
-/// [scheduler].onSaved(). Use [figures] to show guideline figures.
+/// [scheduler].onSaved(). Use [figures] to show guideline figures, and [analyzer] to analyse a captured wound.
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
-      required this.auth, required this.engine, required this.scheduler});
+      required this.auth, required this.engine, required this.scheduler, required this.analyzer});
 
   final AppDatabase db;
   final QueueRepository queue;
@@ -33,6 +34,9 @@ class AppServices {
   final SyncEngine engine;
   final SyncScheduler scheduler;
 
+  /// The on-device wound analysis. It's [SampleWoundAnalyzer] until the real pipeline from Members 1–2 is ready.
+  final WoundAnalyzer analyzer;
+
   /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
@@ -41,6 +45,7 @@ class AppServices {
     BrowserSignIn? browser,
     Stream<bool>? online,
     DateTime Function()? clock,
+    WoundAnalyzer? analyzer,
   }) async {
     final store = secrets ?? const KeystoreSecretStore();
     final database = db ??
@@ -70,7 +75,8 @@ class AppServices {
         api: client,
         auth: auth,
         engine: engine,
-        scheduler: scheduler);
+        scheduler: scheduler,
+        analyzer: analyzer ?? SampleWoundAnalyzer());
   }
 
   /// Signs in on the identity service's page with this phone's device id, and remembers who signed in

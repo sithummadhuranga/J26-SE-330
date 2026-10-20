@@ -36,37 +36,7 @@ class WoundEventValidator {
     check(event['capturedAt'] is String && _isDateTime(event['capturedAt'] as String),
         'capturedAt must be an RFC 3339 date-time with an offset');
 
-    final analytics = event['analytics'];
-    if (analytics is Map<String, dynamic>) {
-      _exactKeys(analytics, {'areaMm2', 'colourRegions', 'fitzpatrickClass', 'pipeline'}, 'analytics.', errors);
-      check(analytics['areaMm2'] is num && (analytics['areaMm2'] as num) >= 0, 'analytics.areaMm2 must be ≥ 0');
-      final regions = analytics['colourRegions'];
-      if (regions is List && regions.length <= 16) {
-        for (final (i, r) in regions.indexed) {
-          if (r is! Map<String, dynamic>) {
-            errors.add('analytics.colourRegions[$i] must be an object');
-            continue;
-          }
-          _exactKeys(r, {'cluster', 'percent'}, 'analytics.colourRegions[$i].', errors);
-          check(r['cluster'] is int && (r['cluster'] as int) >= 1, 'analytics.colourRegions[$i].cluster must be ≥ 1');
-          check(r['percent'] is num && (r['percent'] as num) >= 0 && (r['percent'] as num) <= 100,
-              'analytics.colourRegions[$i].percent must be 0–100');
-        }
-      } else {
-        errors.add('analytics.colourRegions must be a list of at most 16 regions');
-      }
-      check(fitzpatrickClasses.contains(analytics['fitzpatrickClass']), 'analytics.fitzpatrickClass must be I–VI');
-      final pipeline = analytics['pipeline'];
-      if (pipeline is Map<String, dynamic>) {
-        _exactKeys(pipeline, {'calibration', 'segmentation'}, 'analytics.pipeline.', errors);
-        check(pipeline['calibration'] is String, 'analytics.pipeline.calibration must be a string');
-        check(pipeline['segmentation'] is String, 'analytics.pipeline.segmentation must be a string');
-      } else {
-        errors.add('analytics.pipeline is required');
-      }
-    } else {
-      errors.add('analytics is required');
-    }
+    errors.addAll(validateAnalytics(event['analytics']));
 
     // The three-way answers are strict (§3, §5). A missing key is an error, not a quiet "not_recorded".
     final clinical = event['clinicalAssessment'];
@@ -81,6 +51,46 @@ class WoundEventValidator {
 
     final size = utf8.encode(jsonEncode(event)).length;
     check(size <= maxSizeBytes, 'event is $size bytes; the limit is $maxSizeBytes (analytics only, no images, §5)');
+    return errors;
+  }
+
+  /// Checks just the `analytics` part of an event: what the on-device analysis produces.
+  /// Returns any problems it found. An empty list means it's fine.
+  static List<String> validateAnalytics(Object? analytics) {
+    final errors = <String>[];
+    void check(bool ok, String message) {
+      if (!ok) errors.add(message);
+    }
+
+    if (analytics is! Map<String, dynamic>) return ['analytics is required'];
+    _exactKeys(analytics, {'areaMm2', 'colourRegions', 'fitzpatrickClass', 'pipeline'}, 'analytics.', errors);
+    check(analytics['areaMm2'] is num && (analytics['areaMm2'] as num) >= 0, 'analytics.areaMm2 must be ≥ 0');
+    final regions = analytics['colourRegions'];
+    if (regions is List && regions.length <= 16) {
+      for (final (i, r) in regions.indexed) {
+        if (r is! Map<String, dynamic>) {
+          errors.add('analytics.colourRegions[$i] must be an object');
+          continue;
+        }
+        _exactKeys(r, {'cluster', 'percent'}, 'analytics.colourRegions[$i].', errors);
+        check(r['cluster'] is int && (r['cluster'] as int) >= 1, 'analytics.colourRegions[$i].cluster must be ≥ 1');
+        check(
+          r['percent'] is num && (r['percent'] as num) >= 0 && (r['percent'] as num) <= 100,
+          'analytics.colourRegions[$i].percent must be 0–100',
+        );
+      }
+    } else {
+      errors.add('analytics.colourRegions must be a list of at most 16 regions');
+    }
+    check(fitzpatrickClasses.contains(analytics['fitzpatrickClass']), 'analytics.fitzpatrickClass must be I–VI');
+    final pipeline = analytics['pipeline'];
+    if (pipeline is Map<String, dynamic>) {
+      _exactKeys(pipeline, {'calibration', 'segmentation'}, 'analytics.pipeline.', errors);
+      check(pipeline['calibration'] is String, 'analytics.pipeline.calibration must be a string');
+      check(pipeline['segmentation'] is String, 'analytics.pipeline.segmentation must be a string');
+    } else {
+      errors.add('analytics.pipeline is required');
+    }
     return errors;
   }
 
