@@ -30,7 +30,7 @@ async function openClinicians() {
 
 const rowOf = (username: string) => screen.getByText(username).closest('tr')!;
 
-/** The row with [text], moving through the pages with the arrows (the demo admin, the oldest, is on the last). */
+/** Finds the row with [text], paging with the arrows. The demo admin is the oldest, so it's on the last page. */
 async function rowOnSomePage(user: ReturnType<typeof renderDashboard>, text: string) {
   for (;;) {
     const cell = screen.queryByText(text);
@@ -59,7 +59,7 @@ describe('clinicians (real identity service and database)', () => {
     await waitFor(() => expect(screen.getAllByRole('row')[1]).toBe(rowOf(name)), slow);
     expect(within(rowOf(name)).getByText('Wound specialist')).toBeInTheDocument();
 
-    // Saved in the database: a separate session reads it back, and the new account works.
+    // It's saved in the database. A separate session reads it back, and the new account works.
     const admin = await adminSession();
     const saved = (await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name);
     expect(saved).toMatchObject({ fullName: 'E2E Registered', role: 'wound_specialist', active: true, locked: false });

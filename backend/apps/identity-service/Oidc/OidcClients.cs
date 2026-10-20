@@ -2,26 +2,26 @@ using IdentityService.Auth;
 
 namespace IdentityService.Oidc;
 
-/// <summary>OpenID Connect settings (section "Oidc"); clients are fixed in code, their URLs come from here.</summary>
+/// <summary>OpenID Connect settings (the "Oidc" section). The clients are fixed in code, but their URLs come from here.</summary>
 public sealed class OidcOptions
 {
     /// <summary>Lets the mobile client use the password grant. For the device simulator and tests only, never production.</summary>
     public bool AllowPasswordGrant { get; set; }
 
-    /// <summary>Refuse plain HTTP. Off only for local development and CI.</summary>
+    /// <summary>Refuse plain HTTP. It's only turned off for local development and CI.</summary>
     public bool RequireHttps { get; set; } = true;
 
-    /// <summary>Where the admin dashboard receives the authorization code, e.g. http://localhost:3001/callback.</summary>
+    /// <summary>Where the admin dashboard receives the authorization code, such as http://localhost:3001/callback.</summary>
     public string[] DashboardRedirectUris { get; set; } = [];
 
-    /// <summary>Where the dashboard may send the browser after sign-out, e.g. http://localhost:3001/.</summary>
+    /// <summary>Where the dashboard is allowed to send the browser after signing out, such as http://localhost:3001/.</summary>
     public string[] DashboardPostLogoutRedirectUris { get; set; } = [];
 
     /// <summary>The app's redirect on its own URL scheme (RFC 8252 §7.1).</summary>
     public string[] MobileRedirectUris { get; set; } = ["lk.sliit.cdss:/oauth2redirect"];
 }
 
-/// <summary>One registered client. All are public clients: no secret, PKCE required.</summary>
+/// <summary>One registered client. They're all public clients, so there's no secret and PKCE is required.</summary>
 public sealed record OidcClient(string Id, string Audience, IReadOnlyList<string> RedirectUris,
     IReadOnlyList<string> PostLogoutRedirectUris, bool AllowPasswordGrant)
 {

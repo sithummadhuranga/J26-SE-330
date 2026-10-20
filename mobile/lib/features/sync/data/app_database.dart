@@ -8,21 +8,21 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-/// Keys used in the sync_state table.
+/// The keys we use in the sync_state table.
 abstract final class SyncStateKeys {
   static const serverCursor = 'server_cursor';
   static const lastSuccessAt = 'last_success_at';
   static const deviceId = 'device_id';
   static const nextAttemptAt = 'next_attempt_at';
 
-  /// Single flight across isolates (§6.2): the time until which a sync run holds the lease.
+  /// When the current sync run's lease runs out. This keeps two isolates from syncing at once (§6.2).
   static const syncLeaseUntil = 'sync_lease_until';
 
-  /// Which run holds the lease, so a run only renews or releases its own.
+  /// Which run holds the lease, so each run only renews or releases its own.
   static const syncLeaseOwner = 'sync_lease_owner';
 }
 
-/// The SQLCipher-encrypted device database; its key lives in the platform keystore.
+/// The phone's database, encrypted with SQLCipher. Its key is kept in the keystore.
 @DriftDatabase(tables: [
   WoundEventQueue,
   AssessmentLocal,
@@ -35,15 +35,16 @@ abstract final class SyncStateKeys {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
-  /// Opens or creates the encrypted database on a background isolate so the UI never blocks.
+  /// Opens the encrypted database, creating it if needed, on a background isolate so the UI never waits.
   factory AppDatabase.encrypted(File file, String hexKey) => AppDatabase(
         NativeDatabase.createInBackground(file, setup: (raw) => applyKey(raw, hexKey)),
       );
 
-  /// For tests: an in-memory database (not encrypted).
+  /// An in-memory database for tests. It isn't encrypted.
   factory AppDatabase.inMemory() => AppDatabase(NativeDatabase.memory());
 
-  /// Use the raw key, read once to fail fast, and set a busy timeout so two connections can share the file.
+  /// Sets the raw key and reads once, so a wrong key fails straight away. The busy timeout lets
+  /// two connections share the file.
   static void applyKey(sqlite.Database raw, String hexKey) {
     if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(hexKey)) {
       throw ArgumentError('The database key must be 64 lower-case hex characters (32 bytes).');
@@ -53,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
     raw.execute('PRAGMA busy_timeout = 5000');
   }
 
-  /// 2: patient_local (the Patients tab).
+  /// Version 2 added patient_local, for the Patients tab.
   @override
   int get schemaVersion => 2;
 

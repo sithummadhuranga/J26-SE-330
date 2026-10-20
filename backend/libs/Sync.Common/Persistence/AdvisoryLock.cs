@@ -2,7 +2,7 @@ using Npgsql;
 
 namespace Sync.Common.Persistence;
 
-/// <summary>Per-assessment transaction lock; always take it before any row locks to avoid deadlocks.</summary>
+/// <summary>A transaction lock for each assessment. Always take it before any row locks, to avoid deadlocks.</summary>
 public static class AdvisoryLock
 {
     public static async Task AcquireForAssessmentAsync(

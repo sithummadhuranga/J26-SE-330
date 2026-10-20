@@ -14,10 +14,12 @@ import '../features/sync/data/queue_repository.dart';
 import '../features/sync/engine/sync_engine.dart';
 import '../features/sync/engine/sync_scheduler.dart';
 
-/// Backend address, set with --dart-define=SYNC_BASE_URL=...; defaults to the emulator's host address.
+/// The backend address. Set it with --dart-define=SYNC_BASE_URL=... ; by default it points at the
+/// emulator's view of your computer.
 const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://10.0.2.2:8080');
 
-/// Sync services wired once at start-up: save with [queue], then call [scheduler].onSaved(); show figures with [figures].
+/// The sync services, set up once when the app starts. To save, write to [queue] and then call
+/// [scheduler].onSaved(). Use [figures] to show guideline figures.
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
       required this.auth, required this.engine, required this.scheduler});
@@ -31,7 +33,7 @@ class AppServices {
   final SyncEngine engine;
   final SyncScheduler scheduler;
 
-  /// Real phone setup: encrypted DB, Keystore secrets and platform connectivity; tests pass fakes.
+  /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
     SecretStore? secrets,
@@ -47,7 +49,7 @@ class AppServices {
           await DatabaseKeyStore.getOrCreate(store),
         );
     final queue = QueueRepository(database, clock: clock);
-    // A killed app leaves rows leased: they go back to pending at start (§6.2).
+    // If the app was killed mid-sync, some rows are still leased. Put them back to pending now (§6.2).
     await queue.releaseExpiredLeases();
 
     final client = api ?? HttpSyncApi(Uri.parse(syncBaseUrl));
@@ -71,8 +73,8 @@ class AppServices {
         scheduler: scheduler);
   }
 
-  /// Signs in on the identity service's page with this phone's device id, and caches who's signed in for offline
-  /// display. Throws [SignInCancelled] if the clinician closes the page.
+  /// Signs in on the identity service's page with this phone's device id, and remembers who signed in
+  /// so we can show it offline. Throws [SignInCancelled] if the clinician closes the page.
   Future<Clinician> signIn() async {
     final clinician = await auth.signIn(deviceId: await queue.deviceId());
     await db.delete(db.authLocal).go();
@@ -86,7 +88,7 @@ class AppServices {
     return clinician;
   }
 
-  /// Who was signed in last, available offline.
+  /// Who signed in last. This works offline.
   Future<AuthLocalData?> cachedClinician() => db.select(db.authLocal).getSingleOrNull();
 
   Future<void> signOut() async {

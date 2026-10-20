@@ -20,18 +20,19 @@ import 'package:path_provider/path_provider.dart';
 import '../test/sync/support/fakes.dart';
 import '../test/sync/support/password_grant_sign_in.dart';
 
-/// End-to-end offline sync test on an emulator via Toxiproxy; start the stack with `docker compose up -d` first.
+/// An end-to-end offline sync test on an emulator, going through Toxiproxy.
+/// Start the stack with `docker compose up -d` first.
 const proxyUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http://10.0.2.2:18080');
 const toxiproxyUrl = String.fromEnvironment('TOXIPROXY_URL', defaultValue: 'http://10.0.2.2:8474');
 
-/// Takes the phone's route to the gateway down or up, as walking out of Wi-Fi range would.
+/// Cuts or restores the phone's route to the gateway, like walking out of Wi-Fi range and back.
 Future<void> network({required bool up}) async {
-  // PATCH: updating a proxy with POST is deprecated in Toxiproxy.
+  // We use PATCH because Toxiproxy no longer wants POST for updating a proxy.
   final r = await http.patch(Uri.parse('$toxiproxyUrl/proxies/sync-gateway'), body: jsonEncode({'enabled': up}));
   if (r.statusCode != 200) throw StateError('Toxiproxy answered ${r.statusCode}: ${r.body}');
 }
 
-/// The real client, cutting the network right after the first push has its answer.
+/// The real client, except it cuts the network right after the first push gets its answer.
 class _CutAfterFirstPush extends HttpSyncApi {
   _CutAfterFirstPush(super.baseUri);
 
@@ -50,7 +51,7 @@ void main() {
   const secrets = KeystoreSecretStore();
   late File dbFile;
 
-  /// Opens the app's services as start-up does, on a test database file next to the app's own.
+  /// Opens the app's services the same way start-up does, but on a test database file next to the app's own.
   Future<AppServices> openApp({SyncApi? api}) async => AppServices.open(
         db: AppDatabase.encrypted(dbFile, await DatabaseKeyStore.getOrCreate(secrets)),
         secrets: secrets,
@@ -67,7 +68,7 @@ void main() {
     }
   }
 
-  /// Syncs until every row has its advice (or was superseded); the orchestrator takes a few seconds per batch.
+  /// Keeps syncing until every row has its advice or was superseded. The orchestrator takes a few seconds per batch.
   Future<void> syncUntilDone(AppServices app, int expected, {Duration timeout = const Duration(minutes: 3)}) async {
     final deadline = DateTime.now().add(timeout);
     while (true) {
@@ -96,7 +97,8 @@ void main() {
     expect(offline.outcome, SyncOutcome.offline, reason: '$offline');
     expect((await app.queue.counts()).of(QueueStatus.pending), 3);
 
-    // Killed: the access token (memory only) is gone; the queue file and the Keystore session remain.
+    // The app was killed, so the access token (kept only in memory) is gone.
+    // The queue file and the Keystore session are still there.
     await app.close();
     app = await openApp();
     expect((await app.queue.counts()).of(QueueStatus.pending), 3, reason: 'the encrypted queue survived');
@@ -175,7 +177,8 @@ void main() {
         'p99FrameMs': p99,
         'framesOver16ms': spans.where((s) => s > 16.7).length,
         'framesOver200ms': spans.where((s) => s > 200).length,
-        // Frame time split into the UI thread (ours) and the raster thread (GPU, slow on emulators).
+        // Frame time is split into the UI thread (our code) and the raster thread
+        // (the GPU, which is slow on emulators).
         'worstBuildMs': timings.map((t) => t.buildDuration.inMicroseconds / 1000).reduce((a, b) => a > b ? a : b),
         'worstRasterMs': timings.map((t) => t.rasterDuration.inMicroseconds / 1000).reduce((a, b) => a > b ? a : b),
       },

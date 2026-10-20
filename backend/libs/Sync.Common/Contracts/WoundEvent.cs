@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Sync.Common.Contracts;
 
-/// <summary>C# version of the wound-event schema; the JSON schema is the source of truth.</summary>
+/// <summary>The C# version of the wound-event schema. The JSON schema is the real source of truth.</summary>
 public sealed record WoundEvent(
     string SchemaVersion,
     Guid EventId,
@@ -37,12 +37,12 @@ public sealed record ColourRegion(int Cluster, double Percent);
 
 public sealed record PipelineVersions(string Calibration, string Segmentation);
 
-/// <summary>Every field is required. A missing key is a validation failure, never a default.</summary>
+/// <summary>Every field is required. A missing key fails validation; it never falls back to a default.</summary>
 public sealed record ClinicalAssessment(
     TriState PedalPulses,
     TriState ProtectiveSensation);
 
-/// <summary>Present / absent / not_recorded, so "unrecorded" never turns into "no".</summary>
+/// <summary>Present, absent or not_recorded, so "not recorded" never turns into "no".</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<TriState>))]
 public enum TriState
 {

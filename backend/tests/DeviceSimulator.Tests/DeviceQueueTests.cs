@@ -3,7 +3,7 @@ using DeviceSimulator;
 
 namespace DeviceSimulator.Tests;
 
-/// <summary>The simulated device follows the §6 queue rules the real app must follow.</summary>
+/// <summary>The simulated device follows the same §6 queue rules the real app has to follow.</summary>
 public class DeviceQueueTests
 {
     private sealed class ManualClock : TimeProvider
@@ -133,7 +133,7 @@ public class BackoffTests
     [Fact]
     public void Starts_at_two_seconds_doubles_and_caps_at_five_minutes()
     {
-        // Random that always returns its maximum shows the ceiling of each full-jitter draw.
+        // A Random that always returns its maximum shows the upper limit of each full-jitter draw.
         var backoff = new Backoff(new MaxRandom());
         var ceilings = Enumerable.Range(0, 12).Select(_ => backoff.NextDelay().TotalSeconds).ToList();
 

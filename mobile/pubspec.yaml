@@ -33,7 +33,7 @@ dev_dependencies:
   drift_dev: ^2.35.1
   build_runner: ^2.16.1
 
-# package:sqlite3 bundles SQLCipher so the Drift queue is encrypted at rest.
+# package:sqlite3 bundles SQLCipher, so the Drift queue is encrypted on the phone.
 hooks:
   user_defines:
     sqlite3:
@@ -41,7 +41,8 @@ hooks:
 
 flutter:
   uses-material-design: true
-  # Inter (SIL Open Font License, assets/fonts/inter/LICENSE.txt), bundled so the app needs no network for fonts.
+  # The Inter font (SIL Open Font License, assets/fonts/inter/LICENSE.txt), bundled so the app doesn't need the
+  # network for fonts.
   fonts:
     - family: Inter
       fonts:

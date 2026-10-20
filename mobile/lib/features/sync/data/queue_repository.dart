@@ -9,7 +9,7 @@ import '../domain/wound_event_validator.dart';
 import 'app_database.dart';
 import 'tables.dart';
 
-/// Thrown by [QueueRepository.enqueue] when the event breaks the contract; nothing was stored.
+/// Thrown by [QueueRepository.enqueue] when an event doesn't match the contract. Nothing gets stored.
 class EnqueueRejected implements Exception {
   EnqueueRejected(this.errors);
 
@@ -19,7 +19,7 @@ class EnqueueRejected implements Exception {
   String toString() => 'EnqueueRejected: ${errors.join('; ')}';
 }
 
-/// Counts per status, for the sync screen.
+/// How many events are in each status, shown on the sync screen.
 class QueueCounts {
   const QueueCounts(this.byStatus);
 
@@ -30,23 +30,25 @@ class QueueCounts {
   int get total => byStatus.values.fold(0, (a, b) => a + b);
 }
 
-/// The only way an assessment leaves the device; every method is a single transaction.
+/// This is the only way an assessment leaves the phone. Every method runs as one transaction.
 class QueueRepository {
   QueueRepository(this._db, {DateTime Function()? clock}) : _now = clock ?? DateTime.now;
 
   final AppDatabase _db;
   final DateTime Function() _now;
 
-  /// §6.2: rows sent are leased for about two minutes; a lapsed lease returns them to pending.
+  /// Rows being sent are leased for about two minutes. If the lease runs out, they go back to pending
+  /// (architecture §6.2).
   static const lease = Duration(minutes: 2);
 
-  /// §6.2: up to 50 events or 256 KB per request.
+  /// We send at most 50 events or 256 KB in one request (architecture §6.2).
   static const maxBatchEvents = 50;
   static const maxBatchBytes = 256 * 1024;
 
   // ---- writing the queue ------------------------------------------------------------------------------------------
 
-  /// Validates the event (§5) and stores it as pending. Commits before returning, so the UI may say "saved".
+  /// Checks the event against the contract (§5) and stores it as pending. It's committed before this returns,
+  /// so the UI can safely tell the clinician it was saved.
   Future<QueuedEvent> enqueue(Map<String, dynamic> event) async {
     final errors = WoundEventValidator.validate(event);
     if (errors.isNotEmpty) throw EnqueueRejected(errors);
@@ -68,7 +70,7 @@ class QueueRepository {
     });
   }
 
-  /// The local read model (§6): latest revision per assessment, for reviewing history offline.
+  /// Keeps the latest revision of each assessment so history can be browsed offline (architecture §6).
   Future<void> _upsertAssessment(Map<String, dynamic> event) async {
     final assessmentId = event['assessmentId'] as String;
     final revision = event['revision'] as int;
@@ -87,12 +89,13 @@ class QueueRepository {
         AssessmentLocalCompanion.insert(assessmentId: assessmentId, latestRevision: revision, summaryJson: summary));
   }
 
-  /// Puts rows with expired leases back to pending (e.g. after the app was killed mid-sync).
+  /// Puts rows whose lease has expired back to pending, for example after the app was killed mid-sync.
   Future<int> releaseExpiredLeases() => (_db.update(_db.woundEventQueue)
         ..where((q) => q.status.equalsValue(QueueStatus.inFlight) & q.leaseExpiresAt.isSmallerOrEqualValue(_now())))
       .write(const WoundEventQueueCompanion(status: Value(QueueStatus.pending), leaseExpiresAt: Value(null)));
 
-  /// Takes the next batch, oldest first, within 50 events / 256 KB (at least one event), and leases it.
+  /// Picks the next batch, oldest first, and leases it. A batch stays within 50 events and 256 KB,
+  /// but always holds at least one event.
   Future<List<QueuedEvent>> leaseBatch({int maxEvents = maxBatchEvents}) => _db.transaction(() async {
         final now = _now();
         final candidates = await (_db.select(_db.woundEventQueue)
@@ -123,18 +126,19 @@ class QueueRepository {
         return leased;
       });
 
-  /// A push that failed or got no answer: its rows go back to pending (§7.1: 429, 503, timeout, no response).
+  /// Called when a push failed or got no answer (429, 503, a timeout or silence). Its rows go back to pending (§7.1).
   Future<void> release(Iterable<String> eventIds, String error) => (_db.update(_db.woundEventQueue)
         ..where((q) => q.eventId.isIn(eventIds) & q.status.equalsValue(QueueStatus.inFlight)))
       .write(WoundEventQueueCompanion(
           status: const Value(QueueStatus.pending), leaseExpiresAt: const Value(null), lastError: Value(error)));
 
-  /// Applies the per-event results of a push (§7.1). DUPLICATE is ACCEPTED; REJECTED is final.
+  /// Records what the server said about each event in a push (§7.1). A DUPLICATE counts as accepted,
+  /// and a REJECTED event stays rejected.
   Future<void> applyPushResults(List<PushEventResult> results) => _db.transaction(() async {
         final now = _now();
         for (final r in results) {
           if (r.status == 'ACCEPTED' || r.status == 'DUPLICATE') {
-            // Never move a record backwards: a pulled change may already have taken it further.
+            // Don't move a record backwards. A pulled change may already have moved it further along.
             await (_db.update(_db.woundEventQueue)
                   ..where((q) =>
                       q.eventId.equals(r.eventId) &
@@ -147,13 +151,13 @@ class QueueRepository {
         }
       });
 
-  /// Marks events rejected: shown to the clinician, never retried automatically (§6.1).
+  /// Marks events as rejected. The clinician sees them, and we never retry them automatically (§6.1).
   Future<void> reject(Iterable<String> eventIds, String code) => (_db.update(_db.woundEventQueue)
         ..where((q) => q.eventId.isIn(eventIds)))
       .write(WoundEventQueueCompanion(
           status: const Value(QueueStatus.rejected), leaseExpiresAt: const Value(null), lastError: Value(code)));
 
-  /// Applies one pull page and saves the cursor in the same transaction.
+  /// Applies one page from a pull and saves the cursor in the same transaction.
   Future<void> applyPullPage(PullPage page) => _db.transaction(() async {
         final now = _now();
         for (final c in page.changes) {
@@ -161,7 +165,7 @@ class QueueRepository {
             ..where((q) => q.assessmentId.equals(c.assessmentId) & q.revision.equals(c.revision)));
           switch (c.type) {
             case 'PERSISTED':
-              // Stored on the server: proof the push landed even if its response was lost.
+              // The server has stored it, so the push got through even if we never saw its response.
               await (_db.update(_db.woundEventQueue)
                     ..where((q) =>
                         q.assessmentId.equals(c.assessmentId) &
@@ -182,7 +186,8 @@ class QueueRepository {
                       leaseExpiresAt: const Value(null),
                       ackedAt: Value(now)));
             case 'RECOMMENDATION_READY':
-              // Facility-scoped: advice for another phone's assessment is kept too, for the shared ward view.
+              // Changes are shared across the facility, so we also keep advice for other phones' assessments.
+              // That gives everyone on the ward the same view.
               if (c.recommendationJson case final payload?) {
                 await _db.into(_db.recommendationLocal).insertOnConflictUpdate(RecommendationLocalCompanion.insert(
                     assessmentId: c.assessmentId,
@@ -248,10 +253,11 @@ class QueueRepository {
         ..limit(limit))
       .get);
 
-  /// Throttles how often screens see queue changes so a sync doesn't blow the frame budget.
+  /// Limits how often screens hear about queue changes, so a busy sync doesn't make the UI stutter.
   static const uiRefresh = Duration(milliseconds: 300);
 
-  /// Runs [load] now and again after queue changes, at most once per [uiRefresh], one query at a time.
+  /// Runs [load] now and again whenever the queue changes. It runs at most once per [uiRefresh],
+  /// and never two queries at the same time.
   Stream<T> _watchQueue<T>(Future<T> Function() load) {
     late final StreamController<T> controller;
     StreamSubscription<void>? updates;
@@ -305,7 +311,8 @@ class QueueRepository {
 
   Future<int> cursor() async => int.tryParse(await getState(SyncStateKeys.serverCursor) ?? '') ?? 0;
 
-  /// This phone's id, created on first use and kept for the life of the install (§7.1: the gateway binds tokens to it).
+  /// This phone's id. It's created the first time it's needed and kept until the app is uninstalled.
+  /// The gateway ties each token to it (§7.1).
   Future<String> deviceId() async {
     final existing = await getState(SyncStateKeys.deviceId);
     if (existing != null) return existing;
@@ -320,7 +327,7 @@ class QueueRepository {
   Future<void> setState(String key, String value) =>
       _db.into(_db.syncState).insertOnConflictUpdate(SyncStateCompanion.insert(key: key, value: value));
 
-  /// Takes the database sync lease for [owner] unless another run holds a live one.
+  /// Takes the sync lease in the database for [owner], unless another run still holds it.
   Future<bool> tryAcquireSyncLease(Duration duration, {String owner = ''}) => _db.transaction(() async {
         final now = _now();
         final until = DateTime.tryParse(await getState(SyncStateKeys.syncLeaseUntil) ?? '');
@@ -330,14 +337,14 @@ class QueueRepository {
         return true;
       });
 
-  /// Extends [owner]'s lease; false if another run took it over, in which case the caller must stop.
+  /// Extends [owner]'s lease. Returns false if another run has taken it over, and then the caller must stop.
   Future<bool> renewSyncLease(Duration duration, {String owner = ''}) => _db.transaction(() async {
         if (await getState(SyncStateKeys.syncLeaseOwner) != owner) return false;
         await setState(SyncStateKeys.syncLeaseUntil, _now().add(duration).toIso8601String());
         return true;
       });
 
-  /// Frees the lease, unless another run has taken it since.
+  /// Lets go of the lease, unless another run has taken it in the meantime.
   Future<void> releaseSyncLease({String owner = ''}) => _db.transaction(() async {
         if (await getState(SyncStateKeys.syncLeaseOwner) != owner) return;
         await setState(SyncStateKeys.syncLeaseUntil, '');

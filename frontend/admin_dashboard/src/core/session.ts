@@ -3,7 +3,7 @@ import { redirectUri as defaultRedirectUri } from './config';
 import type { TokenPair } from './models';
 import type { TokenStore } from './tokenStore';
 
-/** No usable session: the admin has to sign in again. */
+/** There's no usable session, so the admin has to sign in again. */
 export class NeedsSignIn extends Error {
   readonly reason: string;
 
@@ -14,7 +14,7 @@ export class NeedsSignIn extends Error {
   }
 }
 
-/** The signed-in admin, read from the tokens (for display; the backend checks them). */
+/** The signed-in admin, read from the tokens. It's only for display, since the backend does the real checking. */
 /** How you ended your own session from My account. */
 export type EndedHere = 'passwordChanged' | 'sessionsEnded';
 
@@ -27,15 +27,16 @@ export interface Admin {
 
 const refreshKey = 'cdss_admin_refresh_v1';
 const usernameKey = 'cdss_admin_username_v1';
-/** The PKCE verifier and state of a sign-in in progress; they must survive the trip to the login page. */
+/** The PKCE verifier and state of a sign-in in progress. They have to survive the trip to the login page and back. */
 const pendingKey = 'cdss_admin_pending_v1';
 
-/** Refresh a little before expiry so a request never leaves with a token about to lapse. */
+/** We refresh a little early so a request never goes out with a token that's about to expire. */
 export const refreshMarginMs = 60_000;
 
 /**
- * Keeps the admin signed in through the identity service's OpenID Connect login (ADR 0006): authorization code with
- * PKCE, access token in memory, refresh token in the tab's session storage.
+ * Keeps the admin signed in through the identity service's OpenID Connect login (ADR 0006). It uses the
+ * authorization code flow with PKCE, keeps the access token in memory and the refresh token in the tab's
+ * session storage.
  */
 export class AuthSession {
   readonly api: AdminApi;
@@ -94,7 +95,7 @@ export class AuthSession {
     return failure;
   }
 
-  /** After a reload, swap the refresh token for a new access token; false if there's no session. */
+  /** After a reload, swaps the refresh token for a new access token. Returns false if there's no session. */
   async restore(): Promise<boolean> {
     if (this.store.read(refreshKey) === null) return false;
     try {
@@ -106,7 +107,7 @@ export class AuthSession {
     }
   }
 
-  /** Starts a sign-in: returns the identity service's login page URL for the browser to open. */
+  /** Starts a sign-in and returns the URL of the identity service's login page for the browser to open. */
   async beginSignIn(): Promise<string> {
     const verifier = randomUrlSafe(48);
     const state = randomUrlSafe(16);
@@ -116,7 +117,7 @@ export class AuthSession {
 
   /**
    * Finishes a sign-in from the URL the identity service sent the browser back to (/callback?code=…&state=…).
-   * Throws NeedsSignIn when it is not the answer to this tab's own request, or the server refused.
+   * Throws NeedsSignIn if it isn't the answer to this tab's own request, or if the server said no.
    */
   async completeSignIn(callbackUrl: string): Promise<Admin> {
     try {
@@ -145,7 +146,7 @@ export class AuthSession {
     }
   }
 
-  /** Runs an admin call, refreshing once on a 401; throws NeedsSignIn if that fails too. */
+  /** Runs an admin call. On a 401 it refreshes once and tries again, and throws NeedsSignIn if that fails too. */
   async authorized<T>(call: (accessToken: string) => Promise<T>): Promise<T> {
     try {
       return await call(await this.validAccessToken());
@@ -155,7 +156,7 @@ export class AuthSession {
     }
   }
 
-  /** Rotates both tokens, sharing one request between concurrent callers. */
+  /** Swaps both tokens for new ones. If several callers ask at once, they share one request. */
   refresh(): Promise<string> {
     this.refreshing ??= this.doRefresh().finally(() => {
       this.refreshing = null;
@@ -164,8 +165,8 @@ export class AuthSession {
   }
 
   /**
-   * After you changed your password or ended all your sessions: the server has already ended every session, this one
-   * included, so end it here too without calling the server, and tell the sign-in screen why.
+   * Used after you change your password or end all your sessions. The server has already ended every session,
+   * including this one, so we end it here too without calling the server, and tell the sign-in screen why.
    */
   endHere(reason: EndedHere): void {
     this.endedHere = reason;
@@ -178,7 +179,7 @@ export class AuthSession {
       try {
         await this.api.logout(refreshToken);
       } catch {
-        // The local session ends anyway; the server-side one expires on its own.
+        // The session here ends anyway, and the server's copy will expire on its own.
       }
     }
     this.clear();
@@ -200,7 +201,8 @@ export class AuthSession {
       this.accept(tokens);
       return tokens.accessToken;
     } catch (e) {
-      // invalid_grant: expired, signed out elsewhere, deactivated, or already rotated. Only a new sign-in helps.
+      // invalid_grant means the token expired, was signed out elsewhere, the account was deactivated, or the
+      // token was already used. Only a fresh sign-in can fix that.
       if (e instanceof ApiError && (e.code === 'invalid_grant' || e.status === 401)) {
         this.ended = this.signedIn;
         this.clear();
@@ -269,7 +271,7 @@ export async function sha256UrlSafe(text: string): Promise<string> {
   return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))));
 }
 
-/** Reads the token's contents for display only; the backend is the one that checks it's genuine. */
+/** Reads what's inside the token, only for display. The backend is the one that checks it's genuine. */
 function readClaims(jwt: string): Record<string, unknown> {
   const parts = jwt.split('.');
   if (parts.length !== 3 || !parts[1]) return {};

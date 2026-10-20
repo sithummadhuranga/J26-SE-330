@@ -1,4 +1,5 @@
-"""DISRUPTIVE: the orchestrator stores exactly one recommendation and routes failures to retry or DLQ (local Docker only)."""
+"""DISRUPTIVE: checks the orchestrator stores exactly one recommendation and sends failures to retry or the DLQ.
+Local Docker only."""
 import os
 import secrets
 import subprocess
@@ -23,7 +24,7 @@ def kafka(*args, timeout=60):
 
 
 def stub(mode="none", delay_ms="0"):
-    """Recreates the rag-stub with a failure mode (§13.1 fault injection) and waits until it answers."""
+    """Recreates the rag-stub with a failure mode (§13.1 fault injection) and waits until it's answering."""
     compose("up", "-d", "--no-deps", "--force-recreate", "rag-stub", env={"STUB_FAIL_MODE": mode, "STUB_DELAY_MS": delay_ms})
     wait(lambda: subprocess.run(["curl", "-s", "-o", os.devnull, "-w", "%{http_code}", "http://localhost:5080/health"],
                                 capture_output=True, text=True).stdout == "200", 60)
@@ -119,7 +120,7 @@ try:
     # --------------------------------------------------------------------------------------------------------
     print("\n§11: replaying wound-events.persisted stores nothing twice")
     time.sleep(3)
-    # Only check events that already had an answer; unfinished ones can legitimately complete on replay.
+    # Only check events that already had an answer. Unfinished ones are allowed to complete during the replay.
     cutoff = one("select now()")
     answered = f"(select event_id from audit.provenance where stage = 'RAG_RETURNED' and recorded_at < '{cutoff}')"
     rag_before = one(f"select count(*) from audit.provenance where stage = 'RAG_RETURNED' and event_id in {answered}")

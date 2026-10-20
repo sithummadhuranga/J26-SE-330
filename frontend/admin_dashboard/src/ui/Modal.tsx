@@ -4,8 +4,8 @@ const focusable =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * A centered dialog over a dimmed page; Escape closes it unless it's busy. Keyboard focus stays inside while it is
- * open (Tab wraps around) and goes back to whatever opened it when it closes.
+ * A centred dialog over a dimmed page. Escape closes it unless it's busy. While it's open, keyboard focus stays
+ * inside (Tab wraps around), and when it closes, focus goes back to whatever opened it.
  */
 export function Modal({
   title,

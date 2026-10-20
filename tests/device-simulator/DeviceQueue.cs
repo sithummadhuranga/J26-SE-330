@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace DeviceSimulator;
 
-/// <summary>Record status on the device (architecture §6.1).</summary>
+/// <summary>A record's status on the phone (architecture §6.1).</summary>
 public enum RecordStatus
 {
     Pending,
@@ -35,7 +35,7 @@ public sealed class QueuedEvent(JsonObject payload)
     public bool IsFinal => Status is RecordStatus.Rejected or RecordStatus.Complete or RecordStatus.Superseded;
 }
 
-/// <summary>Thread-safe offline queue where leased rows go back to pending if the lease lapses.</summary>
+/// <summary>A thread-safe offline queue. Leased rows go back to pending if the lease runs out.</summary>
 public sealed class DeviceQueue(TimeProvider clock)
 {
     public static readonly TimeSpan Lease = TimeSpan.FromMinutes(2);
@@ -57,7 +57,7 @@ public sealed class DeviceQueue(TimeProvider clock)
         return row;
     }
 
-    /// <summary>Leases the next batch (oldest first, ≤ 50 events, ≤ 256 KB); expired leases count as PENDING.</summary>
+    /// <summary>Leases the next batch, oldest first, with at most 50 events and 256 KB. Expired leases count as PENDING.</summary>
     public IReadOnlyList<QueuedEvent> LeaseBatch(int maxEvents = MaxBatchEvents)
     {
         var now = clock.GetUtcNow();
@@ -84,7 +84,7 @@ public sealed class DeviceQueue(TimeProvider clock)
         }
     }
 
-    /// <summary>A failed or unanswered push: the rows go back to PENDING. Safe because every event is idempotent.</summary>
+    /// <summary>For a push that failed or got no answer. The rows go back to PENDING, which is safe because sending an event twice does no harm.</summary>
     public void Release(IEnumerable<QueuedEvent> rows, string error)
     {
         lock (_lock)
@@ -96,7 +96,7 @@ public sealed class DeviceQueue(TimeProvider clock)
             }
     }
 
-    /// <summary>Applies one per-event push result (§7.1). DUPLICATE is treated exactly like ACCEPTED.</summary>
+    /// <summary>Applies the push result for one event (§7.1). DUPLICATE is treated just like ACCEPTED.</summary>
     public void ApplyPushResult(QueuedEvent row, string status, string? code)
     {
         lock (_lock)
@@ -115,7 +115,7 @@ public sealed class DeviceQueue(TimeProvider clock)
         }
     }
 
-    /// <summary>Applies one pulled change by (assessmentId, revision); idempotent, so repeats are harmless.</summary>
+    /// <summary>Applies one pulled change by (assessmentId, revision). Getting the same change twice does no harm.</summary>
     public void ApplyChange(Guid assessmentId, int revision, string type)
     {
         lock (_lock)

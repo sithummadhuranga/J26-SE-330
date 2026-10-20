@@ -1,4 +1,4 @@
-// Recommendation Service (Member 3, IT23294202): placeholder so the solution builds.
+// The Recommendation Service (Member 3, IT23294202). For now it's just a placeholder so the solution builds.
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 

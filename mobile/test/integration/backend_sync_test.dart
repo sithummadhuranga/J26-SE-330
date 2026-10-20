@@ -16,7 +16,8 @@ import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 import '../sync/support/fakes.dart';
 import '../sync/support/password_grant_sign_in.dart';
 
-/// Real engine against the real backend; runs only with SYNC_BACKEND_URL set (flutter test --tags integration).
+/// The real engine against the real backend. It only runs when SYNC_BACKEND_URL is set
+/// (flutter test --tags integration).
 void main() {
   final url = Platform.environment['SYNC_BACKEND_URL'];
 
@@ -33,7 +34,7 @@ void main() {
     final clinician = await auth.signIn(deviceId: deviceId);
     expect(clinician.facilityId, 'fac-001');
 
-    // Fresh phone at cursor 0 with tiny pages so the paging path always runs.
+    // A brand new phone at cursor 0, with tiny pages so the paging code always gets exercised.
     expect(await queue.cursor(), 0);
 
     final first = sampleEvent(deviceId: deviceId);
@@ -47,7 +48,7 @@ void main() {
     expect(pushed.accepted, 3);
     expect(await queue.cursor(), greaterThan(0), reason: 'pulled the history');
 
-    // Advice arrives through the orchestrator; pull until every record is final.
+    // Advice comes back through the orchestrator, so keep pulling until every record is final.
     for (var i = 0; i < 30 && (await queue.counts()).of(QueueStatus.complete) + (await queue.counts()).of(QueueStatus.superseded) < 3; i++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       await engine.sync(force: true);
@@ -59,7 +60,8 @@ void main() {
     expect(await queue.recommendationFor(first['assessmentId'] as String, 2), isNotNull);
     expect(api.pagesWithMore, greaterThan(0), reason: 'a pull needed more than one page and followed hasMore');
 
-    // A guideline figure through the gateway's figures proxy (§10.4; the stub serves F1-F3), cached with its license.
+    // Fetch a guideline figure through the gateway's figures proxy and cache it with its license (§10.4).
+    // The stub serves F1 to F3.
     final figures = FigureRepository(db, api, auth);
     final figure = await figures.figureFor('iwgdf-2023.r1', 'F1');
     expect(figure.isFound, isTrue, reason: '${figure.miss}');
@@ -76,7 +78,8 @@ void main() {
      timeout: const Timeout(Duration(minutes: 3)));
 }
 
-/// Gateway client with tiny first pages to exercise paging, then normal pages to stay under the rate limit.
+/// A gateway client that asks for tiny pages at first to exercise paging,
+/// then normal ones to stay under the rate limit.
 class _SmallPagesApi extends HttpSyncApi {
   _SmallPagesApi(super.baseUri);
 

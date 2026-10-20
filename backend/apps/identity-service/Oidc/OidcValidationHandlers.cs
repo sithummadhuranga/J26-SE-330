@@ -7,8 +7,9 @@ using static OpenIddict.Server.OpenIddictServerEvents;
 namespace IdentityService.Oidc;
 
 /// <summary>
-/// In degraded mode OpenIddict has no client store, so these handlers do the client checks: known client, no secret
-/// (every client is public), exact redirect URIs, PKCE S256, allowed grants and the mobile app's device_id.
+/// In degraded mode OpenIddict has no client store, so these handlers check the client themselves: it has to be a
+/// known client with no secret (every client is public), exact redirect URIs, PKCE S256, an allowed grant, and the
+/// mobile app's device_id.
 /// </summary>
 public static class OidcValidationHandlers
 {
@@ -24,11 +25,11 @@ public static class OidcValidationHandlers
         options.AddEventHandler<HandleRevocationRequestContext>(b => b.UseSingletonHandler<EndRevokedSession>());
     }
 
-    /// <summary>The device id the mobile app sends; null when absent or blank.</summary>
+    /// <summary>The device id the mobile app sends, or null if it's missing or blank.</summary>
     public static string? DeviceId(OpenIddictRequest request) =>
         (string?)request[DeviceIdParameter] is { } id && !string.IsNullOrWhiteSpace(id) ? id : null;
 
-    /// <summary>Mobile must name its device (up to 64 characters); the dashboard must not send one.</summary>
+    /// <summary>The mobile app has to name its device (up to 64 characters), and the dashboard mustn't send one.</summary>
     public static string? DeviceProblem(OidcClient client, OpenIddictRequest request)
     {
         var deviceId = DeviceId(request);
@@ -49,7 +50,8 @@ public static class OidcValidationHandlers
                 return default;
             }
 
-            // Exact match only. Until it passes, errors are shown on our page rather than sent to a URI we haven't checked.
+            // Only an exact match counts. Until it passes, errors show on our page instead of going to a URI we haven't
+            // checked.
             if (context.RedirectUri is null || !client.RedirectUris.Contains(context.RedirectUri, StringComparer.Ordinal))
             {
                 context.Reject(Errors.InvalidRequest, "The redirect_uri is not registered for this client.");
@@ -101,7 +103,8 @@ public static class OidcValidationHandlers
         {
             if (context.PostLogoutRedirectUri is not { } uri) return default;
 
-            // With client_id, only that client's URIs; without, any registered one (the URI itself must match exactly).
+            // With a client_id, only that client's URIs count. Without one, any registered URI does, as long as it
+            // matches exactly.
             var allowed = context.ClientId is { } id
                 ? clients.Find(id)?.PostLogoutRedirectUris ?? []
                 : clients.All.SelectMany(c => c.PostLogoutRedirectUris);
@@ -121,7 +124,7 @@ public static class OidcValidationHandlers
         }
     }
 
-    /// <summary>Revoking a refresh token ends its session row, so it (and anything rotated from it) stops working.</summary>
+    /// <summary>Revoking a refresh token ends its session row, so it stops working, along with anything rotated from it.</summary>
     public sealed class EndRevokedSession(SessionStore sessions) : IOpenIddictServerHandler<HandleRevocationRequestContext>
     {
         public async ValueTask HandleAsync(HandleRevocationRequestContext context)

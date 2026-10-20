@@ -2,9 +2,9 @@ using System.Text.Json;
 
 namespace Sync.Common.Contracts;
 
-// C# version of the RAG request/response schemas; the JSON schemas are the source of truth.
+// The C# version of the RAG request and response schemas. The JSON schemas are the real source of truth.
 
-/// <summary>POST /v1/recommendations body. Carries no identifiers: CaseId is the assessment id.</summary>
+/// <summary>The body of POST /v1/recommendations. It carries no identifiers; CaseId is just the assessment id.</summary>
 public sealed record RecommendationRequest(
     string ContractVersion,
     Guid CaseId,
@@ -18,12 +18,12 @@ public sealed record RecommendationRequest(
     public const string CurrentContractVersion = "1.0";
 }
 
-/// <summary>Wound analytics without fitzpatrickClass (data minimization, §10.2).</summary>
+/// <summary>Wound analytics without fitzpatrickClass, to send no more data than needed (§10.2).</summary>
 public sealed record RagWoundAnalytics(double AreaMm2, IReadOnlyList<ColourRegion> ColourRegions, PipelineVersions Pipeline);
 
 public sealed record HealingHistoryPoint(DateTimeOffset CapturedAt, double AreaMm2, PipelineVersions Pipeline);
 
-/// <summary>200 response; only fields we use are typed, the full JSON is stored and sent to the device as-is.</summary>
+/// <summary>The 200 response. Only the fields we use are typed; the full JSON is stored and sent to the phone as it is.</summary>
 public sealed record RecommendationResponse(
     string ContractVersion,
     Guid CaseId,

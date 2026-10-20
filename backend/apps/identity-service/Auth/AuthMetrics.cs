@@ -3,18 +3,18 @@ using Sync.Common.Telemetry;
 
 namespace IdentityService.Auth;
 
-/// <summary>Auth health metrics: login failures, lockouts and session lifetimes for Prometheus.</summary>
+/// <summary>Auth health metrics for Prometheus: login failures, lockouts and how long sessions last.</summary>
 public static class AuthMetrics
 {
     private static readonly Meter Meter = new(SyncMetrics.MeterName);
 
-    /// <summary>One per audit.auth_audit row, with the same action, success and reason code.</summary>
+    /// <summary>Counted once for every audit.auth_audit row, with the same action, success and reason code.</summary>
     public static readonly Counter<long> Events =
         Meter.CreateCounter<long>("auth.events", "{event}", "Auth audit events by action, success and reason");
 
     private static volatile AuthHealthSnapshot _snapshot = AuthHealthSnapshot.Empty;
 
-    /// <summary>Replaced by <see cref="AuthHealthSampler"/> once a minute; the gauges below read the latest.</summary>
+    /// <summary><see cref="AuthHealthSampler"/> replaces this once a minute, and the gauges below read the latest one.</summary>
     public static AuthHealthSnapshot Snapshot
     {
         get => _snapshot;

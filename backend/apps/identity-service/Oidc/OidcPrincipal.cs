@@ -9,17 +9,17 @@ namespace IdentityService.Oidc;
 /// <summary>Builds the identity OpenIddict turns into tokens, with the same access-token claims as before (§7.3).</summary>
 public static class OidcPrincipal
 {
-    /// <summary>Private: the clinical.clinician_session row a refresh token continues. Never leaves the server.</summary>
+    /// <summary>Private. The clinical.clinician_session row that a refresh token carries on. It never leaves the server.</summary>
     public const string SessionIdClaim = "cdss_sid";
 
-    /// <summary>Private: makes each authorization code single use (clinical.oidc_code_redemption).</summary>
+    /// <summary>Private. Makes sure each authorization code can only be used once (clinical.oidc_code_redemption).</summary>
     public const string CodeIdClaim = "cdss_code";
 
     public const string UsernameClaim = "preferred_username";
 
     public static readonly TimeSpan AuthorizationCodeLifetime = TimeSpan.FromMinutes(5);
 
-    /// <param name="sessionId">Null in the authorization code; the session only starts when the code is redeemed.</param>
+    /// <param name="sessionId">Null in the authorization code, because the session only starts when the code is redeemed.</param>
     public static ClaimsPrincipal Create(VerifiedClinician clinician, OidcClient client, IEnumerable<string> scopes,
         Guid? sessionId, TimeSpan refreshLifetime)
     {

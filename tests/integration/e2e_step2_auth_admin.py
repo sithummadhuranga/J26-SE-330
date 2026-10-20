@@ -1,4 +1,5 @@
-"""Clinician registration, login, MFA, admin actions and the auth audit trail end to end; safe to re-run."""
+"""Clinician registration, login, MFA, admin actions and the auth audit trail, from start to finish.
+Safe to run again."""
 import secrets
 import sys
 import time

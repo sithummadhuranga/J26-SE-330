@@ -1,4 +1,5 @@
-"""Drives known login traffic and checks the auth-health metrics and Prometheus series (run while nobody else logs in)."""
+"""Sends a known set of logins and checks the auth-health metrics and Prometheus series.
+Run it while nobody else is signing in."""
 import json
 import os
 import secrets

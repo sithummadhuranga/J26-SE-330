@@ -14,11 +14,11 @@ public static class PushEndpoint
             var tokenFacility = http.User.FindFirst(ClaimNames.FacilityId)?.Value;
             if (tokenDevice is null || tokenFacility is null) return Results.Unauthorized();
 
-            // One device cannot submit as another.
+            // One device can't submit as another.
             if (request.DeviceId != tokenDevice)
                 return Results.Json(new { code = "DEVICE_MISMATCH" }, statusCode: StatusCodes.Status403Forbidden);
 
-            // 413 tells the device to split the batch and retry.
+            // A 413 tells the phone to split the batch and try again.
             if (request.Events is null || request.Events.Count == 0)
                 return Results.BadRequest(new { code = "EMPTY_BATCH" });
             if (request.Events.Count > PushService.MaxEventsPerBatch)

@@ -5,7 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace IdentityService.Auth;
 
-/// <summary>Who a session is for: mobile (tied to a device) or dashboard (admins only, no device).</summary>
+/// <summary>Who a session is for: mobile, which is tied to a device, or the dashboard, which is admins only with no device.</summary>
 public static class Clients
 {
     public const string Mobile = "mobile";
@@ -22,10 +22,10 @@ public sealed class JwtOptions
     public int AccessTokenMinutes { get; set; } = 15;
     public int RefreshTokenDays { get; set; } = 30;
 
-    /// <summary>Audience for dashboard tokens; the Sync Gateway rejects it, so they can't touch patient data.</summary>
+    /// <summary>The audience for dashboard tokens. The Sync Gateway rejects it, so these tokens can't touch patient data.</summary>
     public string DashboardAudience { get; set; } = "melanin-wound-cdss-admin";
 
-    /// <summary>A browser session is shorter-lived than a device's.</summary>
+    /// <summary>A browser session doesn't last as long as a phone's.</summary>
     public int DashboardRefreshTokenHours { get; set; } = 12;
 
     /// <summary>How long a client's session lasts without a refresh (the refresh token's sliding lifetime).</summary>
@@ -33,7 +33,7 @@ public sealed class JwtOptions
         ? TimeSpan.FromHours(DashboardRefreshTokenHours)
         : TimeSpan.FromDays(RefreshTokenDays);
 
-    /// <summary>PEM key for signing tokens; generated at start-up if empty (local dev only).</summary>
+    /// <summary>The PEM key for signing tokens. If it's empty, one is generated at start-up (local development only).</summary>
     public string SigningKeyPem { get; set; } = "";
 }
 
@@ -56,7 +56,7 @@ public sealed class SigningKey
             }
             catch (Exception e) when (e is ArgumentException or CryptographicException)
             {
-                // Never echo the value: it is (or is meant to be) a private key.
+                // Never print the value, because it is (or is meant to be) a private key.
                 throw new InvalidOperationException(
                     "Jwt:SigningKeyPem is not a usable RSA private key. Expected an unencrypted PKCS#8 or PKCS#1 PEM, " +
                     "given as the PEM text (newlines may be written as \\n), as base64 of the PEM file, or as a path to the file.",
@@ -70,7 +70,7 @@ public sealed class SigningKey
         PrivateKey = new RsaSecurityKey(rsa) { KeyId = kid };
     }
 
-    /// <summary>Cleans up a PEM mangled by env files (escaped newlines, quotes, base64, or a file path).</summary>
+    /// <summary>Repairs a PEM that an env file mangled, with escaped newlines, quotes, base64, or a file path instead.</summary>
     internal static string NormalizePem(string value)
     {
         var v = value.Trim().Trim('"', '\'').Trim();
@@ -90,7 +90,7 @@ public sealed class SigningKey
         var match = Regex.Match(v, @"-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----", RegexOptions.Singleline);
         if (!match.Success) return v;
 
-        // Rebuild with canonical 64-column lines so a PEM flattened onto one line still parses.
+        // Rebuild it with standard 64-character lines, so a PEM squashed onto one line still parses.
         var label = match.Groups[1].Value;
         var body = Regex.Replace(match.Groups[2].Value, @"\s+", "");
         var lines = Enumerable.Range(0, (body.Length + 63) / 64)

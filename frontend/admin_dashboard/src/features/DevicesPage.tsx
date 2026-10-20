@@ -22,7 +22,7 @@ import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
 const devicesKey = ['devices'];
 
-/** When anything last happened to the device: revoked, last used, or registered. */
+/** The last time anything happened to the device, whether it was revoked, used or registered. */
 const lastChange = (d: DeviceSummary) =>
   Math.max(...[d.revokedAt, d.lastSeenAt, d.registeredAt].map((t) => (t ? Date.parse(t) : 0)));
 
@@ -30,7 +30,7 @@ const lastChange = (d: DeviceSummary) =>
 const latestFirst = (a: DeviceSummary, b: DeviceSummary) =>
   lastChange(b) - lastChange(a) || a.deviceId.localeCompare(b.deviceId);
 
-/** Registered phones; revoking ends their sessions within 30 s but leaves unsynced data on the phone. */
+/** Registered phones. Revoking one ends its sessions within 30 seconds, but leaves unsynced data on the phone. */
 export function DevicesPage() {
   const session = useSession();
   const toast = useToast();

@@ -2,41 +2,42 @@ using Npgsql;
 
 namespace IdentityService.Auth;
 
-/// <summary>A clinician whose credentials, MFA code and client/device rules all passed.</summary>
+/// <summary>A clinician who passed every check: credentials, MFA code, and the client and device rules.</summary>
 public sealed record VerifiedClinician(Guid ClinicianId, string Username, string Role, string FacilityId, string Client,
     string? DeviceId);
 
 /// <summary>
-/// One sign-in attempt. Either <see cref="Password"/> is given, or <see cref="VerifiedPasswordHash"/> when the
-/// password was already checked in an earlier step (the login page's TOTP step) against that stored hash.
+/// One sign-in attempt. It carries either <see cref="Password"/>, or <see cref="VerifiedPasswordHash"/> if the
+/// password was already checked against that stored hash in an earlier step (the login page's TOTP step).
 /// </summary>
-/// <param name="EnforcePasswordChange">The login page asks for a new password when an admin chose the current one.
-/// The password grant (simulator and tests only) does not.</param>
-/// <param name="MfaAlreadyVerified">The code was checked in an earlier step of this sign-in (before a password
-/// change). Only honoured together with <see cref="VerifiedPasswordHash"/>.</param>
+/// <param name="EnforcePasswordChange">The login page asks for a new password when an admin set the current one.
+/// The password grant (only used by the simulator and tests) doesn't.</param>
+/// <param name="MfaAlreadyVerified">The code was already checked earlier in this sign-in, before a password change.
+/// It only counts when <see cref="VerifiedPasswordHash"/> is set as well.</param>
 public sealed record SignInAttempt(string Username, string? Password, string? Totp, string Client, string? DeviceId,
     string? VerifiedPasswordHash = null, bool EnforcePasswordChange = false, bool MfaAlreadyVerified = false);
 
-/// <param name="PasswordHash">On MFA_REQUIRED or PASSWORD_CHANGE_REQUIRED: the hash the password was checked against,
-/// for the next step.</param>
+/// <param name="PasswordHash">For MFA_REQUIRED or PASSWORD_CHANGE_REQUIRED, the hash the password was checked against,
+/// so the next step can use it.</param>
 public sealed record CredentialResult(VerifiedClinician? Clinician, string? ReasonCode, string? PasswordHash = null)
 {
     public static CredentialResult Fail(string reason, string? passwordHash = null) => new(null, reason, passwordHash);
 }
 
 /// <summary>
-/// The sign-in rules shared by the login page and the password grant: Argon2id, 5-attempt lockout, TOTP with a
-/// replay check, the admin-only dashboard and device binding. Every attempt is audited.
+/// The sign-in rules that the login page and the password grant share: Argon2id, a lockout after 5 attempts, TOTP
+/// with a replay check, admins only on the dashboard, and device binding. Every attempt is audited.
 /// </summary>
 public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hasher, SecretProtector secrets)
 {
     public const int MaxFailedAttempts = 5;
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
-    /// <summary>Caps concurrent Argon2id checks (64 MB each) so a login burst queues instead of running out of memory.</summary>
+    /// <summary>Limits how many Argon2id checks (64 MB each) run at once, so a rush of logins queues up instead of
+    /// running out of memory.</summary>
     private readonly SemaphoreSlim _hashing = new(Math.Max(2, Environment.ProcessorCount));
 
-    /// <param name="onSuccess">Runs inside the same transaction before the LOGIN audit row, e.g. to start a session.</param>
+    /// <param name="onSuccess">Runs inside the same transaction before the LOGIN audit row, for example to start a session.</param>
     /// <returns>Codes: INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, INVALID_TOTP, DEVICE_NOT_ALLOWED, CLIENT_NOT_ALLOWED,
     /// PASSWORD_CHANGE_REQUIRED.</returns>
     public async Task<CredentialResult> ValidateAsync(SignInAttempt attempt, CancellationToken ct,
@@ -44,7 +45,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
     {
         var (username, deviceId) = (attempt.Username, attempt.DeviceId);
 
-        // Check the password before the transaction so slow hashing doesn't hold DB connections.
+        // Check the password before the transaction starts, so slow hashing doesn't tie up database connections.
         var (checkedHash, passwordOk) = attempt.VerifiedPasswordHash is { } verified
             ? (verified, true)
             : await PreVerifyPasswordAsync(username, attempt.Password ?? "", ct);
@@ -106,8 +107,8 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         if (lockedUntil > DateTime.UtcNow)
             return await RefuseAsync("CREDENTIAL_LOCKED");
 
-        // If the hash changed meanwhile (e.g. a reset), check again so a stale result can never let anyone in.
-        // A password verified in an earlier step has no plain text to re-check, so a changed hash just fails.
+        // If the hash changed in the meantime (say, a reset), check again so an out-of-date result can never let
+        // anyone in. A password checked in an earlier step has no plain text left to re-check, so it just fails.
         var valid = passwordHash == checkedHash
             ? passwordOk
             : attempt.Password is { } password && await VerifyAsync(password, passwordHash, salt, ct);
@@ -117,7 +118,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         var mfaDone = attempt.MfaAlreadyVerified && attempt.VerifiedPasswordHash is not null;
         if (mfaEnabled && mfaSecret is not null && !mfaDone)
         {
-            // No code yet: the app should ask for one. Not a guess, so it does not count towards lockout.
+            // There's no code yet, so the app should ask for one. That isn't a guess, so it doesn't count towards the lockout.
             if (string.IsNullOrEmpty(attempt.Totp))
                 return await RefuseAsync("MFA_REQUIRED", passwordHash);
 
@@ -130,7 +131,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
 
         if (attempt.Client == Clients.AdminDashboard)
         {
-            // Checked after the password, so the answer never reveals a username's role to a guesser.
+            // This is checked after the password, so a guesser can never learn a username's role from the answer.
             if (role != "admin")
             {
                 await AuthAudit.WriteAsync(conn, tx, "LOGIN", username, clinicianId, null, false, "CLIENT_NOT_ALLOWED", ct);
@@ -140,7 +141,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         }
         else
         {
-            // Prototype rule: an unknown device is registered to the clinician's facility on first login.
+            // A prototype rule: a device we haven't seen is registered to the clinician's facility on its first login.
             await Sql.ExecAsync(conn, tx, """
                 INSERT INTO clinical.device (device_id, facility_id) VALUES (@d, @f) ON CONFLICT (device_id) DO NOTHING
                 """, ct, ("d", deviceId), ("f", facilityId));
@@ -156,8 +157,8 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
             "UPDATE clinical.clinician_credential SET failed_attempts = 0, locked_until = NULL WHERE clinician_id = @id",
             ct, ("id", clinicianId));
 
-        // Every check passed, but an admin chose this password: the login page asks for a new one first. Recorded as a
-        // PASSWORD_CHANGE prompt, not a failed LOGIN, so it never counts towards the login failure rate.
+        // Every check passed, but an admin set this password, so the login page asks for a new one first. We record
+        // it as a PASSWORD_CHANGE prompt rather than a failed LOGIN, so it never counts towards the failure rate.
         if (attempt.EnforcePasswordChange && mustChangePassword)
         {
             await AuthAudit.WriteAsync(conn, tx, "PASSWORD_CHANGE", username, clinicianId, deviceId, false,
@@ -175,9 +176,10 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
     }
 
     /// <summary>
-    /// Replaces a password an admin chose, after the login page checked the old one (and the code) against
-    /// <paramref name="expectedHash"/>. Codes: PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, SESSION_EXPIRED (the account
-    /// changed meanwhile: reset again, deactivated). Returns the new hash for the rest of the sign-in.
+    /// Replaces a password an admin set, once the login page has checked the old one (and the code) against
+    /// <paramref name="expectedHash"/>. Possible codes are PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED and SESSION_EXPIRED
+    /// (the account changed in the meantime, for example it was reset again or deactivated). Returns the new hash for
+    /// the rest of the sign-in.
     /// </summary>
     public async Task<(string? NewHash, string? Error)> ChangePasswordAsync(string username, string expectedHash,
         string? newPassword, CancellationToken ct)
@@ -216,14 +218,14 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
     }
 
     /// <summary>
-    /// A signed-in clinician changes their own password (plan: profile management, step 5). The current password is
-    /// required, and a wrong one counts towards the same lockout as signing in. On success the new password is set,
-    /// any lockout and pending "choose your own password" are cleared, and every session ends: the token carries no
-    /// session id, so this browser cannot be told apart from the others, and ending them all is the safe choice
+    /// A signed-in clinician changes their own password (profile management plan, step 5). They need the current
+    /// password, and getting it wrong counts towards the same lockout as signing in. If it works, the new password is
+    /// set, any lockout or pending "choose your own password" is cleared, and every session ends. The token has no
+    /// session id, so we can't tell this browser apart from the others, and ending them all is the safe thing to do
     /// after a password change anyway.
     /// </summary>
     /// <returns>Null on success, or PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, INVALID_CREDENTIALS, CREDENTIAL_LOCKED,
-    /// NOT_FOUND (deactivated meanwhile).</returns>
+    /// or NOT_FOUND (the account was deactivated in the meantime).</returns>
     public async Task<string?> ChangeOwnPasswordAsync(Guid clinicianId, string? currentPassword, string? newPassword,
         CancellationToken ct)
     {
@@ -244,7 +246,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
             lockedUntil = r.IsDBNull(3) ? null : r.GetDateTime(3);
         }
 
-        // Slow hashing happens before the transaction so it never holds a database connection.
+        // The slow hashing happens before the transaction, so it never ties up a database connection.
         var locked = lockedUntil > DateTime.UtcNow;
         var currentOk = !locked && await VerifyAsync(currentPassword ?? "", hash, salt, ct);
         if (currentOk && newPassword == currentPassword) return "PASSWORD_UNCHANGED";
@@ -271,7 +273,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
             await tx.CommitAsync(ct);
             return "CREDENTIAL_LOCKED";
         }
-        // The password changed meanwhile (an admin reset): the check above was against the old one.
+        // An admin reset the password in the meantime, so the check above was against the old one.
         if (storedHash != hash) currentOk = false;
 
         if (!currentOk)
@@ -301,7 +303,7 @@ public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hash
         return null;
     }
 
-    /// <summary>Checks the password without holding a connection; skips unknown or locked accounts.</summary>
+    /// <summary>Checks the password without holding a connection open. Unknown or locked accounts are skipped.</summary>
     private async Task<(string? Hash, bool Ok)> PreVerifyPasswordAsync(string username, string password, CancellationToken ct)
     {
         string hash; byte[] salt;

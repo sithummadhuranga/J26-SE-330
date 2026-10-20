@@ -1,4 +1,4 @@
-"""Minimal client for the Toxiproxy API (infra/toxiproxy, port 8474). Standard library only."""
+"""A small client for the Toxiproxy API (infra/toxiproxy, port 8474). It only uses the standard library."""
 import json
 import urllib.request
 
@@ -20,11 +20,11 @@ def reset():
 
 
 def add(name, toxic_type, attributes, stream="downstream", toxicity=1.0):
-    """toxicity is the share of connections the toxic applies to (0-1)."""
+    """toxicity is the share of connections the toxic applies to, from 0 to 1."""
     _call("POST", f"/proxies/{PROXY}/toxics",
           {"name": name, "type": toxic_type, "stream": stream, "toxicity": toxicity, "attributes": attributes})
 
 
 def set_enabled(enabled):
-    """Disabled = every connection refused and open ones dropped: the hospital Wi-Fi is gone."""
+    """Disabling refuses every new connection and drops open ones, as if the hospital Wi-Fi went away."""
     _call("PATCH", f"/proxies/{PROXY}", {"enabled": enabled})  # updating with POST is deprecated

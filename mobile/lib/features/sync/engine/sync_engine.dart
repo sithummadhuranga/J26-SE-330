@@ -14,19 +14,19 @@ enum SyncOutcome {
   /// Pushed what was pending and pulled every change.
   success,
 
-  /// Another run holds the sync (this isolate or another one).
+  /// Another run is already syncing, either in this isolate or in another one.
   alreadyRunning,
 
-  /// Still inside a backoff window; not tried. [SyncReport.retryAt] says when.
+  /// We're still waiting out a backoff, so nothing was tried. [SyncReport.retryAt] says when to try again.
   backingOff,
 
-  /// The gateway is unreachable (or stopped answering mid-run); backing off.
+  /// We couldn't reach the gateway, or it stopped answering mid-run, so we're backing off.
   offline,
 
-  /// The server asked to slow down (429/503); backing off, honouring Retry-After.
+  /// The server asked us to slow down (429 or 503). We back off and respect its Retry-After.
   serverBusy,
 
-  /// No usable session: the app asks the clinician to sign in. The queue is untouched (§7.3).
+  /// There's no usable session, so the app asks the clinician to sign in. The queue is left alone (§7.3).
   needsSignIn,
 }
 
@@ -40,7 +40,7 @@ class SyncReport {
   final int rejected;
   final int changes;
 
-  /// Guideline figures cited by received advice and cached in this run (§10.4).
+  /// How many guideline figures, cited by the advice we received, were cached in this run (§10.4).
   final int figures;
   final DateTime? retryAt;
   final String? detail;
@@ -59,7 +59,8 @@ class _Stop implements Exception {
   final String? detail;
 }
 
-/// The sync engine: one [sync] call pushes the queue, pulls changes and backs off on failure; never throws.
+/// The sync engine. One [sync] call pushes the queue, pulls new changes and backs off if something fails.
+/// It never throws.
 class SyncEngine {
   SyncEngine({
     required QueueRepository queue,
@@ -85,15 +86,15 @@ class SyncEngine {
   final DateTime Function() _now;
   final Backoff _backoff;
 
-  /// Longer than any run, so a run killed mid-way frees the lease on its own.
+  /// Longer than any normal run, so if a run is killed halfway the lease frees itself.
   static const syncLease = Duration(minutes: 3);
 
-  /// Names this engine's runs in the database lease, so a run renews and releases only its own.
+  /// Identifies this engine's runs in the database lease, so a run only renews or releases its own lease.
   final String _leaseOwner = const Uuid().v4();
 
   Future<SyncReport>? _running;
 
-  /// Runs one sync or joins the one in progress; [force] skips the backoff wait.
+  /// Runs one sync, or joins the one already running. Pass [force] to skip the backoff wait.
   Future<SyncReport> sync({bool force = false}) =>
       _running ??= _run(force).whenComplete(() => _running = null);
 
@@ -137,12 +138,12 @@ class SyncEngine {
       await _queue.setState(SyncStateKeys.nextAttemptAt, '');
       await _queue.setState(SyncStateKeys.lastSuccessAt, _now().toIso8601String());
 
-      // Never affects the outcome: the advice itself is already stored, a figure can follow on the next sync.
+      // This never changes the outcome. The advice is already stored, and a missing figure can come next time.
       var figures = 0;
       try {
         figures = await _figures?.prefetchMissing(token) ?? 0;
       } catch (_) {}
-      // Also best effort: patient labels reach the server's record; unsent ones go on the next sync.
+      // Also best effort. Patient labels are sent to the server, and any that don't make it go next time.
       try {
         await _patients?.pushAliases(token);
       } catch (_) {}
@@ -164,33 +165,34 @@ class SyncEngine {
     } on TransportException catch (e) {
       return backOff(SyncOutcome.offline, e.message);
     } on ApiException catch (e) {
-      // An error answer outside the push and pull handling, e.g. the token refresh answered 503 or 500.
+      // An error that push and pull didn't already handle, such as the token refresh returning 503 or 500.
       final busy = e.status == 429 || e.status == 503;
       return backOff(busy ? SyncOutcome.serverBusy : SyncOutcome.offline,
           'HTTP ${e.status}${e.code == null ? '' : ' ${e.code}'}', e.retryAfter);
     } catch (e) {
-      // A malformed answer (a Wi-Fi login page instead of JSON) or anything unforeseen: back off and try again.
+      // A garbled answer (like a Wi-Fi login page instead of JSON) or anything else we didn't expect.
+      // Back off and try again later.
       return backOff(SyncOutcome.offline, 'unexpected: $e');
     } finally {
       await _queue.releaseSyncLease(owner: _leaseOwner);
     }
   }
 
-  /// Renews the database lease before each batch and page. If it lapsed and another run took it, this run stops.
+  /// Renews the database lease before each batch and page. If it ran out and another run took it, we stop here.
   Future<void> _keepLease() async {
     if (!await _queue.renewSyncLease(syncLease, owner: _leaseOwner)) {
       throw _Stop(SyncOutcome.alreadyRunning, null, 'lease taken over by another run');
     }
   }
 
-  /// Pushes one leased batch. Every path leaves each row accepted, rejected or back to pending.
+  /// Pushes one leased batch. However it ends, every row is left accepted, rejected or back in pending.
   Future<({String token, int pushed, int accepted, int rejected})> _push(
       List<QueuedEvent> batch, String token, String deviceId,
       {bool refreshed = false}) async {
     try {
       return await _pushLeased(batch, token, deviceId, refreshed: refreshed);
     } catch (_) {
-      // Release any still-leased rows back to pending right away instead of waiting for the lease to lapse.
+      // Put any rows that are still leased back to pending now, rather than waiting for the lease to run out.
       await _queue.release([for (final r in batch) r.eventId], 'sync stopped');
       rethrow;
     }
@@ -204,7 +206,8 @@ class SyncEngine {
     try {
       response = await _api.push(token, deviceId, [for (final r in batch) r.payloadJson]);
     } on TransportException catch (e) {
-      // No answer: the server may or may not have the events. Resending is safe (DUPLICATE).
+      // No answer, so we don't know if the server got the events. Sending them again is safe,
+      // since the server just answers DUPLICATE.
       await _queue.release(ids, 'no response: ${e.message}');
       throw _Stop(SyncOutcome.offline, null, e.message);
     }
@@ -222,11 +225,11 @@ class SyncEngine {
           rejected: response.results.where((r) => r.status == 'REJECTED').length,
         );
       case 401 when !refreshed:
-        // §7.1: refresh the token, retry the batch (still leased).
+        // Refresh the token and retry the same batch, which is still leased (§7.1).
         final fresh = await _auth.refresh();
         return _pushLeased(batch, fresh, deviceId, refreshed: true);
       case 413 when batch.length > 1:
-        // §7.1: split the batch. The second half goes back to pending and follows in the next batch.
+        // Too big, so split it. The second half goes back to pending and goes out in the next batch (§7.1).
         final half = batch.length ~/ 2;
         await _queue.release(ids.sublist(half), 'split after 413');
         return _pushLeased(batch.sublist(0, half), token, deviceId, refreshed: refreshed);
@@ -234,7 +237,7 @@ class SyncEngine {
         await _queue.reject(ids, 'PAYLOAD_TOO_LARGE');
         return (token: token, pushed: 1, accepted: 0, rejected: 1);
       case 403:
-        // DEVICE_MISMATCH: the session belongs to another device id; a new sign-in binds this one.
+        // DEVICE_MISMATCH means the session belongs to a different device id. Signing in again fixes it.
         await _queue.release(ids, 'HTTP 403 ${response.code ?? ''}');
         throw _Stop(SyncOutcome.needsSignIn, null, response.code ?? 'FORBIDDEN');
       case 401:
@@ -250,7 +253,7 @@ class SyncEngine {
     }
   }
 
-  /// Pulls until hasMore is false; each page and its cursor are stored together.
+  /// Keeps pulling until hasMore is false. Each page is saved together with its cursor.
   Future<int> _pullAll(String token, void Function(String) onToken) async {
     var count = 0;
     var refreshed = false;

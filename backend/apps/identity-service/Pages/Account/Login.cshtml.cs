@@ -10,7 +10,8 @@ namespace IdentityService.Pages.Account;
 
 /// <summary>
 /// The only place a clinician types a password (ADR 0006). The rules and audit are the same as before: lockout, TOTP,
-/// the admin-only dashboard and device binding. The reason code goes in data-code for tests; the message stays plain.
+/// admins only on the dashboard, and device binding. The reason code goes in data-code for the tests, while the
+/// message stays in plain words.
 /// </summary>
 public sealed class LoginModel(CredentialValidator credentials, OidcClients clients, IDataProtectionProvider protection)
     : PageModel
@@ -22,15 +23,16 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
     [BindProperty] public string? Password { get; set; }
     [BindProperty] public string? Totp { get; set; }
 
-    /// <summary>The password step's result, sealed for the TOTP step so the password is never sent twice.</summary>
+    /// <summary>The result of the password step, sealed for the TOTP step so the password never has to be sent twice.</summary>
     [BindProperty] public string? MfaTicket { get; set; }
 
     [BindProperty] public string? NewPassword { get; set; }
     [BindProperty] public string? ConfirmPassword { get; set; }
 
     /// <summary>
-    /// Password, code, client and device all checked, but an admin chose the password: sealed for the step that
-    /// replaces it. A separate purpose from <see cref="MfaTicket"/>, so an MFA ticket can never skip the code.
+    /// The password, code, client and device all passed, but an admin set the password, so this is sealed for the step
+    /// that replaces it. It uses a different purpose from <see cref="MfaTicket"/>, so an MFA ticket can never skip
+    /// the code.
     /// </summary>
     [BindProperty] public string? ChangeTicket { get; set; }
 
@@ -65,7 +67,7 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
             var (newHash, error) = await credentials.ChangePasswordAsync(ticket.Username, ticket.PasswordHash, newPassword, ct);
             if (error is "PASSWORD_TOO_SHORT" or "PASSWORD_UNCHANGED") return Show(error);
             if (error is not null) return Restart(error);
-            // The code was checked before this step; sign in with the new password without asking again.
+            // The code was already checked before this step, so sign in with the new password without asking again.
             attempt = new SignInAttempt(ticket.Username, null, null, target.Client.Id, target.DeviceId, newHash,
                 EnforcePasswordChange: true, MfaAlreadyVerified: true);
             ChangeTicket = null;
@@ -107,7 +109,7 @@ public sealed class LoginModel(CredentialValidator credentials, OidcClients clie
         }
     }
 
-    /// <summary>The authorize request this sign-in is for: only our own /connect/authorize, for a known client.</summary>
+    /// <summary>The authorize request this sign-in belongs to. Only our own /connect/authorize, for a known client.</summary>
     private (OidcClient Client, string? DeviceId)? Target()
     {
         if (string.IsNullOrEmpty(ReturnUrl) || !Url.IsLocalUrl(ReturnUrl) ||

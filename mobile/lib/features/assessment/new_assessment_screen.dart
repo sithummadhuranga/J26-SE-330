@@ -9,13 +9,13 @@ import 'assessment_draft.dart';
 import 'assessment_view.dart';
 import 'capture_screen.dart';
 
-/// Start an assessment: optional patient, clinical questions, then capture.
+/// Starts an assessment. The clinician can pick a patient, answers the clinical questions, then captures the wound.
 class NewAssessmentScreen extends StatefulWidget {
   const NewAssessmentScreen({super.key, required this.services, this.patient});
 
   final AppServices services;
 
-  /// Pre-linked when started from a patient record.
+  /// Already filled in when the assessment was started from a patient's record.
   final PatientLocalData? patient;
 
   @override
@@ -148,7 +148,7 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
   }
 }
 
-/// Present / Absent / Not recorded, as three equal choices (§3: "not recorded" is never collapsed into "no").
+/// Present, Absent and Not recorded as three equal choices. "Not recorded" is never treated as "no" (§3).
 class TriStateQuestion extends StatelessWidget {
   const TriStateQuestion({super.key, required this.label, required this.value, required this.onChanged});
 

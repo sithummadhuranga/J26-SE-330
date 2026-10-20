@@ -4,7 +4,7 @@ namespace IdentityService.Auth;
 
 public sealed record MfaEnrollment(string Secret, string OtpAuthUri);
 
-/// <summary>Two-step TOTP enrollment: MFA only turns on once the clinician confirms a valid code.</summary>
+/// <summary>Sets up TOTP in two steps. MFA only turns on once the clinician confirms a valid code.</summary>
 public sealed class MfaService(NpgsqlDataSource db, SecretProtector secrets)
 {
     public async Task<(MfaEnrollment? Enrollment, string? Error)> EnrollAsync(Guid clinicianId, string? deviceId, CancellationToken ct)

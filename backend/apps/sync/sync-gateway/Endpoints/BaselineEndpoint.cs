@@ -9,7 +9,7 @@ using SyncGateway.Validation;
 
 namespace SyncGateway.Endpoints;
 
-/// <summary>REST baseline for the evaluation: all in one request, deliberately no idempotency or retries.</summary>
+/// <summary>The REST baseline for the evaluation. Everything happens in one request, with no idempotency or retries on purpose.</summary>
 public static class BaselineEndpoint
 {
     public const string RecommendationClient = "recommendation-service";
@@ -22,7 +22,7 @@ public static class BaselineEndpoint
         {
             var started = Stopwatch.GetTimestamp();
 
-            // Same identity rules as push (§7.1): one device cannot submit as another.
+            // The same identity rules as push (§7.1), so one device can't submit as another.
             var tokenDevice = http.User.FindFirst(ClaimNames.DeviceId)?.Value;
             var tokenFacility = http.User.FindFirst(ClaimNames.FacilityId)?.Value;
             if (tokenDevice is null || tokenFacility is null) return Results.Unauthorized();
@@ -86,7 +86,7 @@ public static class BaselineEndpoint
         return group;
     }
 
-    /// <summary>Stores the assessment (never deduplicated) and loads the same wound's earlier captures.</summary>
+    /// <summary>Stores the assessment (duplicates are never removed) and loads the earlier captures of the same wound.</summary>
     private static async Task<(long RowId, AssessmentContext Context)> InsertAsync(NpgsqlConnection conn, JsonElement evt,
         CancellationToken ct)
     {
@@ -121,7 +121,7 @@ public static class BaselineEndpoint
             receivedAt = r.GetFieldValue<DateTimeOffset>(1);
         }
 
-        // Same healing-history rule as the orchestrator: latest revision of each earlier assessment, oldest first.
+        // The same healing-history rule as the orchestrator: the latest revision of each earlier assessment, oldest first.
         var history = new List<HistoryRow>();
         await using (var cmd = new NpgsqlCommand("""
             SELECT captured_at, analytics::text FROM (

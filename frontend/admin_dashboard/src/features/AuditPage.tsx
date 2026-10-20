@@ -14,8 +14,8 @@ import { useLoadFailureToast } from '../ui/toastContext';
 const limits = [100, 250, 500, 1000] as const;
 
 /**
- * MFA_REQUIRED and PASSWORD_CHANGE_REQUIRED are the server asking for the next step, not failed attempts (same rule as
- * the auth-health metrics).
+ * MFA_REQUIRED and PASSWORD_CHANGE_REQUIRED are the server asking for the next step, not failed attempts.
+ * The auth-health metrics follow the same rule.
  */
 const prompts = new Set(['MFA_REQUIRED', 'PASSWORD_CHANGE_REQUIRED']);
 const isFailure = (e: AuthAuditEntry) => !e.success && !prompts.has(e.reasonCode ?? '');
@@ -26,7 +26,7 @@ function matches(e: AuthAuditEntry, query: string, failuresOnly: boolean): boole
   return fuzzyMatch(query, [e.username, auditActionLabel(e.action), result, e.deviceId, e.actorUsername]);
 }
 
-/** Recent sign-in and admin events for the facility, filtered in the browser (max 1000 rows). */
+/** Recent sign-in and admin events for the facility, filtered in the browser (up to 1000 rows). */
 export function AuditPage() {
   const session = useSession();
   const queryClient = useQueryClient();

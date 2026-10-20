@@ -13,7 +13,7 @@ export const ToastContext = createContext<ToastApi | null>(null);
 
 export interface Toasts extends ToastApi {
   success(title: string, message?: string): void;
-  /** [title] says what failed and the message says why; ended sessions are handled on the sign-in screen. */
+  /** [title] says what failed and the message says why. Ended sessions are dealt with on the sign-in screen instead. */
   error(title: string, error: unknown): void;
 }
 
@@ -30,7 +30,7 @@ export function useToast(): Toasts {
   };
 }
 
-/** Shows a toast when a list fails to load; the page still shows its own error state. */
+/** Shows a toast when a list fails to load. The page still shows its own error state too. */
 export function useLoadFailureToast(title: string, error: unknown): void {
   const { error: showError } = useToast();
   useEffect(() => {

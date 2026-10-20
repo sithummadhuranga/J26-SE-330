@@ -4,7 +4,7 @@ using Konscious.Security.Cryptography;
 
 namespace IdentityService.Auth;
 
-/// <summary>Argon2id with a per-credential salt (architecture §12). Never reversible encryption.</summary>
+/// <summary>Hashes passwords with Argon2id and a salt per credential (architecture §12). It's never reversible encryption.</summary>
 public sealed class PasswordHasher
 {
     private const int SaltBytes = 16;

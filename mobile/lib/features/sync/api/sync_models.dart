@@ -1,9 +1,9 @@
-/// Sync protocol wire types, mirroring the auth and sync-changes JSON schemas.
+/// The data types sent over the wire for sync. They follow the auth and sync-changes JSON schemas.
 library;
 
 import 'dart:convert';
 
-/// §7.1: one result per pushed event. DUPLICATE is treated exactly like ACCEPTED.
+/// The server sends back one result for each pushed event (§7.1). DUPLICATE is treated just like ACCEPTED.
 class PushEventResult {
   const PushEventResult(this.eventId, this.status, [this.code]);
 
@@ -15,7 +15,7 @@ class PushEventResult {
       PushEventResult(j['eventId'] as String, j['status'] as String, j['code'] as String?);
 }
 
-/// One change after the cursor; upserted by (assessmentId, revision, type) so repeats are harmless.
+/// One change after the cursor. It's upserted by (assessmentId, revision, type), so getting it twice does no harm.
 class SyncChange {
   const SyncChange({
     required this.seq,
@@ -32,7 +32,8 @@ class SyncChange {
   final int revision;
   final String? mode;
 
-  /// The advice (RECOMMENDATION_READY) as JSON text, ready to store: encoded once, with the page, off the UI isolate.
+  /// The advice (RECOMMENDATION_READY) as JSON text, ready to store. It's encoded once, along with the page,
+  /// away from the UI isolate.
   final String? recommendationJson;
 
   factory SyncChange.fromJson(Map<String, dynamic> j) {
@@ -62,7 +63,7 @@ class PullPage {
       );
 }
 
-/// §7.3: a 15-minute access JWT and a rotating opaque refresh token.
+/// An access JWT that lasts 15 minutes, plus a refresh token that changes every time it's used (§7.3).
 class TokenPair {
   const TokenPair(this.accessToken, this.refreshToken, this.expiresIn, {this.idToken});
 
@@ -70,10 +71,10 @@ class TokenPair {
   final String refreshToken;
   final Duration expiresIn;
 
-  /// Who signed in (preferred_username), for display only; null when the server sent none.
+  /// Who signed in (preferred_username), only used for display. It's null if the server didn't send one.
   final String? idToken;
 
-  /// The OAuth token response of /connect/token (contracts/auth.schema.json 2.0).
+  /// Reads the OAuth token response from /connect/token (contracts/auth.schema.json 2.0).
   factory TokenPair.fromJson(Map<String, dynamic> j) => TokenPair(
       j['access_token'] as String, j['refresh_token'] as String, Duration(seconds: j['expires_in'] as int),
       idToken: j['id_token'] as String?);

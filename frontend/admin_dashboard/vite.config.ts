@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// The end-to-end tests drive the real Docker stack (start it with `docker compose up -d`), one file at a time.
+// The end-to-end tests run against the real Docker stack (start it with `docker compose up -d`), one file at a time.
 export default defineConfig({
   plugins: [react()],
   build: { sourcemap: false },

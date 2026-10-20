@@ -1,4 +1,5 @@
-"""A revoked phone can't log in or refresh, and the gateway refuses its tokens within 30 s; others are unaffected."""
+"""A revoked phone can't log in or refresh, and the gateway refuses its tokens within 30 seconds.
+Other phones carry on as normal."""
 import secrets
 import sys
 import time
@@ -57,7 +58,7 @@ check("its refresh token stops working at once", status == 400, status)
 status, body = login(NURSE, PASSWORD, LOST)
 check("nobody can log in on it", status == 400 and body["code"] == "DEVICE_NOT_ALLOWED", f"{status} {body}")
 
-# The access token is still validly signed; the gateway refuses it once its cached answer expires.
+# The access token is still properly signed, but the gateway refuses it once its cached answer runs out.
 refused_after = None
 while time.monotonic() - revoked_at < CACHE_SECONDS + 10:
     status, _ = http("GET", "/v1/sync/changes?cursor=0&limit=1", token=lost["accessToken"])

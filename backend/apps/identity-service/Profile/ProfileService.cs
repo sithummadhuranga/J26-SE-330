@@ -3,10 +3,10 @@ using Npgsql;
 
 namespace IdentityService.Profile;
 
-/// <param name="LastSignInAt">The newest successful sign-in, from the auth audit; null before the first one.</param>
-/// <summary>One sign-in that is still going: a session family with an active row.</summary>
+/// <param name="LastSignInAt">The latest successful sign-in, from the auth audit. Null before the first one.</param>
+/// <summary>One sign-in that's still going, meaning a session family with an active row.</summary>
 /// <param name="Client">"admin-dashboard" or "mobile".</param>
-/// <param name="DeviceId">The phone, for mobile sessions; null for the dashboard.</param>
+/// <param name="DeviceId">The phone, for mobile sessions. Null for the dashboard.</param>
 /// <param name="LastUsedAt">The latest sign-in or token refresh in this session.</param>
 public sealed record MySession(Guid SessionId, string Client, string? DeviceId, DateTime SignedInAt, DateTime LastUsedAt,
     DateTime ExpiresAt);
@@ -15,12 +15,12 @@ public sealed record MyProfile(string Username, string FullName, string Role, st
     bool MustChangePassword, DateTime CreatedAt, DateTime? LastSignInAt);
 
 /// <summary>
-/// The signed-in clinician's own account (plan: profile management). Every method takes the clinician id from the
-/// access token, never from the request, so nobody can reach someone else's account here.
+/// The signed-in clinician's own account (profile management plan). Every method takes the clinician id from the
+/// access token, never from the request, so nobody can get at someone else's account through here.
 /// </summary>
 public sealed class ProfileService(NpgsqlDataSource db)
 {
-    /// <summary>Null when the account no longer exists or was deactivated (its token can outlive that by minutes).</summary>
+    /// <summary>Null if the account no longer exists or was deactivated. Its token can still be around for a few minutes after that.</summary>
     public async Task<MyProfile?> GetAsync(Guid clinicianId, CancellationToken ct)
     {
         await using var cmd = db.CreateCommand("""
@@ -42,8 +42,9 @@ public sealed class ProfileService(NpgsqlDataSource db)
     public const int MaxFullNameLength = 120;
 
     /// <summary>
-    /// Changes your own full name (step 3), audited as PROFILE_UPDATE with you as the actor. An unchanged name is
-    /// accepted and not audited. Codes: MISSING_FULL_NAME, FULL_NAME_TOO_LONG, NOT_FOUND (deactivated meanwhile).
+    /// Changes your own full name (step 3), audited as PROFILE_UPDATE with you as the actor. If the name hasn't
+    /// changed, it's accepted but not audited. Possible codes are MISSING_FULL_NAME, FULL_NAME_TOO_LONG and NOT_FOUND
+    /// (the account was deactivated in the meantime).
     /// </summary>
     public async Task<(MyProfile? Profile, string? Error)> RenameAsync(Guid clinicianId, string? fullName,
         CancellationToken ct)
@@ -78,7 +79,7 @@ public sealed class ProfileService(NpgsqlDataSource db)
         return (await GetAsync(clinicianId, ct), null);
     }
 
-    /// <summary>Your active sessions (step 7), the most recently used first. Revoked devices' sessions are left out.</summary>
+    /// <summary>Your active sessions (step 7), most recently used first. Sessions on revoked devices are left out.</summary>
     public async Task<IReadOnlyList<MySession>> SessionsAsync(Guid clinicianId, CancellationToken ct)
     {
         await using var cmd = db.CreateCommand("""
@@ -101,9 +102,9 @@ public sealed class ProfileService(NpgsqlDataSource db)
     }
 
     /// <summary>
-    /// Ends one of your sessions, or all of them when [sessionId] is null (step 7): its refresh token stops working and
-    /// an access token it already handed out lapses within 15 minutes. Audited as LOGOUT per session, with you as the
-    /// actor. False when there was nothing of yours to end.
+    /// Ends one of your sessions, or all of them if [sessionId] is null (step 7). Its refresh token stops working, and
+    /// any access token it already gave out expires within 15 minutes. Each session is audited as a LOGOUT with you as
+    /// the actor. Returns false if there was nothing of yours to end.
     /// </summary>
     public async Task<bool> EndSessionsAsync(Guid clinicianId, Guid? sessionId, CancellationToken ct)
     {

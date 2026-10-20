@@ -6,7 +6,7 @@ import 'package:melanin_wound_cdss/features/sync/api/sync_models.dart';
 import 'package:melanin_wound_cdss/features/sync/auth/browser_sign_in.dart';
 import 'package:uuid/uuid.dart';
 
-/// A valid Wound Event (contracts/wound-event.schema.json). [woundId] lets tests build history and revisions.
+/// A valid wound event (contracts/wound-event.schema.json). Tests can pass [woundId] to build up history and revisions.
 Map<String, dynamic> sampleEvent({
   String deviceId = 'dev-test',
   String facilityId = 'fac-001',
@@ -37,11 +37,12 @@ Map<String, dynamic> sampleEvent({
       'clinicalAssessment': {'pedalPulses': 'not_recorded', 'protectiveSensation': 'absent'},
     };
 
-/// What a single push should suffer, for scripted or random fault injection (§7.1, §11).
+/// What should go wrong with a single push, for scripted or random fault injection (§7.1, §11).
 enum PushFault {
   none,
 
-  /// The server stores the batch but the answer never arrives (§11: "response lost after the server accepted").
+  /// The server stores the batch, but its answer never arrives.
+  /// That's §11's "response lost after the server accepted".
   dropResponseAfterAccept,
 
   /// The request never reaches the server.
@@ -53,7 +54,7 @@ enum PushFault {
   tooLarge413,
 }
 
-/// In-memory fake gateway that dedups, records changes and pages pulls like the real one.
+/// A fake gateway in memory. Like the real one, it drops duplicates, records changes and pages its pulls.
 class FakeGateway implements SyncApi {
   FakeGateway({this.autoRecommend = true, this.maxBatchBeforeSplit = 50, Random? random, this.faultRate = 0,
       this.recommendationFigures = const []})
@@ -61,21 +62,21 @@ class FakeGateway implements SyncApi {
 
   final bool autoRecommend;
 
-  /// Figure references every fake recommendation cites ({corpusVersion, figureId}), as §10.2's `figures` array.
+  /// The figures every fake recommendation refers to ({corpusVersion, figureId}), like the `figures` array in §10.2.
   final List<Map<String, String>> recommendationFigures;
   final int maxBatchBeforeSplit;
   final double faultRate;
   final Random _random;
 
-  /// Faults applied to the next pushes, in order; then [faultRate] picks random ones.
+  /// Faults to apply to the next pushes, in order. Once they run out, [faultRate] picks random ones.
   final List<PushFault> scripted = [];
 
   bool reachable = true;
 
-  /// eventId → how many times the server stored it (must never exceed 1).
+  /// How many times the server stored each eventId. It must never go above 1.
   final Map<String, int> stored = {};
 
-  /// eventId → the stored event, as the server received it.
+  /// Each stored event by eventId, exactly as the server received it.
   final Map<String, Map<String, dynamic>> storedEvents = {};
   final List<Map<String, dynamic>> _changes = [];
   int _seq = 0;
@@ -86,13 +87,14 @@ class FakeGateway implements SyncApi {
   String _validRefresh = 'refresh-0';
   bool sessionRevoked = false;
 
-  /// Thrown once by the next refresh instead of answering, e.g. ApiException(503): an error outside §7.1's 401 rule.
+  /// The next refresh throws this once instead of answering, for example ApiException(503).
+  /// It's for errors that §7.1's 401 rule doesn't cover.
   Object? refreshError;
 
-  /// Thrown once by the next push instead of answering, e.g. the FormatException of a Wi-Fi login page.
+  /// The next push throws this once instead of answering, for example the FormatException a Wi-Fi login page causes.
   Object? pushError;
 
-  /// Runs at the start of every push (e.g. another run taking the sync lease meanwhile).
+  /// Runs at the start of every push, for example to have another run grab the sync lease in the meantime.
   Future<void> Function()? onPush;
 
   @override
@@ -117,7 +119,7 @@ class FakeGateway implements SyncApi {
     return _issue();
   }
 
-  /// JWT-shaped like the backend's (§7.3 claims); the signature is not checked on the device.
+  /// Shaped like the backend's JWT, with the §7.3 claims. The phone never checks the signature.
   static String _jwt(Map<String, Object> claims) {
     String part(Object o) => base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
     return '${part({'alg': 'RS256', 'typ': 'JWT'})}.${part(claims)}.${const Uuid().v4()}';
@@ -136,7 +138,7 @@ class FakeGateway implements SyncApi {
         idToken: _jwt({'sub': 'c0ffee00-0000-4000-8000-000000000001', 'preferred_username': 'n.silva'}));
   }
 
-  /// The next request with the current access token is refused, as when it expired.
+  /// The next request using the current access token gets refused, as if it had expired.
   void expireAccessToken() => _validAccess = 'expired';
 
   @override
@@ -199,7 +201,7 @@ class FakeGateway implements SyncApi {
           },
       });
 
-  /// Adds a change as the orchestrator would (ADVICE_DEFERRED, SUPERSEDED, a late RECOMMENDATION_READY).
+  /// Adds a change the way the orchestrator would, such as ADVICE_DEFERRED, SUPERSEDED or a late RECOMMENDATION_READY.
   void addChange(String type, String assessmentId, int revision) =>
       _change(type, {'assessmentId': assessmentId, 'revision': revision});
 
@@ -214,11 +216,11 @@ class FakeGateway implements SyncApi {
     return PullPage.fromJson({'changes': page, 'nextCursor': next, 'hasMore': after.length > limit});
   }
 
-  /// Figures the fake serves, by 'corpusVersion/figureId' (like the rag-stub's F1-F3).
+  /// The figures this fake serves, keyed by 'corpusVersion/figureId' (like F1 to F3 in the rag-stub).
   final Map<String, List<int>> figures = {};
   int figureRequests = 0;
 
-  /// The next figure request answers 502 FIGURE_UNAVAILABLE.
+  /// Makes the next figure request answer 502 FIGURE_UNAVAILABLE.
   bool figureServiceDown = false;
 
   @override
@@ -238,7 +240,8 @@ class FakeGateway implements SyncApi {
     });
   }
 
-  /// Patient aliases stored by setPatientAlias, by patientRef (the server's clinical.patient.display_alias).
+  /// Patient aliases saved through setPatientAlias, keyed by patientRef. On the server this is
+  /// clinical.patient.display_alias.
   final Map<String, String> patientAliases = {};
 
   @override
@@ -250,15 +253,15 @@ class FakeGateway implements SyncApi {
   }
 }
 
-/// Stands in for the system browser and the identity service's login page: the clinician signs in there, or closes
-/// it when [cancel] is set.
+/// Stands in for the system browser and the identity service's login page. The clinician signs in there,
+/// or closes it if [cancel] is set.
 class FakeBrowserSignIn implements BrowserSignIn {
   FakeBrowserSignIn(this.gateway);
 
   final FakeGateway gateway;
   bool cancel = false;
 
-  /// The device ids the app sent with each sign-in (the device_id authorize parameter).
+  /// The device id the app sent with each sign-in, from the device_id authorize parameter.
   final List<String> deviceIds = [];
 
   @override

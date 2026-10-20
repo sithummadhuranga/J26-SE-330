@@ -5,18 +5,19 @@ import '../../../core/theme.dart';
 import '../api/sync_api.dart';
 import '../auth/browser_sign_in.dart';
 
-/// Sign-in screen: opens the identity service's sign-in page (ADR 0006), where the password and, if MFA is on, the
-/// authenticator code are entered. The app never sees them.
+/// The sign-in screen. It opens the identity service's sign-in page (ADR 0006), where the clinician types their
+/// password and, if MFA is on, their authenticator code. The app never sees either of them.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key, required this.services, required this.onSignedIn, this.onCancel});
 
   final AppServices services;
   final VoidCallback onSignedIn;
 
-  /// Set when signing in again on top of the app (see [again]): shows a close button and says the work is kept.
+  /// Set when signing in again on top of the app (see [again]). It adds a close button and tells the clinician
+  /// their work is safe.
   final VoidCallback? onCancel;
 
-  /// Re-sign-in shown over the app after a session ends; the queue and screens stay put.
+  /// Shows the sign-in screen over the app after a session ends. The queue and the screens underneath stay as they are.
   static Future<void> again(BuildContext context, AppServices services) =>
       Navigator.of(context).push(MaterialPageRoute<void>(
         fullscreenDialog: true,
@@ -50,7 +51,7 @@ class _SignInScreenState extends State<SignInScreen> {
       await widget.services.signIn();
       widget.onSignedIn();
     } on SignInCancelled {
-      // They closed the sign-in page. Nothing to report.
+      // They closed the sign-in page, so there's nothing to report.
     } on TransportException {
       setState(() => _error = SignInScreen.offlineMessage);
     } on ApiException {
@@ -134,7 +135,7 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 }
 
-/// The rounded teal app mark (the prototype's scan icon).
+/// The rounded teal app logo, which is the scan icon from the prototype.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 56});
 

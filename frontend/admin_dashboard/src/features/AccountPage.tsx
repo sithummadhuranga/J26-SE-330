@@ -23,7 +23,10 @@ import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 import { SessionsSection } from './SessionsSection';
 
-/** Scrolls to and focuses the section in the URL hash (#profile, #security, #sessions), as the profile panel links. */
+/**
+ * Scrolls to and focuses the section named in the URL hash (#profile, #security or #sessions).
+ * That's where the profile panel's links point.
+ */
 function useSectionFromHash() {
   const { hash } = useLocation();
   useEffect(() => {
@@ -35,8 +38,8 @@ function useSectionFromHash() {
 }
 
 /**
- * Your own account (plan: profile management, step 9): Profile (details and Edit profile), Security (password and
- * two-step sign-in) and Your sessions.
+ * Your own account page (profile management plan, step 9). It has Profile (details and Edit profile),
+ * Security (password and two-step sign-in) and Your sessions.
  */
 export function AccountPage() {
   const session = useSession();
@@ -213,7 +216,7 @@ function ConfirmStep({
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
-  // SVG needs no canvas, and the secret stays in this page: it is never sent to a QR service.
+  // SVG doesn't need a canvas, and the secret stays on this page. It's never sent to a QR service.
   useEffect(() => {
     let live = true;
     void QRCode.toString(enrollment.otpauthUri, { type: 'svg', margin: 1 }).then((svg) => {

@@ -1,4 +1,4 @@
-"""DISRUPTIVE: tests the figures proxy through the gateway, including a 503 from the stub (local Docker only)."""
+"""DISRUPTIVE: tests the figures proxy through the gateway, including a 503 from the stub. Local Docker only."""
 import os
 import secrets
 import subprocess
@@ -60,7 +60,8 @@ for bad in ["stub-0/..%2F..%2Fhealth", "stub-0/F1%3Fx%3D1", "stub-0/F1..", "stub
     status, _, data = get(f"/v1/figures/{bad}", token)
     check(f"unsafe id refused by the proxy, never forwarded ({bad[:30]})",
           status == 400 and b"INVALID_FIGURE_ID" in data, f"{status} {data[:60]!r}")
-# An encoded ".." gets collapsed so nothing matches (empty 404); a forwarded one would say FIGURE_NOT_FOUND.
+# An encoded ".." gets collapsed, so nothing matches and we get an empty 404. If it were forwarded, the answer
+# would say FIGURE_NOT_FOUND.
 status, _, data = get("/v1/figures/%2E%2E/F1", token)
 check("encoded '..' never reaches the proxy (no route)", status == 404 and b"FIGURE_NOT_FOUND" not in data,
       f"{status} {data[:60]!r}")

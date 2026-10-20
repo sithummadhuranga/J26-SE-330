@@ -14,7 +14,8 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using Sync.Common.Web;
 
-// Identity service: the OpenID Connect provider (ADR 0006), plus MFA and admin. The only service that signs tokens.
+// The identity service. It's the OpenID Connect provider (ADR 0006) and also handles MFA and admin.
+// It's the only service that signs tokens.
 var builder = WebApplication.CreateBuilder(args);
 builder.AddSyncTelemetry("identity-service")
     .WithTracing(t => t.AddAspNetCoreInstrumentation())
@@ -24,7 +25,7 @@ var dataSource = NpgsqlDataSource.Create(
     builder.Configuration.GetConnectionString("Postgres")
     ?? "Host=localhost;Username=cdss;Password=cdss;Database=cdss");
 
-// `dotnet run -- create-clinician ...` registers a clinician and exits (bootstrap of a facility's first admin).
+// `dotnet run -- create-clinician ...` registers a clinician and exits. That's how a facility gets its first admin.
 if (args.FirstOrDefault() == "create-clinician")
     return await CreateClinicianCommand.RunAsync(args, dataSource);
 
@@ -49,7 +50,7 @@ builder.Services.AddSingleton<DeviceAdminService>();
 builder.Services.AddSingleton<ProfileService>();
 builder.Services.AddHostedService<AuthHealthSampler>();
 
-// Only reachable inside the Docker network, behind the API gateway, so forwarded headers are trusted as-is.
+// This is only reachable inside the Docker network, behind the API gateway, so we trust forwarded headers as they are.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
@@ -57,9 +58,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Clear();
 });
 
-// MFA and admin endpoints need a signed-in clinician; this service checks its own bearer tokens.
-// In-memory keys are enough here: they only protect short-lived things (the 5-minute login cookie, the MFA step and
-// anti-forgery), so a restart just means signing in again. Codes and refresh tokens use a key from Secrets:EncryptionKey.
+// The MFA and admin endpoints need a signed-in clinician, and this service checks its own bearer tokens.
+// In-memory keys are fine here because they only protect short-lived things (the 5-minute login cookie, the MFA step
+// and anti-forgery), so a restart just means signing in again. Codes and refresh tokens use a key from
+// Secrets:EncryptionKey.
 builder.Services.AddInMemoryDataProtection();
 builder.Services.AddRazorPages();
 builder.Services
@@ -94,7 +96,7 @@ if (!app.Configuration.GetValue<bool>("SkipSchemaCheck"))
     await SchemaVersionGuard.EnsureAsync(dataSource, ExpectedSchemaVersions.All);
 
 app.UseForwardedHeaders();
-// Only the login page's font (wwwroot/account/fonts), so the page matches the app without a font service.
+// Just the login page's font (wwwroot/account/fonts), so the page matches the app without needing a font service.
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public, max-age=604800",

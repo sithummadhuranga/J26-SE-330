@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_scheduler.dart';
 
-/// When the sync runs (architecture §6.2), with a fake clock.
+/// Checks when the sync runs (architecture §6.2), using a fake clock.
 void main() {
   late List<bool> calls; // force flag of each run
   late SyncReport Function() next;

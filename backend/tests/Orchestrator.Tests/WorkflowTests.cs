@@ -186,7 +186,7 @@ internal sealed class FakeClient(Func<RecommendationRequest, RecommendationCallR
     }
 }
 
-/// <summary>In-memory store that behaves like the inbox: once stored, the event counts as processed.</summary>
+/// <summary>An in-memory store that behaves like the inbox. Once an event is stored, it counts as processed.</summary>
 internal sealed class FakeStore : IOrchestratorStore
 {
     public bool Processed, Outdated, Missing, ThrowOnBegin;

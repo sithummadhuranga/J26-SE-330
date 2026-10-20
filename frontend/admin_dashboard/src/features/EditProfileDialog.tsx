@@ -11,7 +11,7 @@ import { useToast } from '../ui/toastContext';
 const maxFullNameLength = 120;
 
 /**
- * Changes your own full name (plan: profile management, step 4). On success the profile panel, My account and the
+ * Changes your own full name (profile management plan, step 4). Afterwards the profile panel, My account and the
  * clinicians list all show the new name without a reload.
  */
 export function EditProfileDialog({ fullName, onClose }: { fullName: string; onClose: () => void }) {

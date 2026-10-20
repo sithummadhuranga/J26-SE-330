@@ -1,4 +1,4 @@
-"""Your own account through /v1/me (plan: profile management), end to end; safe to re-run."""
+"""Your own account through /v1/me (profile management plan), from start to finish. Safe to run again."""
 import secrets
 import sys
 from datetime import datetime

@@ -11,8 +11,8 @@ import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { EditProfileDialog } from './EditProfileDialog';
 
 /**
- * The avatar in the header and the small profile panel it opens (plan: profile management, step 2): who you are,
- * your two-step status, editing your name and password, links to My account, and sign-out.
+ * The avatar in the header and the small profile panel it opens (profile management plan, step 2). The panel shows
+ * who you are and your two-step status, lets you edit your name and password, links to My account, and signs out.
  */
 export function ProfileMenu() {
   const session = useSession();
@@ -32,7 +32,7 @@ export function ProfileMenu() {
     enabled: open,
   });
 
-  // Closes on Escape (focus back on the avatar) or a click outside, which includes the navigation tabs.
+  // It closes on Escape, putting focus back on the avatar, or on a click outside, including on the navigation tabs.
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: PointerEvent) => {

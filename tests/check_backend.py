@@ -1,6 +1,7 @@
 """
-One command to see that the backend is working: services up, health, then every non-disruptive end-to-end suite,
-with a pass/fail summary at the end. Exit code 0 only if everything passed.
+One command to check the backend is working. It checks the services are up and healthy, then runs every
+end-to-end suite that won't disrupt the stack, and finishes with a pass/fail summary. The exit code is 0 only
+if everything passed.
 
     python tests/check_backend.py              services + health + integration suites (about 5 minutes)
     python tests/check_backend.py --unit       also the .NET unit tests
@@ -9,8 +10,8 @@ with a pass/fail summary at the end. Exit code 0 only if everything passed.
     python tests/check_backend.py --quick      services + health + the smoke round trip only
 
 Start the stack first: docker compose up -d --build   (and --profile tools up -d for the auth-health Prometheus checks)
-The disruptive suites (e2e_architecture, e2e_orchestrator, e2e_retry) stop Kafka and restart services, so they are
-never run from here; run them by hand when nothing else is using the stack.
+The disruptive suites (e2e_architecture, e2e_orchestrator, e2e_retry) stop Kafka and restart services, so they're
+never run from here. Run them by hand when nothing else is using the stack.
 """
 import json
 import os
@@ -30,7 +31,8 @@ LONG_RUNNING = ["api-gateway", "identity-service", "sync-gateway", "ingest-persi
                 "housekeeping", "rag-stub", "kafka", "postgres"]
 ONE_SHOT = ["db-migrate", "kafka-init"]
 
-# Order matters: e2e_db_roles right after the smoke test, while every service still holds a database connection.
+# The order matters. e2e_db_roles runs right after the smoke test, while every service still has a database
+# connection open.
 SUITES = [
     ("e2e_smoke", "Round trip: login, push, Kafka, PostgreSQL, outbox, pull"),
     ("e2e_db_roles", "Least-privilege database roles"),
@@ -101,7 +103,7 @@ def run_suite(script, label):
         ok = out.returncode == 0 and failed == 0
         if ok or attempt == 2:
             break
-        # Retry once to tell rate limits or dropped idle connections apart from a real failure.
+        # Try once more, to tell a rate limit or a dropped idle connection apart from a real failure.
         print(f"  {YELLOW}....{RESET}  {label}: failed, retrying once after the rate-limit window (65 s)", flush=True)
         time.sleep(65)
         if script == "e2e_db_roles":

@@ -6,7 +6,7 @@ import { Field, Spinner } from '../ui/components';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toastContext';
 
-/** Register-clinician dialog that checks the server's rules up front and reports the new username. */
+/** The register-clinician dialog. It checks the server's rules before sending, then shows the new username. */
 export function RegisterClinicianDialog({
   onClose,
   onRegistered,
@@ -42,7 +42,7 @@ export function RegisterClinicianDialog({
       );
       onRegistered(name);
     } catch (err) {
-      // The form stays open with what was typed; the toast shows above the dialog.
+      // The form stays open with what was typed, and the toast shows above the dialog.
       toast.error(`Couldn't register ${name}`, err);
       setBusy(false);
       if (err instanceof NeedsSignIn) onClose();

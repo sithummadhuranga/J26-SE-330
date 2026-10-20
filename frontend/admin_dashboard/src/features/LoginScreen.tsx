@@ -7,14 +7,14 @@ import { useToast } from '../ui/toastContext';
 
 /**
  * Sends the admin to the identity service's sign-in page (ADR 0006). The password, the authenticator code and
- * messages like a locked account are all handled there; this app never sees the password.
+ * messages like "account locked" are all handled there, so this app never sees the password.
  */
 export function LoginScreen() {
   const session = useSession();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
-  // Back here because the server ended the session, or the last sign-in did not complete: say so once.
+  // If we're back here because the server ended the session or the last sign-in didn't finish, say so once.
   useEffect(() => {
     const failure = session.takeSignInFailure();
     const ended = session.takeEndedHereNotice();
