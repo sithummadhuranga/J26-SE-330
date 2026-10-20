@@ -56,6 +56,7 @@ public class LoginModelsTests
     [InlineData("/account/login?client_id=mobile")]
     [InlineData("/connect/authorize?client_id=someone-else")]
     [InlineData("/connect/authorize?response_type=code")]
+    [InlineData("/connect/authorize?client_id=mobile&client_id=admin-dashboard")]
     public void Anything_but_our_own_authorize_request_for_a_known_client_is_refused(string? url)
     {
         Assert.Null(LoginTarget.Parse(url, Clients));

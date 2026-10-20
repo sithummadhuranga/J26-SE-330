@@ -28,13 +28,14 @@ public class AccountControllerTests
 
     private readonly FakeRules _rules = new();
     private readonly FakeAuthentication _auth = new();
+    private readonly IDataProtectionProvider _protection = new EphemeralDataProtectionProvider();
     private readonly AccountController _controller;
 
     public AccountControllerTests()
     {
         var services = new ServiceCollection().AddSingleton<IAuthenticationService>(_auth).BuildServiceProvider();
         var http = new DefaultHttpContext { RequestServices = services };
-        _controller = new AccountController(_rules, Clients, new EphemeralDataProtectionProvider())
+        _controller = new AccountController(_rules, Clients, _protection)
         {
             ControllerContext = new ControllerContext { HttpContext = http },
             TempData = new TempDataDictionary(http, new NoTempData()),
@@ -220,6 +221,176 @@ public class AccountControllerTests
         Assert.True(page.AskForNewPassword);
     }
 
+    [Theory]
+    [InlineData(null, "secret-pw")]
+    [InlineData("", "secret-pw")]
+    [InlineData("   ", "secret-pw")]
+    [InlineData("n.silva", null)]
+    [InlineData("n.silva", "")]
+    public async Task A_blank_username_or_empty_password_is_asked_for_again(string? username, string? password)
+    {
+        var page = Page(await Post(new LoginForm { Username = username, Password = password }));
+        Assert.Equal("MISSING_FIELDS", page.ErrorCode);
+        Assert.Empty(_rules.Attempts);
+    }
+
+    [Fact]
+    public async Task The_password_is_checked_exactly_as_typed_and_only_the_username_is_trimmed()
+    {
+        _rules.Results.Enqueue(new CredentialResult(null, "INVALID_CREDENTIALS"));
+        await Post(new LoginForm { Username = " n.silva ", Password = " pass word " });
+        Assert.Equal(("n.silva", " pass word "), (_rules.Attempts[0].Username, _rules.Attempts[0].Password));
+    }
+
+    [Fact]
+    public async Task A_dashboard_sign_in_sends_no_device()
+    {
+        _rules.Results.Enqueue(new CredentialResult(Nurse, null));
+        await Post(new LoginForm { Username = "admin", Password = "secret-pw" }, DashboardReturnUrl);
+        Assert.Equal(("admin-dashboard", null), (_rules.Attempts[0].Client, _rules.Attempts[0].DeviceId));
+    }
+
+    [Fact]
+    public async Task An_unknown_reason_from_the_rules_shows_a_plain_message()
+    {
+        _rules.Results.Enqueue(new CredentialResult(null, "SOMETHING_INTERNAL"));
+        var page = Page(await Post(new LoginForm { Username = "n.silva", Password = "secret-pw" }));
+        Assert.Equal("Sign-in failed. Please try again.", page.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task A_wrong_code_reason_on_the_password_step_does_not_open_the_code_step()
+    {
+        _rules.Results.Enqueue(new CredentialResult(null, "INVALID_TOTP"));
+        var page = Page(await Post(new LoginForm { Username = "n.silva", Password = "secret-pw" }));
+        Assert.False(page.AskForTotp);
+        Assert.Equal("Wrong username or password.", page.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task The_code_step_asks_only_for_the_code()
+    {
+        _rules.Results.Enqueue(new CredentialResult(null, "MFA_REQUIRED", "hash-1"));
+        var page = Page(await Post(new LoginForm { Username = "n.silva", Password = "secret-pw" }));
+        Assert.True(page.AskForTotp);
+        Assert.Null(page.Username);
+        Assert.Null(page.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Tickets_are_encrypted_so_the_page_never_shows_the_username_or_password_hash()
+    {
+        var ticket = await MfaTicket();
+        Assert.DoesNotContain("n.silva", ticket);
+        Assert.DoesNotContain("hash-1", ticket);
+    }
+
+    [Fact]
+    public async Task An_expired_ticket_starts_the_sign_in_again()
+    {
+        var expired = _protection.CreateProtector("IdentityService.Login.MfaTicket").ToTimeLimitedDataProtector()
+            .Protect($$"""{"Username":"n.silva","PasswordHash":"hash-1","ReturnUrl":"{{MobileReturnUrl}}"}""",
+                DateTimeOffset.UtcNow.AddMinutes(-1));
+        var page = Page(await Post(new LoginForm { MfaTicket = expired, Totp = "123456" }));
+        Assert.Equal("SESSION_EXPIRED", page.ErrorCode);
+        Assert.Empty(_rules.Attempts);
+    }
+
+    [Fact]
+    public async Task Tickets_from_the_page_run_out_after_five_minutes()
+    {
+        var mfa = await MfaTicket();
+        var change = await ChangeTicket();
+
+        _protection.CreateProtector("IdentityService.Login.MfaTicket").ToTimeLimitedDataProtector()
+            .Unprotect(mfa, out var mfaExpiry);
+        _protection.CreateProtector("IdentityService.Login.ChangeTicket").ToTimeLimitedDataProtector()
+            .Unprotect(change, out var changeExpiry);
+
+        foreach (var expiry in new[] { mfaExpiry, changeExpiry })
+            Assert.InRange(expiry - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(5));
+    }
+
+    [Fact]
+    public async Task A_freshly_sealed_ticket_in_the_same_format_is_accepted()
+    {
+        // Guards the expired-ticket test: it only proves something if this same ticket works when it is in date.
+        var fresh = _protection.CreateProtector("IdentityService.Login.MfaTicket").ToTimeLimitedDataProtector()
+            .Protect($$"""{"Username":"n.silva","PasswordHash":"hash-1","ReturnUrl":"{{MobileReturnUrl}}"}""",
+                DateTimeOffset.UtcNow.AddMinutes(1));
+        _rules.Results.Enqueue(new CredentialResult(Nurse, null));
+        Assert.IsType<LocalRedirectResult>(await Post(new LoginForm { MfaTicket = fresh, Totp = "123456" }));
+    }
+
+    [Fact]
+    public async Task Any_other_refusal_on_the_code_step_starts_again_without_the_username()
+    {
+        var ticket = await MfaTicket();
+        _rules.Results.Enqueue(new CredentialResult(null, "CREDENTIAL_LOCKED"));
+        var page = Page(await Post(new LoginForm { MfaTicket = ticket, Totp = "123456" }));
+
+        Assert.Equal("CREDENTIAL_LOCKED", page.ErrorCode);
+        Assert.False(page.AskForTotp);
+        Assert.Null(page.Username);
+        Assert.Null(_auth.Principal);
+    }
+
+    [Fact]
+    public async Task After_the_code_an_admin_set_password_still_has_to_be_replaced_without_asking_for_the_code_again()
+    {
+        var mfa = await MfaTicket();
+        _rules.Results.Enqueue(new CredentialResult(null, "PASSWORD_CHANGE_REQUIRED", "hash-1"));
+        var page = Page(await Post(new LoginForm { MfaTicket = mfa, Totp = "123456" }));
+        Assert.True(page.AskForNewPassword);
+        Assert.False(page.AskForTotp);
+
+        _rules.Results.Enqueue(new CredentialResult(Nurse, null));
+        var result = await Post(new LoginForm { ChangeTicket = page.ChangeTicket, NewPassword = "my-own-pw", ConfirmPassword = "my-own-pw" });
+        Assert.IsType<LocalRedirectResult>(result);
+        Assert.True(_rules.Attempts[2].MfaAlreadyVerified);
+    }
+
+    [Fact]
+    public async Task A_change_ticket_cannot_be_moved_to_a_different_authorize_request()
+    {
+        var ticket = await ChangeTicket();
+        var page = Page(await Post(new LoginForm { ChangeTicket = ticket, NewPassword = "my-own-pw", ConfirmPassword = "my-own-pw" },
+            DashboardReturnUrl));
+        Assert.Equal("SIGN_IN_CHANGED", page.ErrorCode);
+        Assert.Empty(_rules.Changes);
+    }
+
+    [Fact]
+    public async Task A_password_change_refused_for_another_reason_starts_again()
+    {
+        var ticket = await ChangeTicket();
+        _rules.ChangeError = "SESSION_EXPIRED";
+        var page = Page(await Post(new LoginForm { ChangeTicket = ticket, NewPassword = "my-own-pw", ConfirmPassword = "my-own-pw" }));
+
+        Assert.Equal("SESSION_EXPIRED", page.ErrorCode);
+        Assert.False(page.AskForNewPassword);
+        Assert.Single(_rules.Attempts);
+    }
+
+    [Fact]
+    public async Task A_refusal_after_the_new_password_starts_again_without_the_username()
+    {
+        var ticket = await ChangeTicket();
+        _rules.Results.Enqueue(new CredentialResult(null, "DEVICE_NOT_ALLOWED"));
+        var page = Page(await Post(new LoginForm { ChangeTicket = ticket, NewPassword = "my-own-pw", ConfirmPassword = "my-own-pw" }));
+
+        Assert.Equal("DEVICE_NOT_ALLOWED", page.ErrorCode);
+        Assert.False(page.AskForNewPassword);
+        Assert.Null(page.Username);
+        Assert.Null(_auth.Principal);
+    }
+
+    [Fact]
+    public void The_signed_out_page_shows()
+    {
+        Assert.IsType<ViewResult>(_controller.SignedOut());
+    }
+
     [Fact]
     public void The_form_post_checks_the_anti_forgery_token()
     {
@@ -228,7 +399,7 @@ public class AccountControllerTests
         Assert.NotNull(post.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
     }
 
-        private sealed class FakeRules : ISignInRules
+    private sealed class FakeRules : ISignInRules
     {
         public Queue<CredentialResult> Results { get; } = new();
         public List<SignInAttempt> Attempts { get; } = [];
@@ -257,7 +428,7 @@ public class AccountControllerTests
         public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
     }
 
-        private sealed class FakeAuthentication : IAuthenticationService
+    private sealed class FakeAuthentication : IAuthenticationService
     {
         public string? Scheme { get; private set; }
         public ClaimsPrincipal? Principal { get; private set; }
