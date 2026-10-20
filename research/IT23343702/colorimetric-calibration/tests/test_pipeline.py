@@ -89,3 +89,33 @@ def test_ablation_has_proposal_table1_configurations():
         assert name in ABLATION_VARIANTS
     res = process_image(skin(64, 64, DARK), ABLATION_VARIANTS["ssr"])
     assert "2_ssr" in res.timings_ms and "2_msr" not in res.timings_ms
+
+
+def test_default_gate_is_the_ita_rule():
+    assert PipelineConfig().gate == "ita"
+    assert ABLATION_VARIANTS["full_model_gate"].gate == "model"
+
+
+def test_unknown_gate_raises():
+    with pytest.raises(ValueError):
+        process_image(skin(64, 64, DARK), PipelineConfig(gate="nope"))
+
+
+def test_model_gate_decides_the_ccm(monkeypatch):
+    cfg = PipelineConfig(gate="model")
+    dark, light = skin(128, 128, DARK), skin(128, 128, LIGHT)
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: False)
+    assert not process_image(dark, cfg).ccm_applied  # the ITA rule alone would have corrected this one
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: True)
+    assert process_image(light, cfg).ccm_applied
+
+
+def test_model_gate_on_the_real_model_corrects_dark_skin():
+    res = process_image(skin(128, 128, DARK), PipelineConfig(gate="model"))
+    assert res.ccm_applied
+
+
+def test_model_gate_falls_back_to_ita_when_it_cannot_read(monkeypatch):
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: None)
+    res = process_image(skin(128, 128, DARK), PipelineConfig(gate="model"))
+    assert res.ccm_applied and any("using the ITA rule" in n for n in res.notes)

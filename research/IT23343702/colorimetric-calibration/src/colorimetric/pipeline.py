@@ -29,6 +29,7 @@ import numpy as np
 from .ccm import apply_adaptive_ccm, estimate_adaptive_ccm, normalise_skin_L_variance
 from .enhance import clahe_median, remove_specular
 from .illumination import gray_world, multi_scale_retinex_L, single_scale_retinex_L, white_balance
+from .gate import is_dark
 from .marker import correct_with_marker
 from .ita import GATE_CUTOFF_FITTED, GATE_CUTOFF_STANDARD, SKIN_V_MIN, classify_image, needs_ccm, skin_mask_hsv
 from .preprocess import _check_rgb, process_raw_input
@@ -44,6 +45,7 @@ class PipelineConfig:
     classify_skin: bool = True         # step 3; off = no ITA/FST, so no CCM either
     use_ccm: bool = True               # step 4
     gate_cutoff: float = GATE_CUTOFF_STANDARD
+    gate: str = "ita"                  # CCM decision: "ita" (ITA <= gate_cutoff) | "model" (T55 light/dark model, see gate.py)
     skin_v_min: float = SKIN_V_MIN     # lower V limit (%) of the skin mask; 35.0 = research guide, see ita.py
     classify_on: str = "raw"           # "raw" | "processed"
     use_specular: bool = True          # step 5
@@ -77,6 +79,7 @@ ABLATION_VARIANTS: dict[str, PipelineConfig] = {
     "retinex_ccm": PipelineConfig(illumination="msr", use_ccm=True, use_specular=False, use_clahe=False),
     "full": PipelineConfig(),
     "full_fitted_gate": PipelineConfig(gate_cutoff=GATE_CUTOFF_FITTED),
+    "full_model_gate": PipelineConfig(gate="model"),
     "full_ccm_v1": PipelineConfig(ccm_shift="fixed", ccm_stratified=False, ccm_l_variance=False),
     "full_ccm_unstratified": PipelineConfig(ccm_stratified=False, ccm_l_variance=False),
 }
@@ -103,6 +106,8 @@ def process_image(
         raise ValueError(f"unknown illumination {cfg.illumination!r}")
     if cfg.classify_on not in ("raw", "processed"):
         raise ValueError(f"unknown classify_on {cfg.classify_on!r}")
+    if cfg.gate not in ("ita", "model"):
+        raise ValueError(f"unknown gate {cfg.gate!r}")
 
     timings: dict[str, float] = {}
     notes: list[str] = []
@@ -149,9 +154,16 @@ def process_image(
 
     ccm_applied = False
     if cfg.use_ccm:
+        run_ccm = None if ita is None else needs_ccm(ita.ita_angle, cfg.gate_cutoff)
+        if ita is not None and cfg.gate == "model":
+            dark = is_dark(rgb)  # same image the ITA was read from (raw, or marker-corrected)
+            if dark is None:
+                notes.append("gate model could not read the photo, using the ITA rule")
+            else:
+                run_ccm = dark
         if ita is None:
             notes.append("CCM skipped: no skin-tone estimate")
-        elif needs_ccm(ita.ita_angle, cfg.gate_cutoff):
+        elif run_ccm:
             cv2.setRNGSeed(cfg.seed)
             try:
                 M = timed("4_ccm_fit", estimate_adaptive_ccm, img, ita.fitzpatrick_type,

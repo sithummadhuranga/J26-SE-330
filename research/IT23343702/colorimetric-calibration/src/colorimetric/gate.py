@@ -14,7 +14,9 @@ It does NOT carry over to a second dataset. On 193 hand-labelled ISIC images (97
 ITA gate gets dark recall 0.99 / light specificity 0.87, this model at 0.35 gets 0.71 / 0.96.
 The two datasets disagree about which gate is better, so do not replace the 28 deg rule with this.
 
-Not wired into the pipeline by default; call `dark_probability` / `is_dark` yourself.
+Off by default. Select it with `PipelineConfig(gate="model")` (ablation variant `full_model_gate`); the default stays the
+ITA rule. The correction strength still comes from the ITA type (`ccm.CORRECTION_FRACTION`), so types I-II get no lift even
+if the model calls the photo dark.
 """
 
 from __future__ import annotations
