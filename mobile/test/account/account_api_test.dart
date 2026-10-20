@@ -9,7 +9,7 @@ import 'package:melanin_wound_cdss/features/sync/auth/auth_session.dart';
 
 import '../sync/support/fakes.dart';
 
-/// The account calls against a scripted server, signed in through the fake gateway.
+/// Your own account through /v1/me, against a scripted server, signed in through the fake gateway.
 void main() {
   late FakeGateway gateway;
   late AuthSession auth;
@@ -37,7 +37,7 @@ void main() {
     'lastSignInAt': null,
   };
 
-  test('reads your profile with the access token', () async {
+  test('your profile is read with this phone\'s access token', () async {
     late http.Request seen;
     final profile = await api((r) async {
       seen = r;
@@ -50,7 +50,7 @@ void main() {
     expect(profile.lastSignInAt, isNull);
   });
 
-  test('on a 401 it refreshes once and tries again', () async {
+  test('an access token that lapsed is refreshed once and the call retried (§7.1: 401)', () async {
     final tokens = <String?>[];
     final profile = await api((r) async {
       tokens.add(r.headers['Authorization']);
@@ -61,7 +61,7 @@ void main() {
     expect(tokens[0], isNot(tokens[1]), reason: 'the retry used the new token');
   });
 
-  test('sends the name and password as JSON, and lists sessions', () async {
+  test('renaming, changing the password and ending sessions send what the server expects', () async {
     final bodies = <String, Object?>{};
     final a = api((r) async {
       bodies['${r.method} ${r.url.path}'] = r.body.isEmpty ? null : jsonDecode(r.body);
@@ -95,7 +95,7 @@ void main() {
     expect(sessions.single.deviceId, 'dev-test');
   });
 
-  test('server refusals come back as ApiException with the reason, and read as plain messages', () async {
+  test('server refusals keep their reason code and read as plain messages', () async {
     final a = api((r) async => json({'code': 'INVALID_CREDENTIALS'}, 400));
     await expectLater(
       a.changePassword('wrong', 'new-password'),
@@ -106,7 +106,7 @@ void main() {
     expect(accountMessage(ApiException(500)), 'Something went wrong. Please try again.');
   });
 
-  test('no connection is a TransportException, and a finished session asks to sign in again', () async {
+  test('offline says so, and a session that has ended asks to sign in again', () async {
     await expectLater(
       api((r) async => throw http.ClientException('connection refused')).profile(),
       throwsA(isA<TransportException>()),

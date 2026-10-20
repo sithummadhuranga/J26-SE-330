@@ -177,7 +177,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('a failed analysis says why on its step and saves nothing', (tester) async {
+  testWidgets('a failed analysis says why on its step, and nothing reaches the queue', (tester) async {
     await open(tester, analyzer: _FailingAnalyzer());
     await tapAndSettle(tester, find.byKey(const Key('newAssessment')));
     await tapAndSettle(tester, find.byKey(const Key('takePhoto')));
@@ -293,7 +293,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('account: offline shows why, and tries again', (tester) async {
+  testWidgets('account: offline says why and offers to try again', (tester) async {
     await open(tester);
     account.offline = true;
     await openAccount(tester);
