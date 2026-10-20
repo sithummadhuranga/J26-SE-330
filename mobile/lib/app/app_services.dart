@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../features/account/account_api.dart';
 import '../features/assessment/analysis/wound_analyzer.dart';
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
@@ -23,7 +24,7 @@ const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http:
 /// [scheduler].onSaved(). Use [figures] to show guideline figures, and [analyzer] to analyse a captured wound.
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
-      required this.auth, required this.engine, required this.scheduler, required this.analyzer});
+      required this.auth, required this.engine, required this.scheduler, required this.analyzer, required this.account});
 
   final AppDatabase db;
   final QueueRepository queue;
@@ -37,6 +38,9 @@ class AppServices {
   /// The on-device wound analysis. It's [SampleWoundAnalyzer] until the real pipeline from Members 1–2 is ready.
   final WoundAnalyzer analyzer;
 
+  /// Your own account on the server (name, password, sessions). Needs a connection, unlike the rest of the app.
+  final AccountApi account;
+
   /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
@@ -46,6 +50,7 @@ class AppServices {
     Stream<bool>? online,
     DateTime Function()? clock,
     WoundAnalyzer? analyzer,
+    AccountApi? account,
   }) async {
     final store = secrets ?? const KeystoreSecretStore();
     final database = db ??
@@ -76,7 +81,8 @@ class AppServices {
         auth: auth,
         engine: engine,
         scheduler: scheduler,
-        analyzer: analyzer ?? SampleWoundAnalyzer());
+        analyzer: analyzer ?? SampleWoundAnalyzer(),
+        account: account ?? HttpAccountApi(Uri.parse(syncBaseUrl), auth));
   }
 
   /// Signs in on the identity service's page with this phone's device id, and remembers who signed in

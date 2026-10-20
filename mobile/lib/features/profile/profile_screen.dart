@@ -4,6 +4,7 @@ import '../../app/app_services.dart';
 import '../../app/connection.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../account/account_screen.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/queue_repository.dart';
 import '../sync/engine/sync_scheduler.dart';
@@ -94,6 +95,18 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         child: Column(
           children: [
+            _SettingRow(
+              key: const Key('account'),
+              icon: Icons.manage_accounts_outlined,
+              label: 'Account',
+              sub: 'Name, password and where you\'re signed in',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AccountScreen(services: services, onSignedOut: onSignedOut),
+                ),
+              ),
+            ),
+            const Divider(),
             ValueListenableBuilder<SyncStatus>(
               valueListenable: services.scheduler.status,
               builder: (context, status, _) => StreamBuilder<QueueCounts>(
@@ -200,7 +213,7 @@ Future<bool> _confirmSignOut(BuildContext context, AppServices services) async {
 }
 
 class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.icon, required this.label, this.sub, this.trailing, this.onTap});
+  const _SettingRow({super.key, required this.icon, required this.label, this.sub, this.trailing, this.onTap});
 
   final IconData icon;
   final String label;
