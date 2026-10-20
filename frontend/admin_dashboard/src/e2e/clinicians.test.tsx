@@ -76,7 +76,7 @@ describe('clinicians (real identity service and database)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Register' }));
     expect(within(dialog).getByText('Enter the full name')).toBeInTheDocument();
     expect(within(dialog).getByText('Use 3–64 of a–z, 0–9, . _ -')).toBeInTheDocument();
-    expect(within(dialog).getByText('At least 12 characters')).toBeInTheDocument();
+    expect(within(dialog).getByText('At least 8 characters')).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText('Full name'), 'Taken Name');
     await user.clear(within(dialog).getByLabelText('Username'));
@@ -136,7 +136,7 @@ describe('clinicians (real identity service and database)', () => {
     const dialog = screen.getByRole('dialog', { name: `Reset password for ${name}` });
     await user.type(within(dialog).getByLabelText('New password'), 'short');
     await user.click(within(dialog).getByRole('button', { name: 'Reset password' }));
-    expect(within(dialog).getByText('At least 12 characters')).toBeInTheDocument();
+    expect(within(dialog).getByText('At least 8 characters')).toBeInTheDocument();
     await user.clear(within(dialog).getByLabelText('New password'));
     await user.type(within(dialog).getByLabelText('New password'), 'New-E2e-Pass-2026!');
     await user.click(within(dialog).getByRole('button', { name: 'Reset password' }));

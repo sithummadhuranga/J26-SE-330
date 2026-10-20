@@ -139,7 +139,7 @@ describe('profile panel from the avatar (real identity service)', () => {
 
     await submit();
     expect(within(dialog).getByText('Enter your current password')).toBeInTheDocument();
-    expect(within(dialog).getByText('At least 12 characters')).toBeInTheDocument();
+    expect(within(dialog).getByText('At least 8 characters')).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText('Current password'), 'definitely-wrong-1');
     await user.type(within(dialog).getByLabelText('New password'), newPassword);
