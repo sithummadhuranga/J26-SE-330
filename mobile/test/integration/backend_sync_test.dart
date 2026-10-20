@@ -46,13 +46,15 @@ void main() {
     final pushed = await engine.sync();
     expect(pushed.outcome, SyncOutcome.success, reason: '$pushed');
     expect(pushed.accepted, 3);
-    expect(await queue.cursor(), greaterThan(0), reason: 'pulled the history');
+    // The cursor can still be 0 here: the server stores pushed events in the background, so on an empty
+    // database the pull straight after the push may find nothing yet. It's checked after the loop below.
 
     // Advice comes back through the orchestrator, so keep pulling until every record is final.
     for (var i = 0; i < 30 && (await queue.counts()).of(QueueStatus.complete) + (await queue.counts()).of(QueueStatus.superseded) < 3; i++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       await engine.sync(force: true);
     }
+    expect(await queue.cursor(), greaterThan(0), reason: 'pulled the changes back');
     final rows = {for (final r in await queue.all()) '${r.assessmentId}/${r.revision}': r};
     expect(rows['${first['assessmentId']}/1']!.status, QueueStatus.superseded, reason: 'revision 2 got the advice');
     expect(rows['${first['assessmentId']}/2']!.status, QueueStatus.complete);
