@@ -45,6 +45,7 @@ class PipelineConfig:
     classify_skin: bool = True         # step 3; off = no ITA/FST, so no CCM either
     use_ccm: bool = True               # step 4
     gate_cutoff: float = GATE_CUTOFF_STANDARD
+    check_agreement: bool = True       # also ask the T55 model and flag a disagreement with the ITA rule (decision unchanged)
     gate: str = "ita"                  # CCM decision: "ita" (ITA <= gate_cutoff) | "model" (T55 light/dark model, see gate.py)
     skin_v_min: float = SKIN_V_MIN     # lower V limit (%) of the skin mask; 35.0 = research guide, see ita.py
     classify_on: str = "raw"           # "raw" | "processed"
@@ -66,6 +67,7 @@ class ProcessResult:
     marker_used: bool = False
     marker_label: str | None = None    # e.g. "relative calibration, stand-in reference colours"; None if no marker used
     marker_skin_delta_e: dict[str, float] = field(default_factory=dict)
+    skin_type_confidence: str = "unchecked"  # "none" no estimate | "low" ITA rule and model disagree | "ok" they agree | "unchecked"
     timings_ms: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
@@ -152,15 +154,22 @@ def process_image(
     if cfg.classify_skin and cfg.classify_on == "processed":
         ita = timed("ita", classify, img)
 
+    confidence = "none" if ita is None else "unchecked"
+    dark = None
+    if ita is not None and (cfg.gate == "model" or cfg.check_agreement):
+        dark = timed("gate_check", is_dark, rgb)  # same image the ITA was read from (raw, or marker-corrected)
+        if dark is None:
+            notes.append("gate model could not read the photo, using the ITA rule")
+        else:
+            confidence = "ok" if dark == needs_ccm(ita.ita_angle, cfg.gate_cutoff) else "low"
+            if confidence == "low":
+                notes.append("ITA rule and the light/dark model disagree: skin type is low confidence")
+
     ccm_applied = False
     if cfg.use_ccm:
         run_ccm = None if ita is None else needs_ccm(ita.ita_angle, cfg.gate_cutoff)
-        if ita is not None and cfg.gate == "model":
-            dark = is_dark(rgb)  # same image the ITA was read from (raw, or marker-corrected)
-            if dark is None:
-                notes.append("gate model could not read the photo, using the ITA rule")
-            else:
-                run_ccm = dark
+        if dark is not None and cfg.gate == "model":
+            run_ccm = dark
         if ita is None:
             notes.append("CCM skipped: no skin-tone estimate")
         elif run_ccm:
@@ -191,6 +200,7 @@ def process_image(
         marker_used=marker_used,
         marker_label=marker_label,
         marker_skin_delta_e=marker_de,
+        skin_type_confidence=confidence,
         timings_ms=timings,
         notes=notes,
     )

@@ -67,7 +67,7 @@ def test_wound_bbox_is_accepted_and_shape_kept():
 def test_to_json_is_serialisable_and_has_no_image_data():
     data = CalibrationPipeline().process(skin(64, 64)).to_json()
     text = json.dumps(data)
-    assert set(data) == {"fitzpatrick_class", "ita_angle", "ccm_applied", "marker_used", "marker_label", "stage_timing_ms", "notes"}
+    assert set(data) == {"fitzpatrick_class", "ita_angle", "ccm_applied", "marker_used", "marker_label", "skin_type_confidence", "stage_timing_ms", "notes"}
     assert len(text) < 2000
 
 
