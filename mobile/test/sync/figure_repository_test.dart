@@ -7,7 +7,7 @@ import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 
 import 'support/fakes.dart';
 
-/// Guideline figures on the device (architecture §6 figures_local, §10.4).
+/// Guideline figures stored on the phone (figures_local in architecture §6, and §10.4).
 void main() {
   late AppDatabase db;
   late QueueRepository queue;

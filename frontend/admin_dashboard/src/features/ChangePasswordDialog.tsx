@@ -11,8 +11,8 @@ import { useToast } from '../ui/toastContext';
 type Errors = { current?: string; next?: string; again?: string };
 
 /**
- * Changes your own password (plan: profile management, step 6). The server then ends every session, this one
- * included, so on success the dashboard returns to the sign-in screen and asks for the new password.
+ * Changes your own password (profile management plan, step 6). The server then ends every session, including
+ * this one, so afterwards the dashboard goes back to the sign-in screen and asks for the new password.
  */
 export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const session = useSession();
@@ -41,7 +41,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       session.endHere('passwordChanged'); // the sign-in screen takes over and asks for the new password
     } catch (err) {
       setBusy(false);
-      // A wrong current password belongs next to that field; anything else is a toast.
+      // A wrong current password is shown next to that field. Anything else becomes a toast.
       if (err instanceof ApiError && err.code === 'INVALID_CREDENTIALS') {
         setErrors({ current: describeError(err) });
         setCurrent('');

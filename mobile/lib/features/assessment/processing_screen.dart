@@ -21,7 +21,8 @@ class _Step {
   String? note;
 }
 
-/// Runs the assessment: save to the encrypted queue first, then sync and wait for advice (or just queue if offline).
+/// Runs the assessment. It saves to the encrypted queue first, then syncs and waits for advice.
+/// If the phone is offline, the assessment just waits in the queue.
 class ProcessingScreen extends StatefulWidget {
   const ProcessingScreen({
     super.key,
@@ -43,7 +44,7 @@ class ProcessingScreen extends StatefulWidget {
 }
 
 class _ProcessingScreenState extends State<ProcessingScreen> {
-  // The first four are stand-ins until Members 1–2's pipeline is plugged in.
+  // The first four steps are stand-ins until the pipeline from Members 1–2 is plugged in.
   final _steps = [
     _Step('Skin tone calibration'),
     _Step('Wound segmentation'),
@@ -94,14 +95,14 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     try {
       (state, note) = await _waitForAdvice();
     } catch (_) {
-      // The assessment is already committed to the queue; whatever failed here, it syncs later.
+      // The assessment is already saved in the queue, so whatever went wrong here, it will still sync later.
       (state, note) = (StepState.attention, 'Saved — guidance will arrive once it syncs');
     }
     _set(5, state, note);
     if (mounted) setState(() => _finished = true);
   }
 
-  /// Null when the event is committed to the queue; otherwise why not, in words.
+  /// Null once the event is saved in the queue. Otherwise, a plain explanation of why it wasn't.
   Future<String?> _save() async {
     final s = widget.services;
     final who = await s.cachedClinician();

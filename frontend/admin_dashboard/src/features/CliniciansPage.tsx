@@ -27,11 +27,11 @@ import { ResetPasswordDialog } from './ResetPasswordDialog';
 
 type Action = 'unlock' | 'resetMfa' | 'deactivate' | 'reactivate';
 
-/** Newest first, so a clinician who was just registered is the top row (the server sorts by username). */
+/** Newest first, so a clinician who was just registered ends up at the top. The server sorts by username. */
 const newestFirst = (a: ClinicianSummary, b: ClinicianSummary) =>
   b.createdAt.localeCompare(a.createdAt) || a.username.localeCompare(b.username);
 
-/** Facility clinicians: register, unlock, reset password or MFA, or deactivate (all audited). */
+/** The facility's clinicians. You can register, unlock, reset a password or MFA, or deactivate. It's all audited. */
 export function CliniciansPage() {
   const session = useSession();
   const me = useAdmin()?.username;

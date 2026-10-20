@@ -42,8 +42,9 @@ async function signedInAsNewAdmin(path = '/') {
 }
 
 /**
- * The clinicians-table row with [text], paging with the arrows: other test files register clinicians at the same
- * time, so this one may not be on page 1. Looks inside the table only (the header shows your username too).
+ * Finds the row with [text] in the clinicians table, paging with the arrows. Other test files register clinicians
+ * at the same time, so it might not be on page 1. It only looks inside the table, because the header shows your
+ * username too.
  */
 async function rowInTable(user: Awaited<ReturnType<typeof signedInAsNewAdmin>>['user'], text: string) {
   for (;;) {
@@ -107,7 +108,7 @@ describe('profile panel from the avatar (real identity service)', () => {
     await user.click(screen.getByRole('button', { name: 'Your profile' }));
     expect(within(await screen.findByRole('dialog', { name: 'Your profile' })).getByText('Renamed In Test')).toBeInTheDocument();
 
-    // Saved on the server: a fresh read of the profile has it.
+    // It's saved on the server, so reading the profile again shows it.
     const admin = await adminSession();
     expect((await admin.authorized((t) => admin.api.clinicians(t))).find((c) => c.username === name)?.fullName).toBe(
       'Renamed In Test',
@@ -174,7 +175,7 @@ describe('profile panel from the avatar (real identity service)', () => {
   it('Your sessions lists the browser and the phone, and ending the phone one signs it out', async () => {
     const name = uniqueName('sess');
     await registerClinician(await adminSession(), name, 'admin');
-    // The phone signs in first (the test-only password grant does not ask for a new password), then this browser.
+    // The phone signs in first, then this browser. The test-only password grant doesn't ask for a new password.
     const phone = await mobileLogin(name, strongPassword, `dev-${name}`);
     expect(phone.status).toBe(200);
     const session = newSession();
@@ -192,7 +193,7 @@ describe('profile panel from the avatar (real identity service)', () => {
     expect(await findToast(`Mobile app on dev-${name} is signed out.`)).toBeInTheDocument();
     expect(await screen.findByText('Your sessions · 1', {}, slow)).toBeInTheDocument();
     expect(within(card).queryByText(`· dev-${name}`, { exact: false })).not.toBeInTheDocument();
-    // The server agrees: only this browser's session is left.
+    // The server agrees that only this browser's session is left.
     expect(await session.authorized((t) => session.api.mySessions(t))).toHaveLength(1);
   });
 

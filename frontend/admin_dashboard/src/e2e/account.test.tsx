@@ -52,7 +52,7 @@ describe('my account: two-step sign-in (real identity service)', () => {
     expect(await findToast('Two-step sign-in is on')).toBeInTheDocument();
     expect(await within(card).findByText('On', {}, slow)).toBeInTheDocument();
 
-    // The password alone no longer signs in; with a fresh code from the app it does.
+    // The password on its own no longer gets you in, but with a fresh code from the app it does.
     await expect(signInThroughLoginPage(newSession(), name, ownPassword)).rejects.toBeInstanceOf(LoginPageError);
     const admin = await signInThroughLoginPage(newSession(), name, ownPassword, totpCode(secret, step() + 1));
     expect(admin.username).toBe(name);

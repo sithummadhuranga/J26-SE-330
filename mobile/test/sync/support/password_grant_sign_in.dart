@@ -5,8 +5,8 @@ import 'package:melanin_wound_cdss/features/sync/api/sync_api.dart';
 import 'package:melanin_wound_cdss/features/sync/api/sync_models.dart';
 import 'package:melanin_wound_cdss/features/sync/auth/browser_sign_in.dart';
 
-/// Signs in against the real backend without a browser, using the password grant the local stack enables for tests
-/// (Oidc:AllowPasswordGrant). The app itself always goes through the login page; the tokens are the same.
+/// Signs in to the real backend without a browser, using the password grant that the local stack turns on for tests
+/// (Oidc:AllowPasswordGrant). The app itself always uses the login page, but the tokens come out the same.
 class PasswordGrantSignIn implements BrowserSignIn {
   PasswordGrantSignIn(this.baseUri, this.username, this.password);
 

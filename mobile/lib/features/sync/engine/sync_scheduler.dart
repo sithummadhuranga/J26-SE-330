@@ -17,7 +17,8 @@ class SyncStatus {
       SyncStatus(running: running ?? this.running, last: last ?? this.last, lastRunAt: lastRunAt ?? this.lastRunAt);
 }
 
-/// Decides when to sync: on reconnect, resume, after a save, pull-to-refresh, a periodic timer and after backoff.
+/// Decides when to sync. That's when the phone reconnects, when the app comes back to the front, after a save,
+/// on pull-to-refresh, on a regular timer, and once a backoff is over.
 class SyncScheduler {
   SyncScheduler(this._sync, {Stream<bool>? online, this.periodic = const Duration(minutes: 5), DateTime Function()? clock})
       : _online = online,
@@ -47,7 +48,7 @@ class SyncScheduler {
     _run('start');
   }
 
-  /// Called after every enqueue: one run two seconds after the last save.
+  /// Called after every save. It syncs once, two seconds after the last save.
   void onSaved() {
     _debounce?.cancel();
     _debounce = Timer(saveDebounce, () => _run('saved'));
@@ -55,10 +56,10 @@ class SyncScheduler {
 
   void onForeground() => _run('foreground');
 
-  /// Pull-to-refresh and the "sync now" button: runs now, even inside a backoff window.
+  /// For pull-to-refresh and the "Sync now" button. It runs straight away, even during a backoff.
   Future<SyncReport> syncNow() => _run('manual', force: true);
 
-  /// Never throws, since triggers are timers and streams; a failed run just shows as offline.
+  /// Never throws, because the triggers are timers and streams. If a run fails, the app just shows it as offline.
   Future<SyncReport> _run(String reason, {bool force = false}) async {
     status.value = status.value.copyWith(running: true);
     SyncReport report;

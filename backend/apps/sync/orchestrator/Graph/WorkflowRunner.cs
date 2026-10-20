@@ -2,7 +2,7 @@ using Microsoft.Agents.AI.Workflows;
 
 namespace Orchestrator.Graph;
 
-/// <summary>Runs the workflow for one job and reduces its events to the single outcome the consumer acts on.</summary>
+/// <summary>Runs the workflow for one job and boils its events down to the one outcome the consumer acts on.</summary>
 public sealed class WorkflowRunner(OrchestratorGraph graph)
 {
     public async Task<OrchestrationOutcome> RunAsync(OrchestrationJob job, CancellationToken ct)
@@ -27,7 +27,7 @@ public sealed class WorkflowRunner(OrchestratorGraph graph)
             }
         }
 
-        // An executor that threw (database down, unexpected payload) never yielded an outcome.
+        // If an executor threw (the database was down, or the payload was unexpected), it never produced an outcome.
         if (failure is not null)
             return new OrchestrationOutcome(job.Event, OutcomeKind.Failed, $"{failure.GetType().Name}: {failure.Message}");
         return outcome ?? new OrchestrationOutcome(job.Event, OutcomeKind.Failed, "workflow ended without an outcome");

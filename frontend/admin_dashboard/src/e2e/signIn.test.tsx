@@ -96,7 +96,7 @@ describe('signing in through the identity service (OpenID Connect, ADR 0006)', (
     expect(locked?.locked).toBe(true);
 
     await admin.authorized((t) => admin.api.unlock(t, name));
-    // Unlocked; the admin chose this password, so the first sign-in also replaces it.
+    // It's unlocked now. The admin chose this password, so the first sign-in also replaces it.
     await expect(signInThroughLoginPage(newSession(), name, strongPassword, undefined, ownPassword)).resolves.toMatchObject({
       username: name,
     });
@@ -154,7 +154,7 @@ describe('signing in through the identity service (OpenID Connect, ADR 0006)', (
     await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
     await screen.findByRole('heading', { name: 'Clinicians' }, slow);
 
-    // Signed out elsewhere, then the access token runs out: the next refresh is refused.
+    // Sign out somewhere else, then let the access token run out. The next refresh gets refused.
     await newSession().api.logout(store.read(refreshKey)!);
     now += 16 * 60_000;
     await user.click(screen.getByRole('link', { name: 'Devices' }));

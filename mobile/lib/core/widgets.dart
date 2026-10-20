@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// Title row for a tab page (tabs have no back button), with an optional action on the right.
+/// The title row at the top of a tab page, with an optional action on the right. Tabs don't have a back button.
 class TabHeader extends StatelessWidget {
   const TabHeader({super.key, required this.title, this.action});
 
@@ -24,7 +24,7 @@ class TabHeader extends StatelessWidget {
   );
 }
 
-/// White rounded card with the prototype's soft shadow.
+/// A white rounded card with the soft shadow from the prototype.
 class WoundCard extends StatelessWidget {
   const WoundCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.onTap});
 
@@ -40,7 +40,7 @@ class WoundCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(WoundRadii.m),
       onTap: onTap,
       child: Ink(
-        // The fill paints over the shadow; without it the blurred shadow tints the whole card grey.
+        // The fill covers the shadow. Without it, the blurred shadow shows through and the card looks grey.
         decoration: BoxDecoration(
           color: WoundColors.surface,
           borderRadius: BorderRadius.circular(WoundRadii.m),
@@ -55,7 +55,7 @@ class WoundCard extends StatelessWidget {
 
 enum BadgeTone { success, warning, error, neutral, accent }
 
-/// Small rounded status label ("Synced", "Advice ready", "Detected").
+/// A small rounded status label, like "Synced", "Advice ready" or "Detected".
 class WoundBadge extends StatelessWidget {
   const WoundBadge(this.label, {super.key, this.tone = BadgeTone.neutral, this.icon});
 
@@ -79,7 +79,7 @@ class WoundBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 12, color: fg), const SizedBox(width: 4)],
-          // Shrinks with an ellipsis when space is short (small phones, large system text) instead of overflowing.
+          // On small phones or with large system text, cut it short with an ellipsis rather than overflowing.
           Flexible(
             child: Text(
               label,
@@ -94,7 +94,7 @@ class WoundBadge extends StatelessWidget {
   }
 }
 
-/// "Recent assessments", "Settings": the small bold heading above a group.
+/// The small bold heading above a group, like "Recent assessments" or "Settings".
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing});
 
@@ -118,7 +118,7 @@ class SectionTitle extends StatelessWidget {
   );
 }
 
-/// The quiet information strip used for privacy and decision-support notices.
+/// A low-key information strip for privacy and decision-support notices.
 class NoticeStrip extends StatelessWidget {
   const NoticeStrip(this.text, {super.key, this.icon = Icons.shield_outlined});
 
@@ -142,7 +142,7 @@ class NoticeStrip extends StatelessWidget {
   );
 }
 
-/// A label above a field, as the prototype lays out its forms.
+/// A label that sits above a field, the way the prototype lays out its forms.
 class FieldLabel extends StatelessWidget {
   const FieldLabel(this.text, {super.key});
 
@@ -179,14 +179,15 @@ class KeyValueRow extends StatelessWidget {
   );
 }
 
-/// Round initials avatar for a patient or clinician.
+/// A round avatar showing initials, for a patient or a clinician.
 class InitialsAvatar extends StatelessWidget {
   const InitialsAvatar(this.text, {super.key, this.size = 44});
 
   final String text;
   final double size;
 
-  /// Initials from a label: "AF bed 12" → AF, "Demo Admin" → DA, "admin.demo" → AD.
+  /// Works out initials from a label. For example "AF bed 12" gives AF, "Demo Admin" gives DA
+  /// and "admin.demo" gives AD.
   static String initialsOf(String s) {
     final parts = s.trim().split(RegExp(r'[\s.,_-]+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
@@ -210,7 +211,7 @@ class InitialsAvatar extends StatelessWidget {
   );
 }
 
-/// Centered empty state with a title and one line of help.
+/// What we show when a list is empty: a title and one line of help, centred.
 class EmptyState extends StatelessWidget {
   const EmptyState({super.key, required this.icon, required this.title, required this.message});
 
@@ -242,7 +243,7 @@ class EmptyState extends StatelessWidget {
   );
 }
 
-/// Area in cm² from the contract's mm² (the prototype shows cm²).
+/// Turns the contract's mm² into cm², which is what the prototype shows.
 String formatArea(num areaMm2) => '${(areaMm2 / 100).toStringAsFixed(2)} cm²';
 
 String formatDate(DateTime t) {
@@ -257,7 +258,7 @@ String formatTime(DateTime t) {
   return '$h:${l.minute.toString().padLeft(2, '0')} ${l.hour < 12 ? 'AM' : 'PM'}';
 }
 
-/// An image area capped at [maxHeightFactor] of the screen so the controls stay visible.
+/// An image area that takes up at most [maxHeightFactor] of the screen, so the controls below stay visible.
 class MediaFrame extends StatelessWidget {
   const MediaFrame({super.key, required this.aspectRatio, required this.child, this.maxHeightFactor = 0.45});
 

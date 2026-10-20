@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// Checks a wound event against the shared schema and 16 KB limit before it's queued.
+/// Checks a wound event against the shared schema and the 16 KB limit before it goes into the queue.
 class WoundEventValidator {
   static const maxSizeBytes = 16 * 1024;
   static const triState = {'present', 'absent', 'not_recorded'};
@@ -14,7 +14,7 @@ class WoundEventValidator {
     'deviceId', 'facilityId', 'capturedAt', 'analytics', 'clinicalAssessment',
   };
 
-  /// Returns the problems found; empty means valid.
+  /// Returns any problems it found. An empty list means the event is fine.
   static List<String> validate(Map<String, dynamic> event) {
     final errors = <String>[];
     void check(bool ok, String message) {
@@ -68,7 +68,7 @@ class WoundEventValidator {
       errors.add('analytics is required');
     }
 
-    // Tri-state is strict (§3, §5): a missing key is an error, never read as not_recorded.
+    // The three-way answers are strict (§3, §5). A missing key is an error, not a quiet "not_recorded".
     final clinical = event['clinicalAssessment'];
     if (clinical is Map<String, dynamic>) {
       _exactKeys(clinical, {'pedalPulses', 'protectiveSensation'}, 'clinicalAssessment.', errors);
@@ -84,7 +84,7 @@ class WoundEventValidator {
     return errors;
   }
 
-  /// additionalProperties: false, and every required key present.
+  /// No extra keys (additionalProperties: false), and every required key has to be there.
   static void _exactKeys(Map<String, dynamic> map, Set<String> allowed, String path, List<String> errors) {
     for (final key in allowed.difference(map.keys.toSet())) {
       errors.add('$path$key is required');

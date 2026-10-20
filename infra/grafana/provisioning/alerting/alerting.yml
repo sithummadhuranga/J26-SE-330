@@ -1,2 +1,2 @@
-# Grafana reads this folder at start-up and logs an error when it is missing. No alert rules are provisioned.
+# Grafana reads this folder at start-up and logs an error if it's missing. We don't set up any alert rules.
 apiVersion: 1

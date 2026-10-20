@@ -7,7 +7,7 @@ import 'package:melanin_wound_cdss/features/sync/ui/sign_in_screen.dart';
 
 import 'support/fakes.dart';
 
-/// The sign-in screen against the fake gateway and an in-memory database (the app's other screens: test/app).
+/// The sign-in screen, tested with the fake gateway and an in-memory database. The other screens are in test/app.
 void main() {
   late AppServices services;
   late FakeGateway gateway;

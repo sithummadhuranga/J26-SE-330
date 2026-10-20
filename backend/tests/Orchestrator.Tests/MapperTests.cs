@@ -4,7 +4,7 @@ using Sync.Common.Recommendations;
 
 namespace Orchestrator.Tests;
 
-/// <summary>BuildContext's request: valid against the RAG contract, and nothing that identifies anyone (§10.2).</summary>
+/// <summary>BuildContext's request matches the RAG contract and contains nothing that identifies anyone (§10.2).</summary>
 public class MapperTests
 {
     private static readonly JsonSchema RequestSchema = JsonSchema.FromText(File.ReadAllText(

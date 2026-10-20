@@ -12,7 +12,7 @@ import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 
 import 'support/fakes.dart';
 
-/// Background sync task, with in-memory services instead of real ones.
+/// The background sync task, using in-memory services instead of real ones.
 void main() {
   late FakeGateway gateway;
   late MemorySecretStore secrets;
@@ -32,7 +32,7 @@ void main() {
     final app = await open();
     await app.signIn();
     final e = await app.queue.enqueue(sampleEvent());
-    // The task opens its own services: same keystore (session) and database, as on the phone.
+    // The task opens its own services but shares the keystore (so the session) and the database, just like on a phone.
     var opened = 0;
     expect(await BackgroundSync.run(open: () async {
       opened++;
@@ -89,7 +89,7 @@ void main() {
     await Future<void>.delayed(QueueRepository.uiRefresh);
     expect(seen.last, 0);
 
-    // A write this connection never hears about, as from the background isolate's own connection.
+    // A write this connection never hears about, like one from the background isolate's own connection.
     await app.db.customStatement("UPDATE wound_event_queue SET status = 'complete'");
     await Future<void>.delayed(QueueRepository.uiRefresh * 2);
     expect(seen.last, 0, reason: 'Drift streams do not see it on their own');

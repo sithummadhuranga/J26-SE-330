@@ -7,7 +7,7 @@ namespace Housekeeping;
 public sealed record CycleResult(bool Ran, int OutboxDeleted, int ChangeLogArchived, int InboxDeleted,
     TimeSpan? InboxRetention, IReadOnlyList<HeldBackFacility> HeldBack);
 
-/// <summary>Periodically cleans up outbox rows, archives old change-log rows and trims the inbox, in batches.</summary>
+/// <summary>Every so often, cleans up outbox rows, archives old change-log rows and trims the inbox, in batches.</summary>
 public sealed class HousekeepingWorker(
     NpgsqlDataSource db, KafkaRetentionProbe kafka, IOptions<HousekeepingOptions> options,
     ILogger<HousekeepingWorker> logger) : BackgroundService
@@ -39,7 +39,7 @@ public sealed class HousekeepingWorker(
 
     public async Task<CycleResult> RunCycleAsync(CancellationToken ct)
     {
-        // Asked before taking the lock, so a slow Kafka never holds it.
+        // Ask Kafka before taking the lock, so a slow Kafka never keeps the lock held.
         var inboxRetention = RetentionPolicy.InboxRetention(_o, await kafka.TopicRetentionsAsync());
 
         await using var conn = await db.OpenConnectionAsync(ct);

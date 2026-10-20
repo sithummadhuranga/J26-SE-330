@@ -6,7 +6,7 @@ import '../../core/widgets.dart';
 import 'assessment_draft.dart';
 import 'review_screen.dart';
 
-/// Capture step; takes a sample capture until Member 1's camera module is plugged in.
+/// The capture step. It uses a sample capture until Member 1's camera module is plugged in.
 class CaptureScreen extends StatelessWidget {
   const CaptureScreen({super.key, required this.services, required this.draft});
 
@@ -61,7 +61,7 @@ class CaptureScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Center(
-          // Announced as a button to screen readers; the visual is just a ring.
+          // Screen readers announce this as a button, even though it just looks like a ring.
           child: Semantics(
             button: true,
             label: 'Take picture',

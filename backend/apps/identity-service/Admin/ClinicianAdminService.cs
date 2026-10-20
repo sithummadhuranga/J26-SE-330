@@ -14,7 +14,7 @@ public sealed record ClinicianSummary(Guid ClinicianId, string Username, string 
 public sealed record AuthAuditEntry(long Id, DateTime RecordedAt, string Action, bool Success, string Username,
     string? ReasonCode, string? DeviceId, string? ActorUsername);
 
-/// <summary>Clinician management for facility admins, scoped to their facility and audited.</summary>
+/// <summary>Lets facility admins manage clinicians. It only touches their own facility, and everything is audited.</summary>
 public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordHasher hasher)
 {
     public static readonly string[] Roles = ["nurse", "wound_specialist", "admin"];
@@ -41,7 +41,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         Guid clinicianId;
         try
         {
-            // ON CONFLICT so a taken username just returns no row instead of logging a unique-violation error.
+            // ON CONFLICT means a taken username just returns no row, instead of logging a unique-violation error.
             await using var insert = new NpgsqlCommand("""
                 WITH c AS (
                     INSERT INTO clinical.clinician (username, full_name, role, facility_id)
@@ -59,15 +59,16 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             insert.Parameters.AddWithValue("f", facilityId);
             insert.Parameters.AddWithValue("h", Convert.ToBase64String(hash));
             insert.Parameters.AddWithValue("s", salt);
-            // An admin shares the password in person, so the clinician replaces it on first sign-in; the command-line
-            // bootstrap is run by whoever will use the account.
+            // An admin hands the password over in person, so the clinician replaces it the first time they sign in.
+            // The command-line bootstrap is run by whoever will use the account, so it doesn't need that.
             insert.Parameters.AddWithValue("must", actorId is not null);
             if (await insert.ExecuteScalarAsync(ct) is not Guid id) return (null, "USERNAME_TAKEN");
             clinicianId = id;
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
         {
-            // ON CONFLICT covers concurrent registrations too; this stays for any unique constraint added later.
+            // ON CONFLICT already covers two registrations at once. This is kept in case another unique constraint
+            // is added later.
             return (null, "USERNAME_TAKEN");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
@@ -100,7 +101,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
         return list;
     }
 
-    /// <summary>Clears a lockout early (e.g. after the clinician calls the admin).</summary>
+    /// <summary>Clears a lockout early, for example after the clinician rings the admin.</summary>
     public Task<string?> UnlockAsync(Guid actorId, string facilityId, string username, CancellationToken ct) =>
         ChangeAsync(actorId, facilityId, username, "UNLOCK", ct, """
             UPDATE clinical.clinician_credential SET failed_attempts = 0, locked_until = NULL WHERE clinician_id = @id
@@ -115,7 +116,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             "UPDATE clinical.clinician_session SET revoked_at = now() WHERE clinician_id = @id AND revoked_at IS NULL");
     }
 
-    /// <summary>Undoes a deactivation. Sessions ended by it stay ended; the clinician signs in again.</summary>
+    /// <summary>Undoes a deactivation. Sessions it ended stay ended, so the clinician has to sign in again.</summary>
     public async Task<string?> ReactivateAsync(Guid actorId, string facilityId, string username, CancellationToken ct)
     {
         await using var cmd = db.CreateCommand(
@@ -127,7 +128,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             "UPDATE clinical.clinician SET active = true WHERE clinician_id = @id");
     }
 
-    /// <summary>For a lost phone: removes the TOTP secret so the clinician can enroll again.</summary>
+    /// <summary>For when a phone is lost. Removes the TOTP secret so the clinician can set up MFA again.</summary>
     public Task<string?> ResetMfaAsync(Guid actorId, string facilityId, string username, CancellationToken ct) =>
         ChangeAsync(actorId, facilityId, username, "MFA_RESET", ct, """
             UPDATE clinical.clinician_credential
@@ -136,8 +137,8 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             """);
 
     /// <summary>
-    /// For a forgotten password: sets a new one, clears any lockout and revokes every session, so whoever might know
-    /// the old password is signed out too. An admin cannot reset their own password here; another admin does it.
+    /// For a forgotten password. Sets a new one, clears any lockout and revokes every session, so anyone who might
+    /// know the old password gets signed out too. Admins can't reset their own password here; another admin has to.
     /// </summary>
     public async Task<string?> ResetPasswordAsync(Guid actorId, string facilityId, string username, string? password,
         CancellationToken ct)
@@ -207,7 +208,7 @@ public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordH
             find.Parameters.AddWithValue("f", facilityId);
             clinicianId = await find.ExecuteScalarAsync(ct) as Guid?;
         }
-        // Clinicians of other facilities are reported as not found, never as forbidden.
+        // Clinicians from other facilities just show up as not found, never as forbidden.
         if (clinicianId is null) return "NOT_FOUND";
 
         foreach (var sql in statements)

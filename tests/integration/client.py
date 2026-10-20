@@ -1,4 +1,4 @@
-"""Shared helpers for the integration scripts in this folder. Standard library only."""
+"""Helpers shared by the integration scripts in this folder. They only use the standard library."""
 import base64
 import hashlib
 import hmac
@@ -62,7 +62,7 @@ def http(method, path, body=None, token=None):
 
 
 def pull_all(token, cursor=0, limit=500):
-    """Pulls like a device (§7.2): page after page until hasMore is false. Returns (status, changes, next_cursor)."""
+    """Pulls the way a phone does (§7.2), page after page until hasMore is false. Returns (status, changes, next_cursor)."""
     changes = []
     for _ in range(1000):
         status, body = http("GET", f"/v1/sync/changes?cursor={cursor}&limit={limit}", token=token)
@@ -79,8 +79,9 @@ _project = None
 
 
 def compose_project():
-    """The Compose project the running gateway belongs to, so stop/start/recreate act on that stack and never start a
-    second one under the default name (e.g. after `docker compose -p cdss-oidc up`). COMPOSE_PROJECT_NAME wins."""
+    """The Compose project the running gateway belongs to. That way stop, start and recreate act on that stack, and
+    never start a second one under the default name (for example after `docker compose -p cdss-oidc up`).
+    COMPOSE_PROJECT_NAME takes priority if it's set."""
     global _project
     if _project is None:
         if os.environ.get("COMPOSE_PROJECT_NAME"):
@@ -98,7 +99,8 @@ def compose_project():
 
 
 def compose(*args, env=None, timeout=300):
-    """`docker compose` on the running stack's project; [env] adds variables for the compose file (e.g. STUB_FAIL_MODE)."""
+    """Runs `docker compose` on the running stack's project. Use env to pass extra variables to the compose file,
+    such as STUB_FAIL_MODE."""
     return subprocess.run(["docker", "compose", "-p", compose_project(), *args], cwd=REPO_ROOT, capture_output=True,
                           text=True, timeout=timeout, env={**os.environ, **(env or {})})
 
@@ -119,7 +121,7 @@ def wait_for(query, expected, seconds=20):
 
 
 def dotenv():
-    """KEY=value pairs from the repo's .env, where docker compose reads the database passwords."""
+    """The KEY=value pairs from the repo's .env, which is where docker compose gets the database passwords."""
     values = {}
     try:
         with open(os.path.join(REPO_ROOT, ".env"), encoding="utf-8") as f:
@@ -133,14 +135,14 @@ def dotenv():
 
 
 def db_password(role):
-    """A service role's password (identity_svc -> DB_PASSWORD_IDENTITY), as db-migrate set it from .env."""
+    """A service role's password (identity_svc uses DB_PASSWORD_IDENTITY), as db-migrate set it from .env."""
     name = role.removesuffix("_svc")
     key = f"DB_PASSWORD_{name.upper()}"
     return os.environ.get(key) or dotenv().get(key) or f"{name}-local-dev"
 
 
 def _identity_env():
-    """A local `dotnet run` reads appsettings.json (cdss/cdss); give it the owner login from .env instead."""
+    """A local `dotnet run` reads appsettings.json (cdss/cdss), so give it the owner login from .env instead."""
     env = dict(os.environ)
     if "ConnectionStrings__Postgres" not in env:
         values = dotenv()
@@ -154,7 +156,7 @@ def _identity_env():
 
 
 def create_clinician(username, password, role, facility, full_name="Test User"):
-    """Uses the identity service's create-clinician command (the bootstrap path for a facility's first admin)."""
+    """Uses the identity service's create-clinician command, which is how a facility gets its first admin."""
     out = subprocess.run(
         ["dotnet", "run", "--no-build", "--project", "backend/apps/identity-service", "--",
          "create-clinician", username, password, role, facility, full_name],
@@ -164,7 +166,7 @@ def create_clinician(username, password, role, facility, full_name="Test User"):
 
 
 def token_request(path, form):
-    """POSTs OAuth form fields (ADR 0006) and returns (status, parsed JSON or None)."""
+    """Posts OAuth form fields (ADR 0006) and returns the status and the parsed JSON, or None."""
     req = urllib.request.Request(GATEWAY + path, data=urllib.parse.urlencode(form).encode(), method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -185,8 +187,8 @@ def _tokens(status, body):
 
 
 def login(username, password, device, totp=None):
-    """A phone signing in: the password grant the local stack enables for tests (Oidc:AllowPasswordGrant).
-    Failures are 400 with code = the reason (INVALID_CREDENTIALS, CREDENTIAL_LOCKED, MFA_REQUIRED, ...)."""
+    """A phone signing in, using the password grant the local stack turns on for tests (Oidc:AllowPasswordGrant).
+    A failure is a 400, with the reason in code (such as INVALID_CREDENTIALS, CREDENTIAL_LOCKED or MFA_REQUIRED)."""
     form = {"grant_type": "password", "client_id": "mobile", "username": username, "password": password,
             "device_id": device, "scope": "openid offline_access"}
     if totp:
@@ -195,13 +197,13 @@ def login(username, password, device, totp=None):
 
 
 def refresh(refresh_token, client_id="mobile"):
-    """Rotates both tokens. A spent, revoked or expired refresh token is 400 invalid_grant."""
+    """Swaps both tokens for new ones. A used, revoked or expired refresh token gets 400 invalid_grant."""
     return _tokens(*token_request("/connect/token", {"grant_type": "refresh_token", "client_id": client_id,
                                                      "refresh_token": refresh_token}))
 
 
 def logout(refresh_token, client_id="mobile"):
-    """Ends the session (token revocation); always 200."""
+    """Ends the session by revoking the token. It always answers 200."""
     status, _ = token_request("/connect/revocation", {"client_id": client_id, "token": refresh_token,
                                                       "token_type_hint": "refresh_token"})
     return status
@@ -217,8 +219,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Browser:
-    """A user agent for the login page: keeps cookies, follows redirects inside the gateway, and stops when the
-    identity service sends it to a client's redirect URI."""
+    """Acts like a browser on the login page. It keeps cookies, follows redirects inside the gateway, and stops when
+    the identity service sends it to a client's redirect URI."""
 
     def __init__(self):
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()),
@@ -235,7 +237,7 @@ class Browser:
             return e.code, e.headers, e.read().decode()
 
     def follow(self, url, form=None):
-        """Returns (final status, headers, body, the URL the browser left the gateway for, or None)."""
+        """Returns the final status, headers and body, plus the URL the browser was sent to outside the gateway (or None)."""
         status, headers, body = self.request(url, form)
         for _ in range(10):
             location = headers.get("Location")
@@ -253,7 +255,7 @@ def form_fields(page):
 
 
 def page_error(page):
-    """The reason the login page shows (data-code), e.g. CLIENT_NOT_ALLOWED."""
+    """The reason the login page shows (data-code), such as CLIENT_NOT_ALLOWED."""
     m = re.search(r'data-code="([^"]+)"', page)
     return m.group(1) if m else None
 
@@ -273,8 +275,9 @@ def authorize_url(client_id, redirect_uri, challenge, device=None, method="S256"
 
 
 def sign_in(browser, url, username, password, totp=None, new_password=None, confirm=None):
-    """Runs the login page; returns (where the browser was sent, last page, reason shown on the page).
-    [new_password] answers the "choose your own password" step, if the page asks (an admin chose the password)."""
+    """Goes through the login page. Returns where the browser was sent, the last page, and the reason shown on it.
+    new_password is used for the "choose your own password" step, which the page asks for when an admin set the
+    password."""
     _, _, page, out = browser.follow(url)
     if out:
         return out, page, None
@@ -295,7 +298,7 @@ def asks_for_new_password(page):
 
 
 def choose_password(browser, page, new_password, confirm=None):
-    """Submits the login page's "choose your own password" step; same return as sign_in."""
+    """Submits the login page's "choose your own password" step. Returns the same things as sign_in."""
     fields = form_fields(page)
     fields.update(NewPassword=new_password, ConfirmPassword=new_password if confirm is None else confirm)
     _, _, page, out = browser.follow(browser.url, fields)
@@ -308,8 +311,8 @@ def code_from(location):
 
 
 def dashboard_login(username, password, totp=None):
-    """The admin dashboard's sign-in: code + PKCE through the login page. Failures are 400 with code = the reason the
-    page showed (CLIENT_NOT_ALLOWED, INVALID_CREDENTIALS, ...)."""
+    """Signs in the way the admin dashboard does, with a code and PKCE through the login page. A failure is a 400,
+    with the reason the page showed in code (such as CLIENT_NOT_ALLOWED or INVALID_CREDENTIALS)."""
     verifier, challenge = pkce()
     out, _, reason = sign_in(Browser(), authorize_url("admin-dashboard", DASHBOARD_REDIRECT, challenge,
                                                       scope="openid profile offline_access"), username, password, totp)
@@ -321,7 +324,7 @@ def dashboard_login(username, password, totp=None):
 
 
 def totp_code(base32_secret, step=None):
-    """RFC 6238 code, matching the gateway's Totp class (SHA-1, 30 s, 6 digits)."""
+    """Makes an RFC 6238 code the same way the gateway's Totp class does (SHA-1, 30 seconds, 6 digits)."""
     key = base64.b32decode(base32_secret + "=" * (-len(base32_secret) % 8))
     step = int(time.time()) // 30 if step is None else step
     digest = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()

@@ -23,13 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # ajv-formats adds date-time/uuid/uri so strict mode accepts the contract schemas.
+      # ajv-formats adds date-time, uuid and uri, so strict mode accepts the contract schemas.
       - name: Install ajv
         run: npm install --no-save --no-package-lock ajv-cli@5 ajv-formats@3
       - name: Every contract compiles
         run: |
           for s in contracts/*.schema.json; do
-            # sync-changes embeds the RAG response; give it that schema to resolve the reference.
+            # sync-changes embeds the RAG response, so give it that schema to resolve the reference.
             if [ "$s" = contracts/sync-changes.schema.json ]; then refs="-r contracts/rag-response.schema.json"; else refs=""; fi
             npx ajv compile --spec=draft2020 -c ajv-formats -s "$s" $refs
           done
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: docker-compose.yml is valid (including the tools profile)
-        # Placeholders only: this step checks the file's syntax, nothing connects to a database.
+        # These are just placeholders. This step only checks the file's syntax; nothing connects to a database.
         env:
           POSTGRES_PASSWORD: ci-placeholder
           DB_PASSWORD_IDENTITY: ci-placeholder
@@ -92,7 +92,8 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze
-      # hashFiles() only works in step conditions; skip until a test exists since flutter test fails on an empty folder.
+      # hashFiles() only works in step conditions. Skip this until a test exists, because flutter test fails on an
+      # empty folder.
       - if: hashFiles('mobile/test/**/*_test.dart') != ''
         run: flutter test
 
@@ -101,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # Throwaway passwords for this CI database only; locally they come from .env.
+      # Throwaway passwords just for this CI database. Locally they come from .env.
       POSTGRES_PASSWORD: ci-postgres-only
       DB_PASSWORD_IDENTITY: ci-identity-only
       DB_PASSWORD_GATEWAY: ci-gateway-only

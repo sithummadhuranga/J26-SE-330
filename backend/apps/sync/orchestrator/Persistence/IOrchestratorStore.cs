@@ -5,22 +5,22 @@ using Sync.Common.Recommendations;
 
 namespace Orchestrator.Persistence;
 
-/// <summary>All the workflow's database access, so the executors can be tested without a database.</summary>
+/// <summary>Everything the workflow does with the database, kept here so the executors can be tested without one.</summary>
 public interface IOrchestratorStore
 {
-    /// <summary>True if already processed; otherwise records ORCHESTRATION_STARTED and returns false.</summary>
+    /// <summary>Returns true if it was already processed. Otherwise it records ORCHESTRATION_STARTED and returns false.</summary>
     Task<bool> BeginAsync(OrchestrationJob job, CancellationToken ct);
 
-    /// <summary>Marks this revision SUPERSEDED and returns true if a newer revision is already stored.</summary>
+    /// <summary>If a newer revision is already stored, marks this one SUPERSEDED and returns true.</summary>
     Task<bool> SupersedeIfOutdatedAsync(OrchestrationJob job, CancellationToken ct);
 
-    /// <summary>The stored assessment and the earlier captures of the same wound, or null if it is not stored.</summary>
+    /// <summary>The stored assessment and the earlier captures of the same wound, or null if it isn't stored.</summary>
     Task<AssessmentContext?> LoadContextAsync(PersistedEvent evt, CancellationToken ct);
 
-    /// <summary>Stores the recommendation and related rows in one transaction; false if it was already stored.</summary>
+    /// <summary>Stores the recommendation and its related rows in one transaction. Returns false if it was already stored.</summary>
     Task<bool> StoreRecommendationAsync(OrchestrationJob job, RecommendationResponse response, JsonElement rawBody,
         CancellationToken ct);
 
-    /// <summary>Adds an ADVICE_DEFERRED change for the device, once per (assessment, revision).</summary>
+    /// <summary>Adds an ADVICE_DEFERRED change for the phone, once for each assessment and revision.</summary>
     Task RecordDeferredAsync(PersistedEvent evt, CancellationToken ct);
 }

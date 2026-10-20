@@ -10,12 +10,12 @@ import 'package:melanin_wound_cdss/features/sync/data/app_database.dart';
 
 import '../sync/support/fakes.dart';
 
-/// App screens tested on the real sync layer with a fake gateway and in-memory database.
+/// Tests the app's screens on top of the real sync layer, with a fake gateway and an in-memory database.
 void main() {
   late AppServices services;
   late FakeGateway gateway;
 
-  /// Lets the in-memory database (same isolate) and Drift's stream updates run on the test's fake clock.
+  /// Lets the in-memory database (on the same isolate) and Drift's stream updates run on the test's fake clock.
   Future<void> settle(WidgetTester tester, [int rounds = 25]) async {
     for (var i = 0; i < rounds; i++) {
       await tester.pump(const Duration(milliseconds: 20));
@@ -83,7 +83,7 @@ void main() {
     await tapAndSettle(tester, find.byKey(const Key('useImage')));
     expect(find.text('Analyzing Assessment'), findsOneWidget);
 
-    // Four analysis steps, the save, then the sync that brings the advice back.
+    // Four analysis steps, then the save, then the sync that brings the advice back.
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
@@ -98,7 +98,7 @@ void main() {
     expect(find.text('Assessment Summary'), findsOneWidget);
     expect(find.byKey(const Key('woundArea')), findsOneWidget);
     expect(find.text('Advice ready'), findsOneWidget);
-    // A long page: scroll down to the clinical answers and the guidance button, as a clinician would.
+    // It's a long page, so scroll down to the clinical answers and the guidance button like a clinician would.
     final page = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(find.text('Present'), 200, scrollable: page);
     expect(find.text('Absent'), findsOneWidget);

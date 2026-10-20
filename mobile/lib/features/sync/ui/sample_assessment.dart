@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:uuid/uuid.dart';
 
-/// Fake analytics in the wound-event shape until the real capture and measurement pipeline exists.
+/// Made-up analytics in the wound-event format, until the real capture and measurement pipeline exists.
 Map<String, dynamic> sampleAnalytics({Random? random}) {
   final rng = random ?? Random();
   final first = double.parse((40 + rng.nextDouble() * 40).toStringAsFixed(1));
@@ -20,7 +20,7 @@ Map<String, dynamic> sampleAnalytics({Random? random}) {
   };
 }
 
-/// A valid synthetic assessment for testing sync before the capture screens exist.
+/// A made-up but valid assessment, for testing sync before the capture screens exist.
 Map<String, dynamic> sampleAssessment({required String deviceId, required String facilityId, Random? random}) {
   final rng = random ?? Random();
   const triState = ['present', 'absent', 'not_recorded'];
@@ -42,7 +42,7 @@ Map<String, dynamic> sampleAssessment({required String deviceId, required String
   };
 }
 
-/// RFC 3339 with the device's offset, as §5 shows (e.g. 2026-10-03T09:41:12+05:30).
+/// Formats a time as RFC 3339 with the phone's time zone offset, as in §5 (for example 2026-10-03T09:41:12+05:30).
 String offsetTimestamp(DateTime local) {
   final o = local.timeZoneOffset;
   final sign = o.isNegative ? '-' : '+';

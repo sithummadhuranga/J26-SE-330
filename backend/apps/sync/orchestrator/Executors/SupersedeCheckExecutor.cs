@@ -4,7 +4,7 @@ using Orchestrator.Persistence;
 
 namespace Orchestrator.Executors;
 
-/// <summary>Marks this revision SUPERSEDED and stops if a newer one is already stored.</summary>
+/// <summary>If a newer revision is already stored, marks this one SUPERSEDED and stops.</summary>
 [YieldsOutput(typeof(OrchestrationOutcome))]
 public sealed class SupersedeCheckExecutor(IOrchestratorStore store) : Executor<InboxChecked, SupersedeChecked>("SupersedeCheck")
 {

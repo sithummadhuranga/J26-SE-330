@@ -6,11 +6,11 @@ export const pageSize = 10;
 export interface Paged<T> {
   /** The rows on the current page. */
   rows: T[];
-  /** Zero-based; always a page that exists, even after the list shrank. */
+  /** Counts from zero. It's always a page that exists, even if the list got shorter. */
   page: number;
   pageCount: number;
   total: number;
-  /** One-based positions of the first and last row shown; 0 and 0 for an empty list. */
+  /** Positions of the first and last rows shown, counting from one. Both are 0 when the list is empty. */
   from: number;
   to: number;
   setPage: (page: number) => void;

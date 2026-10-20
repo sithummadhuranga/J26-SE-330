@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DeviceSimulator;
 
-// Device simulator for 1-100 phones, e.g. `-- --devices 10 --events 20 [--mode baseline]`.
+// Simulates 1 to 100 phones, for example `-- --devices 10 --events 20 [--mode baseline]`.
 var options = SimOptions.Parse(args);
 var clock = TimeProvider.System;
 
@@ -21,7 +21,7 @@ using var setupHttp = new HttpClient { BaseAddress = new Uri(options.SetupGatewa
 Console.WriteLine($"Run {options.RunId}: {options.Devices} devices × {options.EventsPerDevice} events, " +
                   $"{options.Mode}, gateway {options.Gateway}");
 
-// Register one clinician per phone through the admin API unless --shared-user is set.
+// Register one clinician per phone through the admin API, unless --shared-user is set.
 if (options.SharedUsername is null)
 {
     var admin = new GatewayClient(setupHttp, $"sim-{options.RunId}-admin", options.AdminUsername, options.AdminPassword);

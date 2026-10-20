@@ -16,7 +16,8 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using Sync.Common.Web;
 
-// Sync Gateway: push/pull, patient alias and figure proxy; it only validates tokens, never issues them.
+// The Sync Gateway handles push, pull, patient aliases and the figures proxy. It only checks tokens and never
+// issues them.
 var builder = WebApplication.CreateBuilder(args);
 builder.AddSyncTelemetry("sync-gateway")
     .WithTracing(t => t.AddAspNetCoreInstrumentation())
@@ -34,7 +35,7 @@ builder.Services.AddSingleton(new AblationOptions(builder.Configuration.GetValue
 builder.Services.AddSingleton<PushService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<DeviceRevocationCheck>();
-// Recommendation Service client for the figures proxy and the REST baseline (60 s, no retries).
+// The Recommendation Service client for the figures proxy and the REST baseline (60 seconds, no retries).
 builder.Services.AddSingleton(RecommendationResponseValidator.FromOutputDirectory());
 builder.Services.AddHttpClient(BaselineEndpoint.RecommendationClient, client =>
 {
@@ -46,13 +47,13 @@ builder.Services.AddSingleton<IProducer<string, byte[]>>(_ => new ProducerBuilde
         deliveryTimeoutMs: 10_000)).Build());
 
 builder.Services.AddRequestDecompression(); // devices send gzip batches (§6.2)
-// Bearer tokens only: the data-protection keys AddAuthentication brings in protect nothing here.
+// We only use bearer tokens, so the data-protection keys that AddAuthentication brings in don't protect anything here.
 builder.Services.AddInMemoryDataProtection();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
-        // Public keys come from the identity service's JWKS, cached and refetched on an unknown kid.
+        // The public keys come from the identity service's JWKS. We cache them and fetch again if we see an unknown kid.
         o.MetadataAddress = jwt["MetadataAddress"] ?? "http://localhost:8085/.well-known/openid-configuration";
         o.RequireHttpsMetadata = jwt.GetValue("RequireHttpsMetadata", false);
         o.RefreshInterval = TimeSpan.FromSeconds(30); // retry soon if the identity service was not up yet
@@ -66,7 +67,7 @@ builder.Services
             NameClaimType = ClaimNames.Subject,
             RoleClaimType = ClaimNames.Role,
         };
-        // Mobile tokens also need a non-revoked device; dashboard tokens have no device and skip this.
+        // Phone tokens also need a device that hasn't been revoked. Dashboard tokens have no device, so they skip this.
         o.Events = new JwtBearerEvents
         {
             OnTokenValidated = async context =>
@@ -92,7 +93,7 @@ app.UseRequestDecompression();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// The device probes this before pushing: reachability, not just connectivity (§6.2).
+// The phone checks this before pushing. Being on a network isn't enough; the server has to answer (§6.2).
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 var v1 = app.MapGroup("/v1");

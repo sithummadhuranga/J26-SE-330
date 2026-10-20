@@ -2,7 +2,7 @@ using System.Net;
 
 namespace DeviceSimulator;
 
-/// <summary>One simulated phone: captures into its queue while a sync loop pushes, pulls and backs off.</summary>
+/// <summary>One simulated phone. It captures into its queue while a sync loop pushes, pulls and backs off.</summary>
 public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, EventFactory events, SimOptions options,
     TimeProvider clock, Random random)
 {
@@ -16,7 +16,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
 
     public async Task RunAsync(CancellationToken ct)
     {
-        // Capture never needs the network (§12): the clinician keeps working while login retries.
+        // Capturing never needs the network (§12), so the clinician keeps working while login retries.
         var capturing = CaptureAsync(ct);
         while (!await TryAsync(() => gateway.LoginAsync(ct), ct)) { }
 
@@ -30,7 +30,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
         await capturing;
     }
 
-    /// <summary>Runs one network step; failures never stop the device, it just backs off.</summary>
+    /// <summary>Runs one network step. A failure never stops the device; it just backs off.</summary>
     private async Task<bool> TryAsync(Func<Task> step, CancellationToken ct)
     {
         try
@@ -46,7 +46,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
         }
     }
 
-    /// <summary>The clinician saves assessments; each one commits to the queue before anything else (§6).</summary>
+    /// <summary>The clinician saves assessments, and each one is committed to the queue before anything else happens (§6).</summary>
     private async Task CaptureAsync(CancellationToken ct)
     {
         for (var i = 0; i < options.EventsPerDevice; i++)
@@ -58,7 +58,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
 
     private async Task SyncStepAsync(CancellationToken ct)
     {
-        // Reachability probe once per sync run, before pushing (§6.2).
+        // Check the server is reachable once per sync run, before pushing (§6.2).
         if (Queue.HasWorkToSend() && !await gateway.HealthAsync(ct))
         {
             await Task.Delay(_backoff.NextDelay(), ct);
@@ -85,7 +85,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
         await PullAsync(ct);
     }
 
-    /// <returns>false when the sync run should stop and back off.</returns>
+    /// <returns>False if the sync run should stop and back off.</returns>
     private async Task<bool> PushAsync(IReadOnlyList<QueuedEvent> batch, CancellationToken ct)
     {
         Pushes++;
@@ -100,12 +100,12 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
                 return true;
 
             case HttpStatusCode.RequestEntityTooLarge when batch.Count > 1:
-                // §7.1: split the batch and retry. Push the first half now; the rest is picked up on the next pass.
+                // Split the batch and retry (§7.1). Push the first half now, and the rest goes on the next pass.
                 Queue.Release(batch.Skip(batch.Count / 2), "split after 413");
                 return await PushAsync(batch.Take(batch.Count / 2).ToList(), ct);
 
             default:
-                // 429, 503, timeout, no response: rows back to PENDING and back off (§7.1).
+                // A 429, 503, timeout or no response. Put the rows back to PENDING and back off (§7.1).
                 Queue.Release(batch, outcome.Error ?? "push failed");
                 await Task.Delay(_backoff.NextDelay(outcome.RetryAfter), ct);
                 return false;
@@ -145,7 +145,7 @@ public sealed class SimulatedDevice(string deviceId, GatewayClient gateway, Even
             }
             else
             {
-                // A naive client retries the same request; the baseline stores it again each time.
+                // A simple client just retries the same request, and the baseline stores it again every time.
                 Queue.Release([row], error ?? "baseline failed");
                 await Task.Delay(_backoff.NextDelay(), ct);
                 return;

@@ -5,8 +5,8 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace IdentityService.Oidc;
 
 /// <summary>
-/// The OpenIddict server (ADR 0006). It runs in degraded mode: clients are defined in code (<see cref="OidcClients"/>)
-/// and sessions live in clinical.clinician_session, so OpenIddict needs no database of its own.
+/// The OpenIddict server (ADR 0006). It runs in degraded mode. Clients are defined in code (<see cref="OidcClients"/>)
+/// and sessions live in clinical.clinician_session, so OpenIddict doesn't need a database of its own.
 /// </summary>
 public static class OidcServer
 {

@@ -17,7 +17,7 @@ public sealed class SecretProtector
         _key = SHA256.HashData(Encoding.UTF8.GetBytes(passphrase));
     }
 
-    /// <summary>Derives a separate 256-bit key for another job, so the same key bytes never do two things.</summary>
+    /// <summary>Derives a separate 256-bit key for a different job, so the same key bytes are never used for two things.</summary>
     public byte[] DeriveKey(string purpose) =>
         HKDF.DeriveKey(HashAlgorithmName.SHA256, _key, 32, info: Encoding.UTF8.GetBytes(purpose));
 

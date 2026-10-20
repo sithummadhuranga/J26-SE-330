@@ -4,26 +4,27 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import '../api/sync_api.dart';
 import '../api/sync_models.dart';
 
-/// The clinician closed the sign-in page without signing in; nothing changed.
+/// The clinician closed the sign-in page without signing in, so nothing changed.
 class SignInCancelled implements Exception {
   @override
   String toString() => 'SignInCancelled';
 }
 
-/// Signs in on the identity service's own page (ADR 0006): the app never sees the password or the MFA code.
+/// Signs in on the identity service's own page (ADR 0006), so the app never sees the password or the MFA code.
 abstract class BrowserSignIn {
-  /// Opens the login page for this phone and returns the tokens. Throws [SignInCancelled] when the clinician closes
-  /// it, [TransportException] when the server cannot be reached.
+  /// Opens the login page for this phone and returns the tokens. Throws [SignInCancelled] if the clinician
+  /// closes it, or [TransportException] if the server can't be reached.
   Future<TokenPair> signIn({required String deviceId});
 }
 
-/// Authorization code + PKCE in the system browser (RFC 8252), through AppAuth.
+/// Uses AppAuth to run the authorization code flow with PKCE in the system browser (RFC 8252).
 class AppAuthSignIn implements BrowserSignIn {
   AppAuthSignIn(this.baseUri, {FlutterAppAuth? appAuth}) : _appAuth = appAuth ?? const FlutterAppAuth();
 
   static const clientId = 'mobile';
 
-  /// Registered with the identity service and in android/app/build.gradle.kts (appAuthRedirectScheme).
+  /// This has to match what's registered with the identity service and in android/app/build.gradle.kts
+  /// (appAuthRedirectScheme).
   static const redirectUrl = 'lk.sliit.cdss:/oauth2redirect';
 
   final Uri baseUri;
@@ -43,7 +44,7 @@ class AppAuthSignIn implements BrowserSignIn {
         ),
         scopes: const ['openid', 'profile', 'offline_access'],
         additionalParameters: {'device_id': deviceId},
-        // Plain HTTP only for the local stack (10.0.2.2); a real deployment is HTTPS.
+        // Plain HTTP is only allowed for the local stack (10.0.2.2). A real deployment uses HTTPS.
         allowInsecureConnections: baseUri.scheme == 'http',
       ));
       final access = r.accessToken;
@@ -56,7 +57,7 @@ class AppAuthSignIn implements BrowserSignIn {
     } on FlutterAppAuthUserCancelledException {
       throw SignInCancelled();
     } on PlatformException catch (e) {
-      // AppAuth reports network failures as platform errors; the queue is untouched either way.
+      // AppAuth reports network failures as platform errors. Either way, the queue isn't touched.
       throw TransportException(e.message ?? e.code);
     }
   }

@@ -31,9 +31,10 @@ describe('audit log (real audit trail)', () => {
     await signInOnScreen(user, session, demoAdmin.username, demoAdmin.password);
     await screen.findByRole('table', {}, slow);
 
-    // Search for this run's clinician: created by the admin, one wrong password, one sign-in.
+    // Search for the clinician from this run. The admin created them, then they got one password wrong
+    // and signed in once.
     await user.type(screen.getByLabelText('Search audit log'), nurse);
-    // Looked up each time: the table is replaced by "No matching events" while a search matches nothing.
+    // We look the table up each time, because it's swapped for "No matching events" while a search finds nothing.
     const table = () => screen.getByRole('table');
     await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(4), slow);
     expect(within(table()).getByText('Account created')).toBeInTheDocument();

@@ -22,7 +22,7 @@ public static class ConnectEndpoints
     {
         app.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], AuthorizeAsync).AllowAnonymous();
         app.MapPost("/connect/token", TokenAsync).AllowAnonymous().DisableAntiforgery();
-        // The cast matters: a handler taking only HttpContext binds as a RequestDelegate and its IResult never runs.
+        // The cast matters. A handler that only takes HttpContext binds as a RequestDelegate, and its IResult never runs.
         app.MapMethods("/connect/endsession", [HttpMethods.Get, HttpMethods.Post],
             (Func<HttpContext, Task<IResult>>)EndSessionAsync).AllowAnonymous();
         return app;
@@ -35,14 +35,14 @@ public static class ConnectEndpoints
         var client = clients.Find(request.ClientId)!;
         var deviceId = OidcValidationHandlers.DeviceId(request);
 
-        // The sign-in must be for this client and this device; prompt=login always asks again.
+        // The sign-in has to be for this client and this device, and prompt=login always asks again.
         var who = await LoginCookie.ReadAsync(http);
         if (who is null || who.Client != client.Id || who.DeviceId != deviceId || request.HasPromptValue(PromptValues.Login))
         {
             if (request.HasPromptValue(PromptValues.None))
                 return Error(Errors.LoginRequired, "The clinician needs to sign in.");
 
-            // The login page comes back to this exact request; a POSTed request is turned into a GET first.
+            // The login page comes back to this exact request. A POSTed request gets turned into a GET first.
             var returnUrl = http.Request.PathBase + http.Request.Path + QueryString.Create(
                 request.GetParameters().Where(p => p.Key != Parameters.Prompt)
                     .Select(p => KeyValuePair.Create(p.Key, (string?)p.Value)));
@@ -63,7 +63,8 @@ public static class ConnectEndpoints
 
         if (request.IsPasswordGrantType())
         {
-            // Device simulator and tests only (Oidc:AllowPasswordGrant); same rules and audit as the login page.
+            // Only for the device simulator and tests (Oidc:AllowPasswordGrant). It follows the same rules and audit
+            // as the login page.
             Guid sessionId = default;
             var result = await credentials.ValidateAsync(
                 new SignInAttempt(request.Username ?? "", request.Password, (string?)request[OidcValidationHandlers.TotpParameter],
@@ -74,7 +75,8 @@ public static class ConnectEndpoints
                 : Error(Errors.InvalidGrant, result.ReasonCode!);
         }
 
-        // A code or refresh token. OpenIddict has checked it belongs to this client; read back what we stored in it.
+        // A code or a refresh token. OpenIddict has already checked it belongs to this client, so read back what we
+        // stored in it.
         var granted = (await http.AuthenticateAsync(Scheme)).Principal;
         if (granted is null) return Error(Errors.InvalidGrant, "The grant is not valid.");
 
@@ -90,14 +92,14 @@ public static class ConnectEndpoints
                 authenticationScheme: Scheme);
         }
 
-        // Refresh: the session row must still be active; it is ended and the next one in its family issued.
+        // For a refresh, the session row has to still be active. We end it and create the next one in its family.
         if (OidcPrincipal.SessionId(granted) is not { } current || await sessions.RotateAsync(current, ct) is not { } next)
             return Error(Errors.InvalidGrant, "INVALID_REFRESH_TOKEN");
         return Results.SignIn(OidcPrincipal.Create(next.Clinician, client, granted.GetScopes(), next.SessionId, refreshLifetime),
             authenticationScheme: Scheme);
     }
 
-    /// <summary>Clears any pending sign-in; OpenIddict then sends the browser to the validated post-logout URI.</summary>
+    /// <summary>Clears any sign-in in progress. OpenIddict then sends the browser to the checked post-logout URI.</summary>
     private static async Task<IResult> EndSessionAsync(HttpContext http)
     {
         await LoginCookie.SignOutAsync(http);

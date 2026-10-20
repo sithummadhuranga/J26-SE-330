@@ -11,7 +11,7 @@ export const sessionStorageStore: TokenStore = {
   delete: (key) => sessionStorage.removeItem(key),
 };
 
-/** Keeps tokens in memory instead (used by the tests). */
+/** Keeps tokens in memory instead. The tests use this. */
 export class MemoryTokenStore implements TokenStore {
   readonly values = new Map<string, string>();
   read = (key: string) => this.values.get(key) ?? null;

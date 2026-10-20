@@ -5,7 +5,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../sync/data/patient_repository.dart';
 
-/// Adds a patient by label only; the phone generates a pseudonymous id. Pops with the new patient.
+/// Adds a patient using just a label, and the phone makes up a pseudonymous id. Closes with the new patient.
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key, required this.services});
 

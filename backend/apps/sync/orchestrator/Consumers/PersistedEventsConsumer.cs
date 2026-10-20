@@ -8,7 +8,7 @@ using System.Diagnostics;
 
 namespace Orchestrator.Consumers;
 
-/// <summary>Runs the workflow for each persisted event, committing once the outcome is durable.</summary>
+/// <summary>Runs the workflow for each persisted event, and commits once the outcome is safely saved.</summary>
 public sealed class PersistedEventsConsumer(
     WorkflowRunner runner, OutcomeRouter router, IConfiguration config, ILogger<PersistedEventsConsumer> logger)
     : BackgroundService
@@ -36,7 +36,7 @@ public sealed class PersistedEventsConsumer(
         {
             try
             {
-                // Short poll so finished work is committed and drained partitions resume promptly.
+                // Poll briefly, so finished work gets committed and caught-up partitions resume quickly.
                 if (consumer.Consume(TimeSpan.FromMilliseconds(200)) is { } result) workers.Dispatch(consumer, result);
                 workers.Tick(consumer);
             }
@@ -54,7 +54,7 @@ public sealed class PersistedEventsConsumer(
         consumer.Close();
     }
 
-    /// <summary>Shared with the retry consumer: parse, run the workflow, route the outcome.</summary>
+    /// <summary>Shared with the retry consumer. Parses the message, runs the workflow and routes the outcome.</summary>
     internal static async Task<OrchestrationOutcome> ProcessAsync(ConsumeResult<string, byte[]> result, WorkflowRunner runner,
         OutcomeRouter router, ILogger logger, CancellationToken ct)
     {
@@ -68,7 +68,7 @@ public sealed class PersistedEventsConsumer(
         }
         catch (JsonException ex)
         {
-            // Unparseable: retrying cannot help.
+            // We can't parse it, so retrying won't help.
             var unknown = new OrchestrationOutcome(new PersistedEvent(Guid.Empty, Guid.Empty, 0, Guid.Empty),
                 OutcomeKind.DeadLetter, $"UNPARSEABLE: {ex.Message}");
             await router.RouteAsync(result, unknown, ct);

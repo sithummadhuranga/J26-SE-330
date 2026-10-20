@@ -6,7 +6,7 @@ import { Field, Spinner } from '../ui/components';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/toastContext';
 
-/** Sets a new password for a clinician who forgot theirs; the server also unlocks them and ends their sessions. */
+/** Sets a new password for a clinician who forgot theirs. The server also unlocks them and ends their sessions. */
 export function ResetPasswordDialog({
   clinician,
   onClose,

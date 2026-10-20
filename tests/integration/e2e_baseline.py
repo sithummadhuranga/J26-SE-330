@@ -1,4 +1,4 @@
-"""DISRUPTIVE: tests the REST baseline's duplicates and waiting-for-advice behavior (local Docker only)."""
+"""DISRUPTIVE: tests how the REST baseline handles duplicates and waiting for advice. Local Docker only."""
 import os
 import secrets
 import subprocess

@@ -1,5 +1,6 @@
-"""OpenID Connect sign-in end to end (ADR 0006): code + PKCE through the login page, refresh rotation, revocation,
-the password grant for tests, and the client rules. Drives the browser flow with plain HTTP; safe to re-run."""
+"""OpenID Connect sign-in from start to finish (ADR 0006): code and PKCE through the login page, refresh rotation,
+revocation, the password grant for tests, and the client rules. It acts out the browser flow over plain HTTP,
+and it's safe to run again."""
 import base64
 import json
 import secrets

@@ -13,8 +13,9 @@ import { useLoadFailureToast, useToast } from '../ui/toastContext';
 const clientLabel = (s: MySession) => (s.client === 'mobile' ? 'Mobile app' : 'Admin dashboard');
 
 /**
- * "Your sessions" on My account (plan: profile management, step 8): where you are signed in, with a way to end one
- * session or all of them. The server can't tell which session is this browser, so none is marked as "this one".
+ * "Your sessions" on My account (profile management plan, step 8). It shows where you're signed in and lets you
+ * end one session or all of them. The server can't tell which session is this browser, so none is marked
+ * as "this one".
  */
 export function SessionsSection() {
   const session = useSession();

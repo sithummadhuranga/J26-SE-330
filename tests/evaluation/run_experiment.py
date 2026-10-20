@@ -1,7 +1,8 @@
 """
 Evaluation experiments (architecture §13, plan phase 10 part 2). Each scenario sets up a fault, runs the device
-simulator through Toxiproxy (so every scenario uses the same network path), samples Kafka consumer lag, then writes
-the §13 metrics. Everything is put back afterwards: toxics removed, stub and services restored.
+simulator through Toxiproxy (so every scenario uses the same network path), samples Kafka consumer lag, and then
+writes out the §13 metrics. Afterwards everything is put back: the toxics are removed and the stub and services
+restored.
 
 DISRUPTIVE: local Docker stack only. Needs `docker compose --profile tools up -d toxiproxy` as well.
 
@@ -69,7 +70,7 @@ def group_lag(group):
 
 
 class LagSampler(threading.Thread):
-    """Consumer lag over time (§13: 'consumer lag rises then drains'), every 2 s, for both consumer groups."""
+    """Samples consumer lag every 2 seconds for both consumer groups, to show it 'rises then drains' (§13)."""
 
     def __init__(self):
         super().__init__(daemon=True)
@@ -100,7 +101,7 @@ def loss_setup():
 
 
 def flaky_during(done):
-    """Down 8 s, up 12 s, starting 5 s in, until the devices are done."""
+    """Takes the network down for 8 seconds and back up for 12, starting 5 seconds in, until the devices finish."""
     if done.wait(5):
         return
     while True:
@@ -128,7 +129,7 @@ def kill_during(done):
 
 
 def replay_after(started):
-    """Rewinds the persister and orchestrator to the run's start time, so only this run's messages repeat."""
+    """Rewinds the persister and orchestrator to when the run started, so only this run's messages get repeated."""
     at = started.strftime("%Y-%m-%dT%H:%M:%S.000")
     compose("stop", "ingest-persister", "orchestrator")
     for group, topic in [("persister", "wound-events"), ("orchestrator", "wound-events.persisted")]:
@@ -156,7 +157,7 @@ def run_once(scenario, mode, args, out_dir):
     setup, during, teardown = SCENARIOS[scenario]
     run_id = f"{scenario.replace('-', '')}{datetime.now().strftime('%H%M%S')}{'b' if mode == 'baseline' else 'e'}"
     toxiproxy.reset()
-    # Start devices at the current cursor so the run measures only its own traffic (archive counts too).
+    # Start the devices at the current cursor, so the run only measures its own traffic (archived rows count too).
     head = metrics.psql_csv("select greatest((select max(server_seq) from sync.change_log), "
                             "(select max(server_seq) from sync.change_log_archive), 0) as head")[0]["head"]
     setup()
@@ -169,7 +170,7 @@ def run_once(scenario, mode, args, out_dir):
         sim = subprocess.run(
             ["dotnet", "run", "--no-build", "--project", "tests/device-simulator", "--",
              "--gateway", PROXIED_GATEWAY, "--setup-gateway", DIRECT_GATEWAY,
-             # New TCP connection per request so Toxiproxy faults hit every request in every scenario.
+             # Open a new TCP connection for every request, so Toxiproxy faults hit every request in every scenario.
              "--connection-lifetime-s", "0", "--start-cursor", head,
              "--capture-interval-ms", str(args.capture_interval_ms),
              "--devices", str(args.devices), "--events", str(args.events),
@@ -180,7 +181,7 @@ def run_once(scenario, mode, args, out_dir):
         action.join(timeout=60)
         toxiproxy.reset()
         teardown()
-    # Let the pipeline drain before measuring (advice can still arrive after the devices stop).
+    # Let the pipeline finish up before measuring, since advice can still arrive after the devices stop.
     if mode == "event-driven":
         wait(lambda: group_lag("persister") == 0 and group_lag("orchestrator") == 0, 120, 2)
         if after := AFTER.get(scenario.removesuffix("-ablation")):
@@ -239,7 +240,7 @@ def append_summary(r):
         with open(path, newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
     fields = list(row.keys()) + [k for k in (rows[0].keys() if rows else []) if k not in row]
-    # Rewritten whole, so a new column (e.g. the ablation counts) never misaligns older rows.
+    # We rewrite the whole file, so adding a column (like the ablation counts) never knocks older rows out of line.
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, restval="")
         w.writeheader()
@@ -247,7 +248,8 @@ def append_summary(r):
 
 
 def set_ablation(enabled):
-    """§13 ablation: gateway DUPLICATE check and orchestrator inbox off, shadow rows recorded (see ablation/0001)."""
+    """The §13 ablation. Turns off the gateway's DUPLICATE check and the orchestrator inbox, and records shadow rows
+    (see ablation/0001)."""
     compose("up", "-d", "--no-deps", "--force-recreate", "sync-gateway", "ingest-persister", "orchestrator",
             env={"ABLATION": "true" if enabled else "false"})
     marker = "ABLATION MODE"

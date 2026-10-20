@@ -9,7 +9,7 @@ import type {
   TokenPair,
 } from './models';
 
-/** No HTTP answer at all: gateway down, CORS refused, timeout. */
+/** We got no HTTP answer at all, for example because the gateway is down, CORS refused us, or it timed out. */
 export class TransportError extends Error {
   constructor(message: string) {
     super(message);
@@ -17,7 +17,7 @@ export class TransportError extends Error {
   }
 }
 
-/** An HTTP error answer, with the reason code the backend sends (`{"code": "..."}`). */
+/** The server answered with an HTTP error, along with the reason code the backend sends (`{"code": "..."}`). */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
@@ -46,7 +46,7 @@ export class AdminApi {
 
   // ---- auth: OpenID Connect (ADR 0006) ----
 
-  /** The identity service's sign-in page for this request; the browser goes there, never this code. */
+  /** The identity service's sign-in page for this request. The browser goes there; this code never calls it. */
   authorizeUrl(params: { redirectUri: string; state: string; codeChallenge: string }): string {
     const query = new URLSearchParams({
       response_type: 'code',
@@ -60,12 +60,15 @@ export class AdminApi {
     return `${this.base}/connect/authorize?${query.toString()}`;
   }
 
-  /** Swaps the code from /callback for tokens. Throws ApiError with the OAuth error, e.g. invalid_grant. */
+  /** Swaps the code from /callback for tokens. Throws ApiError with the OAuth error, such as invalid_grant. */
   exchangeCode(code: string, codeVerifier: string, redirectUri: string): Promise<TokenPair> {
     return this.token({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: redirectUri });
   }
 
-  /** Rotates both tokens; the old refresh token stops working. Throws ApiError invalid_grant once the session is over. */
+  /**
+   * Swaps both tokens for new ones, and the old refresh token stops working.
+   * Once the session is over, this throws ApiError invalid_grant.
+   */
   refresh(refreshToken: string): Promise<TokenPair> {
     return this.token({ grant_type: 'refresh_token', refresh_token: refreshToken });
   }
@@ -81,7 +84,7 @@ export class AdminApi {
     return this.get('v1/admin/clinicians', token) as Promise<ClinicianSummary[]>;
   }
 
-  /** Throws ApiError 409 USERNAME_TAKEN, or 400 INVALID_USERNAME, PASSWORD_TOO_SHORT, INVALID_ROLE, ... */
+  /** Throws ApiError 409 USERNAME_TAKEN, or a 400 such as INVALID_USERNAME, PASSWORD_TOO_SHORT or INVALID_ROLE. */
   async registerClinician(
     token: string,
     clinician: { username: string; password: string; fullName: string; role: string },
@@ -107,27 +110,33 @@ export class AdminApi {
     await this.post(`v1/admin/clinicians/${enc(username)}/reset-mfa`, null, token);
   }
 
-  /** Also clears a lockout and signs the clinician out everywhere. Throws ApiError 400 PASSWORD_TOO_SHORT, 409 CANNOT_RESET_OWN_PASSWORD. */
+  /**
+   * Also clears a lockout and signs the clinician out everywhere.
+   * Throws ApiError 400 PASSWORD_TOO_SHORT or 409 CANNOT_RESET_OWN_PASSWORD.
+   */
   async resetPassword(token: string, username: string, password: string): Promise<void> {
     await this.post(`v1/admin/clinicians/${enc(username)}/reset-password`, { password }, token);
   }
 
   // ---- own account ----
 
-  /** Your own profile; the account is the one in the token. Throws ApiError 404 once the account is deactivated. */
+  /** Your own profile. The account always comes from the token. Throws ApiError 404 once the account is deactivated. */
   me(token: string): Promise<MyProfile> {
     return this.get('v1/me', token) as Promise<MyProfile>;
   }
 
   /**
-   * Changes your own password; on success the server ends every session, this one included. Throws ApiError 400
-   * INVALID_CREDENTIALS, PASSWORD_TOO_SHORT, PASSWORD_UNCHANGED, or 409 CREDENTIAL_LOCKED.
+   * Changes your own password. If it works, the server ends every session, including this one.
+   * Throws ApiError 400 INVALID_CREDENTIALS, PASSWORD_TOO_SHORT or PASSWORD_UNCHANGED, or 409 CREDENTIAL_LOCKED.
    */
   async changePassword(token: string, currentPassword: string, newPassword: string): Promise<void> {
     await this.post('v1/me/password', { currentPassword, newPassword }, token);
   }
 
-  /** Changes your own full name; answers the updated profile. Throws ApiError 400 MISSING_FULL_NAME, FULL_NAME_TOO_LONG. */
+  /**
+   * Changes your own full name and returns the updated profile.
+   * Throws ApiError 400 MISSING_FULL_NAME or FULL_NAME_TOO_LONG.
+   */
   updateProfile(token: string, fullName: string): Promise<MyProfile> {
     return this.send('v1/me', {
       method: 'PATCH',
@@ -153,7 +162,10 @@ export class AdminApi {
 
   // ---- own account: two-step sign-in ----
 
-  /** Starts two-step setup with a new secret; MFA turns on only after confirmMfa. Throws ApiError 409 MFA_ALREADY_ENABLED. */
+  /**
+   * Starts setting up two-step sign-in with a new secret. MFA only turns on after confirmMfa.
+   * Throws ApiError 409 MFA_ALREADY_ENABLED.
+   */
   mfaEnroll(token: string): Promise<MfaEnrollment> {
     return this.post('v1/auth/mfa/enroll', null, token) as Promise<MfaEnrollment>;
   }
@@ -194,7 +206,7 @@ export class AdminApi {
     };
   }
 
-  /** OAuth endpoints take form fields and answer {error, error_description}. */
+  /** The OAuth endpoints take form fields and answer with {error, error_description}. */
   private form(path: string, fields: Record<string, string>): Promise<unknown> {
     return this.send(path, {
       method: 'POST',
@@ -213,7 +225,7 @@ export class AdminApi {
     return this.send(path, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
   }
 
-  /** Returns the parsed response, or throws ApiError (server said no) or TransportError (no answer). */
+  /** Returns the parsed response. Throws ApiError if the server said no, or TransportError if it didn't answer. */
   private async send(path: string, init: RequestInit): Promise<unknown> {
     let response: Response;
     let text: string;
@@ -225,7 +237,7 @@ export class AdminApi {
     }
     const body = text ? tryParse(text) : null;
     if (response.ok) return body;
-    // Our API sends {code}; OAuth endpoints send {error}.
+    // Our own API sends {code}, while the OAuth endpoints send {error}.
     const code = !isRecord(body) ? null : typeof body.code === 'string' ? body.code : typeof body.error === 'string' ? body.error : null;
     throw new ApiError(response.status, code);
   }

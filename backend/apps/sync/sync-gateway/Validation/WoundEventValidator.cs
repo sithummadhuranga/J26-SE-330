@@ -4,7 +4,7 @@ using Sync.Common.Contracts;
 
 namespace SyncGateway.Validation;
 
-/// <summary>Validates incoming events against the shared wound-event schema and the 16 KB limit.</summary>
+/// <summary>Checks incoming events against the shared wound-event schema and the 16 KB limit.</summary>
 public sealed class WoundEventValidator
 {
     private readonly JsonSchema _schema;
@@ -20,7 +20,7 @@ public sealed class WoundEventValidator
         _schema = JsonSchema.FromText(File.ReadAllText(path));
     }
 
-    /// <returns>null when valid, otherwise a (code, detail) pair for the per-event REJECTED result.</returns>
+    /// <returns>Null if the event is fine. Otherwise a (code, detail) pair for that event's REJECTED result.</returns>
     public (string Code, string Detail)? Validate(JsonElement evt)
     {
         var size = System.Text.Encoding.UTF8.GetByteCount(evt.GetRawText());

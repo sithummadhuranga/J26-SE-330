@@ -13,7 +13,7 @@ public sealed record PushOutcome(HttpStatusCode? Status, IReadOnlyList<(Guid Eve
 
 public sealed record Change(long Seq, string Type, Guid AssessmentId, int Revision);
 
-/// <summary>The device's side of the sync protocol: login, health probe, push and pull.</summary>
+/// <summary>The phone's side of the sync protocol: login, the health check, push and pull.</summary>
 public sealed class GatewayClient(HttpClient http, string deviceId, string username, string password)
 {
     private string? _accessToken;
@@ -36,7 +36,8 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
                 ["device_id"] = deviceId,
                 ["scope"] = "offline_access",
             }), ct);
-            // Login is rate-limited per IP and all simulated phones share one; on 5xx the caller backs off and retries.
+            // Login is rate-limited per IP and all the simulated phones share one. On a 5xx the caller backs off and
+            // tries again.
             if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < 5)
             {
                 await Task.Delay(response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(10), ct);
@@ -47,7 +48,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
         }
     }
 
-    /// <summary>Registers a clinician in the admin's facility; 409 means it already exists.</summary>
+    /// <summary>Registers a clinician in the admin's facility. A 409 means they already exist.</summary>
     public async Task RegisterClinicianAsync(string newUsername, string newPassword, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "v1/admin/clinicians")
@@ -60,7 +61,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
                                                 await response.Content.ReadAsStringAsync(ct));
     }
 
-    /// <summary>Refreshes the access token; logs in again when the refresh token is no longer valid (§6.2).</summary>
+    /// <summary>Refreshes the access token, and logs in again if the refresh token no longer works (§6.2).</summary>
     public async Task RefreshAsync(CancellationToken ct)
     {
         if (_refreshToken is not null)
@@ -80,7 +81,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
         await LoginAsync(ct);
     }
 
-    /// <summary>Reachability, not just connectivity: is the gateway answering at all (§6.2)?</summary>
+    /// <summary>Checks whether the gateway is actually answering, not just whether there's a network (§6.2).</summary>
     public async Task<bool> HealthAsync(CancellationToken ct)
     {
         try
@@ -131,7 +132,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            // No response: the server may or may not have taken the batch. Resending is safe (idempotent).
+            // No response, so we don't know if the server took the batch. Sending it again is safe.
             return new PushOutcome(null, [], null, ex.GetType().Name);
         }
     }
@@ -157,7 +158,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
         }
     }
 
-    /// <summary>REST baseline (§13.1): one event, one synchronous request, advice in the response.</summary>
+    /// <summary>The REST baseline (§13.1): one event per synchronous request, with the advice in the response.</summary>
     public async Task<(HttpStatusCode? Status, string? Error)> BaselineAsync(QueuedEvent row, CancellationToken ct)
     {
         try
@@ -175,7 +176,7 @@ public sealed class GatewayClient(HttpClient http, string deviceId, string usern
         }
     }
 
-    /// <summary>Sends with the access token; on 401 refreshes once and retries.</summary>
+    /// <summary>Sends with the access token. On a 401 it refreshes once and tries again.</summary>
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);

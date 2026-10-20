@@ -1,4 +1,4 @@
-// Helpers for the end-to-end tests: everything here talks to the real Docker stack through the API gateway.
+// Helpers for the end-to-end tests. Everything here talks to the real Docker stack through the API gateway.
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createHmac, randomBytes } from 'node:crypto';
@@ -26,7 +26,7 @@ export async function requireBackend(): Promise<void> {
   if (!health?.ok) throw new Error(`No backend at ${backendUrl}: start it with \`docker compose up -d\`.`);
 }
 
-/** A username no earlier run has used, e.g. e2e.reg.mv1x2k4f9q. */
+/** A username no earlier run has used, like e2e.reg.mv1x2k4f9q. */
 export const uniqueName = (tag: string) => `e2e.${tag}.${Date.now().toString(36)}${randomBytes(2).toString('hex')}`;
 
 export const strongPassword = 'E2e-Test-Pass-2026!';
@@ -34,12 +34,12 @@ export const strongPassword = 'E2e-Test-Pass-2026!';
 /** What a clinician picks on the login page to replace [strongPassword], which their admin chose. */
 export const ownPassword = 'Own-E2e-Pass-2026!';
 
-/** A dashboard session on the real backend; [now] lets a test move the clock forward. */
+/** A dashboard session on the real backend. A test can use [now] to move the clock forward. */
 export function newSession(store = new MemoryTokenStore(), now?: () => number, baseUrl = backendUrl): AuthSession {
   return new AuthSession(new AdminApi(baseUrl), store, now, redirectUri);
 }
 
-/** The login page refused the sign-in; [code] is the reason it shows (data-code), e.g. CLIENT_NOT_ALLOWED. */
+/** The login page refused the sign-in. [code] is the reason it shows (data-code), such as CLIENT_NOT_ALLOWED. */
 export class LoginPageError extends Error {
   readonly code: string | null;
 
@@ -59,10 +59,11 @@ const unescapeHtml = (html: string) =>
     .replace(/&amp;/g, '&');
 
 /**
- * What a browser does between the dashboard and /callback: opens [authorizeUrl], fills in the identity service's
- * real login page (and the authenticator code when asked), following redirects with cookies. Returns the URL the
- * identity service sent the browser back to; throws LoginPageError when the page refused. When an admin chose the
- * password, the page asks for a new one: [newPassword] answers it, otherwise this throws PASSWORD_CHANGE_REQUIRED.
+ * Does what a browser does between the dashboard and /callback. It opens [authorizeUrl], fills in the identity
+ * service's real login page (and the authenticator code if asked), and follows redirects with cookies. It returns
+ * the URL the identity service sent the browser back to, or throws LoginPageError if the page said no.
+ * If an admin set the password, the page asks for a new one. [newPassword] is used for that, and without it
+ * this throws PASSWORD_CHANGE_REQUIRED.
  */
 export async function throughLoginPage(
   authorizeUrl: string,
@@ -92,7 +93,7 @@ export async function throughLoginPage(
     return response;
   };
 
-  /** Follows redirects inside the backend; stops at a page, or says where the browser left for. */
+  /** Follows redirects inside the backend. It stops at a page, or reports where the browser was sent off to. */
   const follow = async (target: string, form?: Record<string, string>) => {
     url = target;
     let response = await request(target, form);
@@ -165,8 +166,8 @@ export async function cleanUp(): Promise<void> {
 }
 
 /**
- * A phone signing in (with a device id), which also registers the device on first use. Uses the password grant the
- * local stack enables for tests (Oidc:AllowPasswordGrant); the app itself goes through the login page.
+ * A phone signing in with a device id, which also registers the device the first time. It uses the password grant
+ * that the local stack turns on for tests (Oidc:AllowPasswordGrant). The app itself uses the login page.
  */
 export async function mobileLogin(username: string, password: string, deviceId: string) {
   const response = await fetch(`${backendUrl}/connect/token`, {
@@ -235,7 +236,7 @@ export async function signInOnScreen(
   }
 }
 
-/** Waits for a toast containing [text]; real network calls can take a moment. */
+/** Waits for a toast containing [text], since real network calls can take a moment. */
 export const findToast = (text: string | RegExp) => screen.findByText(text, {}, { timeout: 15_000 });
 
 export const slow = { timeout: 15_000 };

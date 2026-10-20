@@ -10,7 +10,7 @@ public class RetentionPolicyTests
     [Fact]
     public void Inbox_rows_outlive_the_longest_topic_retention_plus_the_margin()
     {
-        // Kafka's default 7 days + 1 day margin = 8 days, equal to the configured minimum.
+        // Kafka's default of 7 days plus a 1-day margin makes 8 days, the same as the configured minimum.
         Assert.Equal(TimeSpan.FromDays(8), RetentionPolicy.InboxRetention(Defaults, [Week, Week / 7]));
 
         var thirtyDays = (long)TimeSpan.FromDays(30).TotalMilliseconds;

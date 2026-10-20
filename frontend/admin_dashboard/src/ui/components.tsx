@@ -2,7 +2,7 @@ import { cloneElement, useEffect, useId, useRef, useState, type CSSProperties, t
 import { initialsOf } from '../core/format';
 import { describeError } from '../core/messages';
 
-/** Page heading with a short explanation and actions on the right. */
+/** A page heading with a short explanation, and actions on the right. */
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle: string; actions?: ReactNode }) {
   return (
     <header className="page-header">
@@ -17,7 +17,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export type ChipTone = 'teal' | 'blue' | 'error' | 'muted';
 
-/** A small colored label (Active, Locked, MFA on, ...). */
+/** A small coloured label, like Active, Locked or MFA on. */
 export function StatusChip({ label, tone, title }: { label: string; tone: ChipTone; title?: string }) {
   return (
     <span className={`chip chip--${tone}`} title={title}>
@@ -36,7 +36,7 @@ export function Centered({ children }: { children: ReactNode }) {
 
 // ---- building blocks shared with the mobile app's look (mobile/lib/core/widgets.dart) ----
 
-/** A round soft-teal avatar with initials. Decorative: the name is always written next to it. */
+/** A round soft-teal avatar with initials. It's just decoration, since the name is always written next to it. */
 export function InitialsAvatar({ name, size = 36 }: { name: string; size?: number }) {
   return (
     <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.33 }} aria-hidden="true">
@@ -54,7 +54,7 @@ export function IconTile({ children, tone = 'accent' }: { children: ReactNode; t
   );
 }
 
-/** Nothing to show yet: an icon tile, a bold line and a hint (the app's EmptyState). */
+/** What we show when there's nothing yet: an icon tile, a bold line and a hint (the app's EmptyState). */
 export function EmptyState({ icon, title, message }: { icon: ReactNode; title: string; message?: string }) {
   return (
     <div className="empty">
@@ -131,8 +131,8 @@ export function LoadError({ error, onRetry }: { error: unknown; onRetry: () => v
 }
 
 /**
- * A table inside a card that scrolls sideways only when it needs more room than it has. [footer] (the pager) stays
- * at the bottom of the card and does not scroll with the table.
+ * A table inside a card. It only scrolls sideways when it needs more room than it has. [footer], the pager, stays
+ * at the bottom of the card and doesn't scroll with the table.
  */
 export function TableCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (

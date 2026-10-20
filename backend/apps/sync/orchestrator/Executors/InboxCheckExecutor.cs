@@ -4,7 +4,7 @@ using Orchestrator.Persistence;
 
 namespace Orchestrator.Executors;
 
-/// <summary>Skips messages this consumer already processed, using the inbox table.</summary>
+/// <summary>Uses the inbox table to skip messages this consumer has already processed.</summary>
 [YieldsOutput(typeof(OrchestrationOutcome))]
 public sealed class InboxCheckExecutor(IOrchestratorStore store) : Executor<OrchestrationJob, InboxChecked>("InboxCheck")
 {

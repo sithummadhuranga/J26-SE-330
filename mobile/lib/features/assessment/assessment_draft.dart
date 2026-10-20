@@ -3,7 +3,8 @@ import 'package:uuid/uuid.dart';
 import '../sync/data/app_database.dart';
 import '../sync/ui/sample_assessment.dart';
 
-/// A draft assessment with stable client-side UUIDv7 ids so a retried save is the same event.
+/// An assessment being filled in. Its UUIDv7 ids are made on the phone and don't change,
+/// so saving it again produces the same event.
 class AssessmentDraft {
   AssessmentDraft({this.patient})
     : eventId = const Uuid().v7(),
@@ -14,19 +15,21 @@ class AssessmentDraft {
   final String assessmentId;
   final String woundId;
 
-  /// Null means an unlinked case: the event still carries a fresh pseudonymous patientRef (the contract needs one).
+  /// Null means the case isn't linked to a patient. The event still gets a new pseudonymous patientRef,
+  /// because the contract requires one.
   PatientLocalData? patient;
 
-  /// Tri-state (§3). "Not recorded" until the clinician answers; never assumed to be "absent".
+  /// One of three answers (§3). It stays "not recorded" until the clinician answers, and we never assume "absent".
   String pedalPulses = 'not_recorded';
   String protectiveSensation = 'not_recorded';
 
-  /// Set by the analysis step. Today a stand-in ([sampleAnalytics]); Members 1–2's pipeline replaces it.
+  /// Filled in by the analysis step. For now that's a stand-in ([sampleAnalytics]) until the pipeline
+  /// from Members 1–2 replaces it.
   Map<String, dynamic>? analytics;
 
   final DateTime startedAt = DateTime.now();
 
-  /// The wound event (contracts/wound-event.schema.json) for the queue.
+  /// Builds the wound event that goes into the queue (contracts/wound-event.schema.json).
   Map<String, dynamic> toEvent({required String deviceId, required String facilityId, required String patientRef}) => {
     'schemaVersion': '1.0',
     'eventId': eventId,

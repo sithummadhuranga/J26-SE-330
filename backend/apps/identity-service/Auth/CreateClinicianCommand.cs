@@ -3,7 +3,7 @@ using IdentityService.Admin;
 
 namespace IdentityService.Auth;
 
-/// <summary>CLI: create-clinician [--if-not-exists] username password role facilityId [full name].</summary>
+/// <summary>The command line: create-clinician [--if-not-exists] username password role facilityId [full name].</summary>
 public static class CreateClinicianCommand
 {
     public static async Task<int> RunAsync(string[] args, NpgsqlDataSource db)
@@ -32,7 +32,7 @@ public static class CreateClinicianCommand
 
         if (error == "USERNAME_TAKEN" && skipExisting)
         {
-            // Registered by someone else between the check and the insert.
+            // Someone else registered it between our check and the insert.
             Console.WriteLine($"Clinician '{username}' already exists; skipped (password unchanged).");
             return 0;
         }
@@ -45,7 +45,7 @@ public static class CreateClinicianCommand
         return 0;
     }
 
-    /// <summary>Same normalization as registration (trimmed, lower-case), so "N.Silva" finds n.silva.</summary>
+    /// <summary>Tidies the name the same way registration does (trimmed, lower-case), so "N.Silva" finds n.silva.</summary>
     private static async Task<bool> ExistsAsync(NpgsqlDataSource db, string username)
     {
         await using var cmd = db.CreateCommand("SELECT EXISTS (SELECT 1 FROM clinical.clinician WHERE username = @u)");

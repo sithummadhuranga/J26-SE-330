@@ -17,15 +17,15 @@ const tabs: { path: string; label: string; icon: ReactNode }[] = [
 ];
 
 /**
- * The signed-in frame, in the mobile app's style: a greeting header, and tabs with a soft-teal pill that become a
- * bottom navigation bar on a phone-sized screen.
+ * The frame around everything once you're signed in, styled like the mobile app. It has a greeting header and tabs
+ * with a soft-teal pill, which turn into a bottom navigation bar on a phone-sized screen.
  */
 export function DashboardShell() {
   const session = useSession();
   const admin = useAdmin();
   const { pathname, hash } = useLocation();
 
-  // Each tab opens at the top; a link to a section (#sessions) scrolls there itself.
+  // Each tab opens at the top. A link to a section (like #sessions) scrolls there by itself.
   useEffect(() => {
     if (!hash) window.scrollTo?.({ top: 0 });
   }, [pathname, hash]);

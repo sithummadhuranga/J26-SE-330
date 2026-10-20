@@ -3,14 +3,14 @@ using Npgsql;
 
 namespace SyncGateway.Auth;
 
-/// <summary>Blocks tokens from revoked devices, with a short per-device cache to spare the database.</summary>
+/// <summary>Blocks tokens from revoked devices. A short cache per device saves hitting the database every time.</summary>
 public sealed class DeviceRevocationCheck(NpgsqlDataSource db, TimeProvider clock)
 {
     public static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<string, (bool Allowed, DateTimeOffset CheckedAt)> _cache = new();
 
-    /// <summary>False for a revoked device, and for one the identity service never registered.</summary>
+    /// <summary>False for a revoked device, and for a device the identity service never registered.</summary>
     public async Task<bool> IsAllowedAsync(string deviceId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();

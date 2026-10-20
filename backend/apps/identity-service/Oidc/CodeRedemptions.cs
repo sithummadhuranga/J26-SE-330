@@ -14,7 +14,7 @@ public sealed class CodeRedemptions(NpgsqlDataSource db)
             ON CONFLICT (code_id) DO NOTHING
             """);
         cmd.Parameters.AddWithValue("id", codeId);
-        // Keep the row a bit longer than the code lives, so clock skew can't open a gap for reuse.
+        // Keep the row a bit longer than the code lasts, so clocks being slightly out can't leave a gap for reuse.
         cmd.Parameters.AddWithValue("expires", DateTime.UtcNow + OidcPrincipal.AuthorizationCodeLifetime * 2);
         return await cmd.ExecuteNonQueryAsync(ct) == 1;
     }

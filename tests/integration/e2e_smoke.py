@@ -1,4 +1,4 @@
-"""Smoke test for the full push-to-advice round trip; needs the stack up and a demo clinician (n.silva)."""
+"""A smoke test for the whole trip from push to advice. It needs the stack running and a demo clinician (n.silva)."""
 import os
 import sys
 
@@ -61,8 +61,8 @@ eid = good["eventId"]
 check("assessment persisted once",
       wait_for(f"select count(*) from clinical.wound_assessment where event_id = '{eid}'", "1"))
 stages = sql(f"select string_agg(stage, ',' order by provenance_id) from audit.provenance where event_id = '{eid}'")
-# Each stage once. Not in row order: the gateway records GATEWAY_ACCEPTED after Kafka's ack, and the persister can
-# consume the event and record PERSISTED first.
+# Each stage should appear exactly once, but not necessarily in row order. The gateway records GATEWAY_ACCEPTED
+# after Kafka's ack, so the persister can pick up the event and record PERSISTED first.
 check("provenance has GATEWAY_ACCEPTED and PERSISTED, once each",
       stages.split(",").count("GATEWAY_ACCEPTED") == 1 and stages.split(",").count("PERSISTED") == 1, stages)
 
