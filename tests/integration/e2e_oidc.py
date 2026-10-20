@@ -300,4 +300,22 @@ check("an external returnUrl is refused", status == 400, status)
 status, _, page, _ = Browser().follow("/account/login?returnUrl=/v1/admin/clinicians")
 check("a returnUrl other than /connect/authorize is refused", status == 400, status)
 
+browser = Browser()
+_, _, page, _ = browser.follow(mobile_url())
+check("the sign-in form has no returnUrl field", "returnurl" not in str(list(form_fields(page))).lower(),
+      list(form_fields(page)))
+check("... and posts back to its own address", "action=" not in page.split("<form", 1)[-1].split(">", 1)[0])
+check("... and carries an anti-forgery token", "__RequestVerificationToken" in form_fields(page))
+status, _, page, _ = browser.follow(browser.url, {"Username": FIRST, "Password": "anything"})
+check("a post without the anti-forgery token is refused", status == 400, status)
+typed = "Typed-Secret-" + secrets.token_hex(4)
+browser = Browser()
+_, _, page, _ = browser.follow(mobile_url())
+fields = form_fields(page)
+fields.update(Username="nobody-" + suffix, Password=typed)
+_, _, page, out = browser.follow(browser.url, fields)
+check("a wrong password is refused on the page", out is None and error_code(page) == "INVALID_CREDENTIALS",
+      error_code(page))
+check("... and the typed password is never put back into the page", typed not in page)
+
 sys.exit(t.finish())
