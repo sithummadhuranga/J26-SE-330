@@ -29,7 +29,11 @@ public sealed record CredentialResult(VerifiedClinician? Clinician, string? Reas
 /// with a replay check, admins only on the dashboard, and device binding. Every attempt is audited.
 /// </summary>
 public sealed class CredentialValidator(NpgsqlDataSource db, PasswordHasher hasher, SecretProtector secrets)
+    : ISignInRules
 {
+    Task<CredentialResult> ISignInRules.ValidateAsync(SignInAttempt attempt, CancellationToken ct) =>
+        ValidateAsync(attempt, ct);
+
     public const int MaxFailedAttempts = 5;
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 

@@ -43,6 +43,7 @@ builder.Services.AddSingleton<OidcClients>();
 builder.Services.AddSingleton<CodeRedemptions>();
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddSingleton<CredentialValidator>();
+builder.Services.AddSingleton<ISignInRules>(sp => sp.GetRequiredService<CredentialValidator>());
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<MfaService>();
 builder.Services.AddSingleton<ClinicianAdminService>();
@@ -63,7 +64,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 // and anti-forgery), so a restart just means signing in again. Codes and refresh tokens use a key from
 // Secrets:EncryptionKey.
 builder.Services.AddInMemoryDataProtection();
-builder.Services.AddRazorPages();
+// MVC for the sign-in page (AccountController and Views/Account); everything else is minimal APIs.
+builder.Services.AddControllersWithViews();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddLoginCookie(oidc.RequireHttps)
@@ -106,7 +108,7 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapConnectEndpoints();
-app.MapRazorPages();
+app.MapControllers();
 
 var v1 = app.MapGroup("/v1");
 v1.MapAuthEndpoints();
