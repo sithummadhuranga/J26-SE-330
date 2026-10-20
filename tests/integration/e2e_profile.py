@@ -115,7 +115,7 @@ check("... counts as a failed attempt",
       sql(f"select cc.failed_attempts from clinical.clinician_credential cc join clinical.clinician c using (clinician_id) "
           f"where c.username = '{PW_USER}'") == "1")
 status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": "short"}, pw_dash)
-check("a new password under 12 characters is refused", status == 400 and body.get("code") == "PASSWORD_TOO_SHORT",
+check("a new password under 8 characters is refused", status == 400 and body.get("code") == "PASSWORD_TOO_SHORT",
       f"{status} {body}")
 status, body = http("POST", "/v1/me/password", {"currentPassword": PASSWORD, "newPassword": PASSWORD}, pw_dash)
 check("the same password again is refused", status == 400 and body.get("code") == "PASSWORD_UNCHANGED", f"{status} {body}")

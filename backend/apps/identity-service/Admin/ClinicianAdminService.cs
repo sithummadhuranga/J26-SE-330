@@ -18,7 +18,7 @@ public sealed record AuthAuditEntry(long Id, DateTime RecordedAt, string Action,
 public sealed partial class ClinicianAdminService(NpgsqlDataSource db, PasswordHasher hasher)
 {
     public static readonly string[] Roles = ["nurse", "wound_specialist", "admin"];
-    public const int MinPasswordLength = 12;
+    public const int MinPasswordLength = 8;
 
     [GeneratedRegex("^[a-z0-9][a-z0-9._-]{2,63}$")]
     private static partial Regex UsernamePattern();

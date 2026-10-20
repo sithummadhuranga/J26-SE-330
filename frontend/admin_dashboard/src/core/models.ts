@@ -28,7 +28,7 @@ export function roleLabel(role: string): string {
 }
 
 /** The server's minimum password length. */
-export const minPasswordLength = 12;
+export const minPasswordLength = 8;
 
 /** The server's username rule: 3–64 lower-case letters, digits, dots, dashes or underscores. */
 export const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,63}$/;
