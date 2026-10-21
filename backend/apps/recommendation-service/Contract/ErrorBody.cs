@@ -21,5 +21,26 @@ public static class ErrorBody
 
     public static byte[] Unavailable(string message) => Bytes(new JsonObject { ["error"] = "unavailable", ["message"] = message });
 
+    // The follow-up chat's errors (draft rag-chat.schema.json), in the same shape.
+    public static byte[] NotFound() => Bytes(new JsonObject { ["error"] = "not_found", ["message"] = "No chat session has this id." });
+
+    public static byte[] NoAnswer() => Bytes(new JsonObject
+    {
+        ["error"] = "no_answer",
+        ["message"] = "This caseId and revision have no stored answer to start a chat from.",
+    });
+
+    public static byte[] CorpusDiffers() => Bytes(new JsonObject
+    {
+        ["error"] = "corpus_differs",
+        ["message"] = "The answer came from another corpus version than the one this service answers from.",
+    });
+
+    public static byte[] TurnConflict() => Bytes(new JsonObject
+    {
+        ["error"] = "turn_conflict",
+        ["message"] = "Another question in this session was answered at the same moment. Reload the session.",
+    });
+
     private static byte[] Bytes(JsonObject body) => System.Text.Encoding.UTF8.GetBytes(body.ToJsonString());
 }

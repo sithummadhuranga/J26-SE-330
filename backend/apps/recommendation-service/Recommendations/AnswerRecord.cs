@@ -4,6 +4,7 @@
 using System.Text.Json;
 using RecommendationService.Contract;
 using WoundRag.Core.Cases;
+using WoundRag.Core.Gating;
 using WoundRag.Core.Retrieval;
 using WoundRag.Infrastructure.Requests;
 
@@ -41,6 +42,8 @@ public static class AnswerRecord
 
         return new NewAnswer(Guid.NewGuid(), input.CaseId, input.Revision, fingerprint.StableSha256, fingerprint.BodySha256, corpusVersion,
             timing.ReceivedAt, timing.AnsweredAt, retrievals, composed.Generation.Mode, outcome.RetrievalMode, body,
-            [.. composed.Delivered.Select(d => new CitationRow(d.Tag, d.Passage.ChunkId, d.Passage.ChunkHash))], audit);
+            [.. composed.Delivered.Select(d => new CitationRow(d.Tag, d.Passage.ChunkId, d.Passage.ChunkHash))], audit,
+            new ChatContext(composed.Findings, [.. GateFields.Gateable.Where(outcome.Observed.Contains)],
+                [.. outcome.Gate.Refusals.Select(r => r.MissingField)]));
     }
 }

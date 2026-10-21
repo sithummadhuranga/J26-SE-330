@@ -3,9 +3,13 @@
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using RecommendationService.Chat;
 using RecommendationService.Contract;
 using RecommendationService.Recommendations;
+using WoundRag.Core.Chat;
+using WoundRag.Core.Chat.Agent;
 using WoundRag.Core.Generation;
+using WoundRag.Infrastructure.Chat;
 using WoundRag.Infrastructure.Composition;
 using WoundRag.Infrastructure.Corpus;
 using WoundRag.Infrastructure.Figures;
@@ -49,6 +53,12 @@ public static class ServiceRegistration
         services.AddSingleton(_ => ResponseCheck.FromOutputDirectory());
         services.AddSingleton<IRequestRepository, PostgresRequestRepository>();
         services.AddSingleton<RecommendationUseCase>();
+
+        // The follow-up chat: the same models, in the same order; the second one verifies the first one's answer.
+        services.AddSingleton<IChatRepository, PostgresChatRepository>();
+        services.AddSingleton(sp => new ChatTurnEngine([.. sp.GetRequiredService<GenerationChain>().Generators.OfType<IChatModel>()]));
+        services.AddSingleton(_ => new ChatRequestReader(ChatContract.FromOutputDirectory()));
+        services.AddSingleton<ChatUseCase>();
         return services;
     }
 

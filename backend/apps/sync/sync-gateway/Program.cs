@@ -42,6 +42,12 @@ builder.Services.AddHttpClient(BaselineEndpoint.RecommendationClient, client =>
     client.BaseAddress = new Uri(builder.Configuration["RecommendationService:BaseUrl"] ?? "http://localhost:5080");
     client.Timeout = TimeSpan.FromSeconds(60);
 });
+// DRAFT (Member 3): the follow-up chat's client; a turn may take several model calls.
+builder.Services.AddHttpClient(ChatProxyEndpoint.ChatClient, client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["RecommendationService:BaseUrl"] ?? "http://localhost:5080");
+    client.Timeout = ChatProxyEndpoint.ChatTimeout;
+});
 builder.Services.AddSingleton<IProducer<string, byte[]>>(_ => new ProducerBuilder<string, byte[]>(
     KafkaDefaults.Producer(builder.Configuration["Kafka:BootstrapServers"] ?? KafkaDefaults.DefaultBootstrapServers,
         deliveryTimeoutMs: 10_000)).Build());
@@ -101,6 +107,7 @@ v1.MapPatientEndpoints();
 v1.MapPushEndpoint();
 v1.MapPullEndpoint();
 v1.MapFiguresProxyEndpoint();
+v1.MapChatProxyEndpoint(); // DRAFT (Member 3)
 v1.MapBaselineEndpoint();
 
 await app.RunAsync();

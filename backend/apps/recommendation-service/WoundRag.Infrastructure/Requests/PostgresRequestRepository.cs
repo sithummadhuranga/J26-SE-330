@@ -18,6 +18,7 @@ public sealed class PostgresRequestRepository(NpgsqlDataSource db) : IRequestRep
     private static readonly string ProtocolSql = SqlFiles.Read("protocol_insert.sql");
     private static readonly string CitationSql = SqlFiles.Read("citation_insert.sql");
     private static readonly string AuditSql = SqlFiles.Read("audit_insert.sql");
+    private static readonly string ChatContextSql = SqlFiles.Read("chat_context_insert.sql");
 
     public async Task<RequestLookup?> FindAsync(Guid caseId, int revision, string bodySha256, CancellationToken ct)
     {
@@ -73,6 +74,10 @@ public sealed class PostgresRequestRepository(NpgsqlDataSource db) : IRequestRep
             ids.requestId, ids.at, e.EventType, e.Provider, e.RequestedModel, e.ReturnedModel, e.Attempt, e.Outcome,
             e.InputTokens, e.OutputTokens, e.LatencyMs, e.DetailsJson,
         }), tx, cancellationToken: ct));
+        await conn.ExecuteAsync(new CommandDefinition(ChatContextSql, new
+        {
+            ids.requestId, findings = a.Chat.Findings, observed = a.Chat.Observed.ToArray(), withheld = a.Chat.Withheld.ToArray(),
+        }, tx, cancellationToken: ct));
         return new SaveOutcome(SaveStatus.Saved, null);
     }
 }

@@ -1,17 +1,19 @@
 // One model on Alibaba Model Studio (Singapore), called through its OpenAI-format chat endpoint (decision 40).
 // Plain HttpClient and hand-built JSON: enable_thinking is a non-standard field an SDK may drop, and both models
 // think by default, so it is sent false; that it stays off was measured in the demo (0 reasoning tokens).
+// The protocol sends one prompt; the follow-up chat sends a conversation with tools (demo decision 49).
 
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using WoundRag.Core.Chat.Agent;
 using WoundRag.Core.Generation;
 
 namespace WoundRag.Infrastructure.Generation;
 
-public sealed class ModelStudioGenerator : ITextGenerator
+public sealed class ModelStudioGenerator : ITextGenerator, IChatModel
 {
     public const string DeepSeekName = "deepseek-modelstudio";
     public const string QwenName = "qwen";
@@ -49,23 +51,71 @@ public sealed class ModelStudioGenerator : ITextGenerator
 
     public async Task<GeneratorReply> GenerateAsync(PromptText prompt, CancellationToken ct)
     {
-        var body = new JsonObject
+        var sent = await PostAsync(Body(new JsonArray(
+            new JsonObject { ["role"] = "system", ["content"] = prompt.System },
+            new JsonObject { ["role"] = "user", ["content"] = prompt.User })), ct);
+        return sent.Failure is { } f
+            ? new GeneratorReply(f.Status, LatencyMs: sent.LatencyMs, Detail: f.Detail)
+            : Parse(sent.Text!, sent.LatencyMs);
+    }
+
+    public async Task<ChatReply> CompleteAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition> tools, CancellationToken ct)
+    {
+        var body = Body(new JsonArray([.. messages.Select(ToJson)]));
+        if (tools.Count > 0)
         {
-            ["model"] = Model,
-            ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = prompt.System },
-                new JsonObject { ["role"] = "user", ["content"] = prompt.User }),
-            ["temperature"] = 0,
-            ["stream"] = false,
-            ["enable_thinking"] = false,
-        };
+            body["tools"] = new JsonArray([.. tools.Select(t => (JsonNode)new JsonObject
+            {
+                ["type"] = "function",
+                ["function"] = new JsonObject
+                {
+                    ["name"] = t.Name,
+                    ["description"] = t.Description,
+                    ["parameters"] = JsonNode.Parse(t.ParametersSchema),
+                },
+            })]);
+        }
+        var sent = await PostAsync(body, ct);
+        return sent.Failure is { } f
+            ? new ChatReply(f.Status, LatencyMs: sent.LatencyMs, Detail: f.Detail)
+            : ParseChat(sent.Text!, sent.LatencyMs);
+    }
+
+    private JsonObject Body(JsonArray messages) => new()
+    {
+        ["model"] = Model,
+        ["messages"] = messages,
+        ["temperature"] = 0,
+        ["stream"] = false,
+        ["enable_thinking"] = false,
+    };
+
+    // An assistant turn carries its tool calls; a tool result quotes the call id (the API wants one result per id).
+    private static JsonNode ToJson(ChatMessage m)
+    {
+        var node = new JsonObject { ["role"] = m.Role, ["content"] = m.Content };
+        if (m.ToolCalls is { Count: > 0 } calls)
+        {
+            node["tool_calls"] = new JsonArray([.. calls.Select(c => (JsonNode)new JsonObject
+            {
+                ["id"] = c.Id,
+                ["type"] = "function",
+                ["function"] = new JsonObject { ["name"] = c.Name, ["arguments"] = c.Arguments },
+            })]);
+        }
+        if (m.ToolCallId is not null) node["tool_call_id"] = m.ToolCallId;
+        return node;
+    }
+
+    // One call per attempt, no retry here: the chain (and the chat engine) decide what happens next.
+    private async Task<(string? Text, (ReplyStatus Status, string Detail)? Failure, int LatencyMs)> PostAsync(JsonObject body, CancellationToken ct)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint)
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-        // One call per attempt, no retry here: the chain allows two attempts in all.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(_timeout);
         var clock = Stopwatch.StartNew();
@@ -77,18 +127,18 @@ public sealed class ModelStudioGenerator : ITextGenerator
             if (!response.IsSuccessStatusCode)
             {
                 var status = (int)response.StatusCode;
-                return new GeneratorReply(GenerationChain.StatusForHttpFailure(status), LatencyMs: latencyMs, Detail: $"HTTP {status}");
+                return (null, (GenerationChain.StatusForHttpFailure(status), $"HTTP {status}"), latencyMs);
             }
-            return Parse(text, latencyMs);
+            return (text, null, latencyMs);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Our deadline fired, not the caller's cancellation: an outage.
-            return new GeneratorReply(ReplyStatus.Unavailable, LatencyMs: (int)clock.ElapsedMilliseconds, Detail: "timeout");
+            return (null, (ReplyStatus.Unavailable, "timeout"), (int)clock.ElapsedMilliseconds);
         }
         catch (HttpRequestException e)
         {
-            return new GeneratorReply(ReplyStatus.Unavailable, LatencyMs: (int)clock.ElapsedMilliseconds, Detail: $"connection failure: {e.HttpRequestError}");
+            return (null, (ReplyStatus.Unavailable, $"connection failure: {e.HttpRequestError}"), (int)clock.ElapsedMilliseconds);
         }
     }
 
@@ -109,15 +159,56 @@ public sealed class ModelStudioGenerator : ITextGenerator
                 OutputTokens: usage.GetProperty("completion_tokens").GetInt32(),
                 ReasoningTokens: Number(usage, "completion_tokens_details", "reasoning_tokens"),
                 LatencyMs: latencyMs,
-                ReasoningReturned: message.TryGetProperty("reasoning_content", out var rc) && rc.ValueKind == JsonValueKind.String
-                                   && rc.GetString()!.Length > 0);
+                ReasoningReturned: ReasoningReturned(message));
         }
-        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException
-                                       or ArgumentOutOfRangeException)
+        catch (Exception e) when (IsShapeError(e))
         {
             return new GeneratorReply(ReplyStatus.Rejected, LatencyMs: latencyMs, Detail: "unexpected response shape");
         }
     }
+
+    // Text and/or tool calls. cached_tokens is read when reported (Model Studio did in the demo) and is 0 otherwise.
+    private static ChatReply ParseChat(string text, int latencyMs)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            var message = root.GetProperty("choices")[0].GetProperty("message");
+            var usage = root.GetProperty("usage");
+            var calls = new List<ToolCall>();
+            if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var c in toolCalls.EnumerateArray())
+                {
+                    var function = c.GetProperty("function");
+                    calls.Add(new ToolCall(c.GetProperty("id").GetString()!, function.GetProperty("name").GetString()!,
+                        function.GetProperty("arguments").GetString()!));
+                }
+            }
+            return new ChatReply(
+                ReplyStatus.Ok,
+                Text: message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String ? content.GetString() : null,
+                ToolCalls: calls,
+                ReportedModel: root.TryGetProperty("model", out var m) ? m.GetString() : null,
+                InputTokens: usage.GetProperty("prompt_tokens").GetInt32(),
+                OutputTokens: usage.GetProperty("completion_tokens").GetInt32(),
+                CachedTokens: Number(usage, "prompt_tokens_details", "cached_tokens"),
+                ReasoningTokens: Number(usage, "completion_tokens_details", "reasoning_tokens"),
+                LatencyMs: latencyMs,
+                ReasoningReturned: ReasoningReturned(message));
+        }
+        catch (Exception e) when (IsShapeError(e))
+        {
+            return new ChatReply(ReplyStatus.Rejected, LatencyMs: latencyMs, Detail: "unexpected response shape");
+        }
+    }
+
+    private static bool IsShapeError(Exception e) =>
+        e is JsonException or KeyNotFoundException or InvalidOperationException or IndexOutOfRangeException or ArgumentOutOfRangeException;
+
+    private static bool ReasoningReturned(JsonElement message) =>
+        message.TryGetProperty("reasoning_content", out var rc) && rc.ValueKind == JsonValueKind.String && rc.GetString()!.Length > 0;
 
     private static int Number(JsonElement usage, string group, string name) =>
         usage.TryGetProperty(group, out var g) && g.ValueKind == JsonValueKind.Object
