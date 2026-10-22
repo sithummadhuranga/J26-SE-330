@@ -173,7 +173,15 @@ class GuidanceScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          if (payload['caseId'] case final String caseId when payload['revision'] is int) ...[
+          // The stand-in service (corpus "stub-…") has no chat, so say that instead of offering a button that can only fail.
+          if (payload['caseId'] is String && payload['revision'] is int && '${payload['corpusVersion']}'.startsWith('stub')) ...[
+            const NoticeStrip(
+              'Follow-up questions need the guideline service, which is not connected in this setup.',
+              icon: Icons.forum_outlined,
+              key: Key('chatNotConnected'),
+            ),
+            const SizedBox(height: 12),
+          ] else if (payload['caseId'] case final String caseId when payload['revision'] is int) ...[
             OutlinedButton.icon(
               key: const Key('askAboutGuidance'),
               icon: const Icon(Icons.forum_outlined),
