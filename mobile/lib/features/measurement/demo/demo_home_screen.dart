@@ -9,21 +9,36 @@ import 'analysis_session.dart';
 import 'demo_result_screen.dart';
 
 /// Start screen of the wound measurement demo: take a photo, pick one, or use a sample photo.
+///
+/// The engine, the sample list, the photo picker and the session are replaceable so tests can run without a model, a camera or files.
 class DemoHomeScreen extends StatefulWidget {
-  const DemoHomeScreen({super.key});
+  const DemoHomeScreen({super.key, this.engine, this.loadSamples = DemoEngine.samplePhotos, this.picker, this.sessionFactory});
+
+  /// The model holder; a real [DemoEngine] when null.
+  final DemoEngine? engine;
+
+  /// The photos for the "Sample photos" strip.
+  final Future<List<File>> Function() loadSamples;
+
+  /// Takes or picks a photo and returns its bytes (null when cancelled); the system camera or gallery when null.
+  final Future<List<int>?> Function(ImageSource source)? picker;
+
+  /// Builds the analysis for a decoded photo; the real [EngineSession] when null.
+  final AnalysisSession Function(DemoEngine engine, DecodedPhoto photo)? sessionFactory;
 
   @override
   State<DemoHomeScreen> createState() => _DemoHomeScreenState();
 }
 
 class _DemoHomeScreenState extends State<DemoHomeScreen> {
-  final DemoEngine _engine = DemoEngine();
+  late final DemoEngine _engine;
   bool _loading = true;
   List<File> _samples = const [];
 
   @override
   void initState() {
     super.initState();
+    _engine = widget.engine ?? DemoEngine();
     _refresh();
   }
 
@@ -36,7 +51,7 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
   Future<void> _refresh() async {
     setState(() => _loading = true);
     await _engine.load();
-    final files = await DemoEngine.samplePhotos();
+    final files = await widget.loadSamples();
     if (!mounted) return;
     setState(() {
       _samples = files;
@@ -59,10 +74,12 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
     if (photo == null || !mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DemoResultScreen(session: EngineSession(_engine, photo!))));
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DemoResultScreen(session: widget.sessionFactory?.call(_engine, photo!) ?? EngineSession(_engine, photo!))));
   }
 
   Future<List<int>?> _pick(ImageSource source) async {
+    final custom = widget.picker;
+    if (custom != null) return custom(source);
     final file = await ImagePicker().pickImage(source: source);
     return file?.readAsBytes();
   }

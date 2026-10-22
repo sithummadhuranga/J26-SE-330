@@ -54,9 +54,13 @@ class ColourBar extends StatelessWidget {
                 const Spacer(),
                 Text('${r.percent.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(width: 12),
-                Text(
-                  'RGB ${r.centre[0].round()}, ${r.centre[1].round()}, ${r.centre[2].round()}',
-                  style: const TextStyle(color: WoundColors.textSecondary, fontSize: 12.5),
+                Flexible(
+                  child: Text(
+                    'RGB ${r.centre[0].round()}, ${r.centre[1].round()}, ${r.centre[2].round()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: WoundColors.textSecondary, fontSize: 12.5),
+                  ),
                 ),
               ],
             ),
