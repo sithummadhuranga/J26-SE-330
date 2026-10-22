@@ -34,10 +34,37 @@ def classify(contour):
     return "triangle" if n == 3 else "rectangle" if n == 4 else "circle" if n >= 8 else None
 
 
+def _linear(rgb):
+    x = rgb.astype(np.float32) / 255.0
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def shape_alpha(rgb, contour):
+    """How much of each pixel near the shape is shape (0 to 1), not just in or out. A hard colour threshold puts the edge at a
+    level that moves with blur, tilt and print; summing the share of every edge pixel does not (blur moves the share around
+    but keeps the sum). The paper level is taken from a ring outside the shape and the fill level from its inside; the maths is done
+    in linear light, where blending two colours is a straight mix. Falls back to the hard shape when fill and paper look alike."""
+    hard = np.zeros(rgb.shape[:2], np.uint8)
+    cv2.drawContours(hard, [contour], -1, 1, -1)
+    k = int(max(8, 0.04 * np.sqrt(hard.sum())))      # a margin wider than the blur of the photo
+    inner = cv2.erode(hard, np.ones((2 * k + 1, 2 * k + 1), np.uint8))
+    ring = cv2.dilate(hard, np.ones((6 * k + 1, 6 * k + 1), np.uint8)) - cv2.dilate(hard, np.ones((4 * k + 1, 4 * k + 1), np.uint8))
+    lin = _linear(rgb)
+    red = lin[..., 0] - 0.5 * (lin[..., 1] + lin[..., 2])
+    if inner.sum() == 0 or ring.sum() == 0:
+        return hard.astype(np.float32)
+    fill, paper = float(np.median(red[inner > 0])), float(np.median(red[ring > 0]))
+    if fill - paper < 0.1:
+        return hard.astype(np.float32)
+    near = cv2.dilate(hard, np.ones((2 * k + 1, 2 * k + 1), np.uint8))
+    return (np.clip((red - paper) / (fill - paper), 0, 1) * near).astype(np.float32)
+
+
 def measure_photo(rgb, side_mm):
-    """Stickers found in an RGB photo and, for each red shape, its area with the homography and with one scale.
-    Returns (stickers, rows); each row: kind, printed, hom, uni (mm2), hom_pct, uni_pct (errors in %), contour."""
-    stickers = SF.find_stickers(rgb, side_mm)
+    """Stickers found in an RGB photo and, for each red shape, its area with the homography (hard mask: hom, and soft coverage:
+    soft, the better one) and with one scale (uni). Returns (stickers, rows); each row: kind, printed, hom, soft, uni (mm2),
+    hom_pct, soft_pct, uni_pct (errors in %), contour."""
+    stickers =SF.find_stickers(rgb, side_mm)
     rows = []
     if not stickers:
         return stickers, rows
@@ -52,8 +79,9 @@ def measure_photo(rgb, side_mm):
         ctr = np.array(c.reshape(-1, 2).mean(axis=0))
         st = min(stickers, key=lambda t: np.linalg.norm(t.corners.mean(axis=0) - ctr))
         hom, uni = SF.area_mm2(mask, st), SF.area_uniform_mm2(mask, st)
-        rows.append(dict(kind=kind, printed=TRUTH[kind], hom=hom, uni=uni, hom_pct=100 * (hom - TRUTH[kind]) / TRUTH[kind],
-                         uni_pct=100 * (uni - TRUTH[kind]) / TRUTH[kind], contour=c))
+        soft = SF.area_mm2(shape_alpha(rgb, c), st)
+        rows.append(dict(kind=kind, printed=TRUTH[kind], hom=hom, soft=soft, uni=uni, hom_pct=100 * (hom - TRUTH[kind]) / TRUTH[kind],
+                         soft_pct=100 * (soft - TRUTH[kind]) / TRUTH[kind], uni_pct=100 * (uni - TRUTH[kind]) / TRUTH[kind], contour=c))
     return stickers, rows
 
 
