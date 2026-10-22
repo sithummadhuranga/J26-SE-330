@@ -6,6 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:melanin_wound_cdss/core/theme.dart';
+import 'package:melanin_wound_cdss/features/measurement/capture/capture_check.dart';
+import 'package:melanin_wound_cdss/features/measurement/capture/capture_verdict.dart';
+import 'package:melanin_wound_cdss/features/measurement/capture/photo_check_screen.dart';
+import 'package:melanin_wound_cdss/features/measurement/capture/sticker_gate.dart';
+import 'package:melanin_wound_cdss/features/measurement/light_calibrator.dart';
 import 'package:melanin_wound_cdss/features/measurement/demo/analysis_session.dart';
 import 'package:melanin_wound_cdss/features/measurement/demo/demo_home_screen.dart';
 import 'package:melanin_wound_cdss/features/measurement/demo/demo_result_screen.dart';
@@ -13,6 +18,17 @@ import 'package:melanin_wound_cdss/features/measurement/demo/measurement_demo_ma
 
 import 'analysis_session_test.dart' show FakeEngine, tinyPng;
 import 'demo_result_screen_test.dart' show FakeSession;
+
+/// A capture check with the given outcome, so the tests need no real photo of a sticker.
+CaptureCheck fakeCheck(Verdict v, [String? finderCode]) {
+  final finder = [for (final c in FinderCode.values) if (c.code == finderCode) c].firstOrNull;
+  return CaptureCheck(
+    GateScan(finder == null ? const [GateSticker([(0.5, 0.2), (3.5, 0.3), (3.4, 1.8), (0.6, 1.7)], 1, 0.9, 0.9)] : const [], finder, 0.5, 0.5, 1),
+    null,
+    const SkinType(fitzpatrick: 'III', skinPixels: 5000),
+    CaptureVerdict(v, finderCode),
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +48,8 @@ void main() {
     Future<List<File>> Function()? loadSamples,
     Future<List<int>?> Function(ImageSource)? picker,
     List<DecodedPhoto>? opened,
+    Future<CaptureCheck> Function(DecodedPhoto)? checker,
+    List<DecodedPhoto>? checked,
   }) =>
       MaterialApp(
         theme: woundTheme(),
@@ -39,6 +57,10 @@ void main() {
           engine: engine ?? FakeEngine(),
           loadSamples: loadSamples ?? () async => const [],
           picker: picker ?? (_) async => null,
+          checker: (photo) async {
+            checked?.add(photo);
+            return checker == null ? fakeCheck(Verdict.ok) : checker(photo);
+          },
           sessionFactory: (e, photo) {
             opened?.add(photo);
             return FakeSession();
@@ -114,6 +136,11 @@ void main() {
     await tester.tap(find.text('Choose a photo'));
     await settle(tester);
     expect(asked, [ImageSource.gallery]);
+    expect(find.byType(PhotoCheckScreen), findsOneWidget, reason: 'the photo is checked before it is measured');
+    expect(find.byType(DemoResultScreen), findsNothing);
+    expect(opened, isEmpty);
+    await tester.tap(find.text('Measure this photo'));
+    await settle(tester);
     expect(find.byType(DemoResultScreen), findsOneWidget);
     expect([opened.single.width, opened.single.height], [4, 2]);
   });
@@ -128,6 +155,8 @@ void main() {
     await tester.tap(find.text('Scan a wound with the camera'));
     await settle(tester);
     expect(asked, [ImageSource.camera]);
+    await tester.tap(find.text('Measure this photo'));
+    await settle(tester);
     expect(find.byType(DemoResultScreen), findsOneWidget);
   });
 
@@ -148,6 +177,47 @@ void main() {
     await settle(tester);
     // The tap starts a real file read; run it on the real event loop so it can finish.
     await tester.runAsync(() => tester.tap(find.descendant(of: find.byType(GridView), matching: find.byType(InkWell)).first));
+    await settle(tester);
+    expect(find.byType(PhotoCheckScreen), findsOneWidget);
+    await tester.tap(find.text('Measure this photo'));
+    await settle(tester);
+    expect(find.byType(DemoResultScreen), findsOneWidget);
+    expect(opened, hasLength(1));
+  });
+
+  testWidgets('the check gets the decoded photo, and its verdict is what the screen shows', (tester) async {
+    final checked = <DecodedPhoto>[];
+    await tester.pumpWidget(app(picker: (_) async => png, checked: checked, checker: (_) async => fakeCheck(Verdict.warn)));
+    await settle(tester);
+    await tester.tap(find.text('Choose a photo'));
+    await settle(tester);
+    expect([checked.single.width, checked.single.height], [4, 2]);
+    expect(find.text('Check'), findsOneWidget);
+    expect(find.text('Measure anyway'), findsOneWidget);
+  });
+
+  testWidgets('a photo that must be retaken goes back to the start, and measures nothing', (tester) async {
+    final opened = <DecodedPhoto>[];
+    await tester.pumpWidget(app(picker: (_) async => png, opened: opened, checker: (_) async => fakeCheck(Verdict.retake, 'mirrored')));
+    await settle(tester);
+    await tester.tap(find.text('Choose a photo'));
+    await settle(tester);
+    expect(find.text('The sticker looks mirrored.'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Retake'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PhotoCheckScreen), findsNothing);
+    expect(find.text('Scan a wound with the camera'), findsOneWidget);
+    expect(opened, isEmpty);
+  });
+
+  testWidgets('the demo can still measure a photo that has no sticker, after saying so', (tester) async {
+    final opened = <DecodedPhoto>[];
+    await tester.pumpWidget(app(picker: (_) async => png, opened: opened, checker: (_) async => fakeCheck(Verdict.retake, 'no_candidate')));
+    await settle(tester);
+    await tester.tap(find.text('Choose a photo'));
+    await settle(tester);
+    expect(find.text('No sticker found.'), findsOneWidget);
+    await tester.tap(find.text('Measure without a sticker'));
     await settle(tester);
     expect(find.byType(DemoResultScreen), findsOneWidget);
     expect(opened, hasLength(1));

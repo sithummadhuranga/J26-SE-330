@@ -61,13 +61,14 @@ class FakeEngine extends DemoEngine {
   }
 
   @override
-  MeasurementPipeline pipeline(double confidence) {
+  MeasurementPipeline pipeline(double confidence, {Calibrator? calibrator}) {
     pipelineCalls++;
     lastConfidence = confidence;
     return MeasurementPipeline(
       segmenter: OneWoundSegmenter(failFirst: failGpuRun && gpuActive),
       segmentationVersion: versionName,
       confidence: confidence,
+      calibrator: calibrator,
     );
   }
 }
@@ -203,5 +204,5 @@ class _ThrowingEngine extends FakeEngine {
   _ThrowingEngine() : super(gpuAtStart: false);
 
   @override
-  MeasurementPipeline pipeline(double confidence) => throw StateError('the model failed');
+  MeasurementPipeline pipeline(double confidence, {Calibrator? calibrator}) => throw StateError('the model failed');
 }

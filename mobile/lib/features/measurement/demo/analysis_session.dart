@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:path_provider/path_provider.dart';
 
+import '../capture/decoded_photo.dart';
 import '../image_prepare.dart';
 import '../measurement_pipeline.dart';
 import '../wound_segmenter.dart';
+
+export '../capture/decoded_photo.dart';
 
 /// One photo that can be analysed again with different settings. The demo screens only talk to this, so tests can swap in
 /// a fake that needs no model.
@@ -26,26 +27,6 @@ abstract class AnalysisSession {
 
   /// Runs the whole measurement. The photo is fitted to the model input only once; later runs reuse it.
   Future<MeasurementResult> run(double confidence);
-}
-
-/// A decoded photo: RGBA pixels and size as the phone's image decoder delivers them (this is where a wrongly rotated
-/// photo would show up).
-class DecodedPhoto {
-  const DecodedPhoto(this.width, this.height, this.rgba);
-
-  final int width, height;
-  final Uint8List rgba;
-}
-
-Future<DecodedPhoto> decodePhoto(Uint8List encoded) async {
-  final codec = await ui.instantiateImageCodec(encoded);
-  final frame = await codec.getNextFrame();
-  final image = frame.image;
-  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-  final photo = DecodedPhoto(image.width, image.height, data!.buffer.asUint8List());
-  image.dispose();
-  codec.dispose();
-  return photo;
 }
 
 /// Loads the exported model from the app's private folder and keeps one [WoundSegmenter] alive.
@@ -121,8 +102,8 @@ class DemoEngine {
     }
   }
 
-  MeasurementPipeline pipeline(double confidence) =>
-      MeasurementPipeline(segmenter: _segmenter!, segmentationVersion: versionName, confidence: confidence);
+  MeasurementPipeline pipeline(double confidence, {Calibrator? calibrator}) =>
+      MeasurementPipeline(segmenter: _segmenter!, segmentationVersion: versionName, confidence: confidence, calibrator: calibrator);
 
   void dispose() => _segmenter?.close();
 }

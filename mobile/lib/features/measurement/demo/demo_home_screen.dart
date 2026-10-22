@@ -5,14 +5,26 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme.dart';
+import '../capture/capture_check.dart';
+import '../capture/capture_runner.dart';
+import '../capture/photo_check_screen.dart';
 import 'analysis_session.dart';
 import 'demo_result_screen.dart';
 
-/// Start screen of the wound measurement demo: take a photo, pick one, or use a sample photo.
+/// Start screen of the wound measurement demo: take a photo, pick one, or use a sample photo. Every photo is checked first
+/// (is there a usable sticker?) and the verdict is shown before the photo is measured.
 ///
-/// The engine, the sample list, the photo picker and the session are replaceable so tests can run without a model, a camera or files.
+/// The engine, the sample list, the photo picker, the check and the session are replaceable so tests can run without a model, a
+/// camera or files.
 class DemoHomeScreen extends StatefulWidget {
-  const DemoHomeScreen({super.key, this.engine, this.loadSamples = DemoEngine.samplePhotos, this.picker, this.sessionFactory});
+  const DemoHomeScreen({
+    super.key,
+    this.engine,
+    this.loadSamples = DemoEngine.samplePhotos,
+    this.picker,
+    this.sessionFactory,
+    this.checker = checkInBackground,
+  });
 
   /// The model holder; a real [DemoEngine] when null.
   final DemoEngine? engine;
@@ -25,6 +37,9 @@ class DemoHomeScreen extends StatefulWidget {
 
   /// Builds the analysis for a decoded photo; the real [EngineSession] when null.
   final AnalysisSession Function(DemoEngine engine, DecodedPhoto photo)? sessionFactory;
+
+  /// The capture check of a decoded photo.
+  final Future<CaptureCheck> Function(DecodedPhoto photo) checker;
 
   @override
   State<DemoHomeScreen> createState() => _DemoHomeScreenState();
@@ -67,14 +82,37 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
     DecodedPhoto? photo;
+    Uint8List? encoded;
+    CaptureCheck? check;
     try {
       final data = await bytes;
-      if (data != null) photo = await decodePhoto(Uint8List.fromList(data));
+      if (data != null) {
+        encoded = Uint8List.fromList(data);
+        photo = await decodePhoto(encoded);
+        check = await widget.checker(photo);
+      }
     } finally {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
-    if (photo == null || !mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DemoResultScreen(session: widget.sessionFactory?.call(_engine, photo!) ?? EngineSession(_engine, photo!))));
+    if (photo == null || encoded == null || check == null || !mounted) return;
+    final decoded = photo;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (checkContext) => PhotoCheckScreen(
+          photoBytes: encoded!,
+          photoWidth: decoded.width,
+          photoHeight: decoded.height,
+          check: check!,
+          allowMeasureWithoutSticker: true,
+          onRetake: () => Navigator.of(checkContext).pop(),
+          onMeasure: () => Navigator.of(checkContext).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => DemoResultScreen(session: widget.sessionFactory?.call(_engine, decoded) ?? EngineSession(_engine, decoded)),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<List<int>?> _pick(ImageSource source) async {

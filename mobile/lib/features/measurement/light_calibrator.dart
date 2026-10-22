@@ -79,10 +79,26 @@ const kStandInReference = StickerReference('stand-in', {
   'skin_b': <double?>[25.0, null, null],
 });
 
+/// Why a sticker's colour patches could not be used, as a fixed word the app can turn into a sentence (the list agreed with the
+/// colour component; the text in [MarkerCheck.reason] stays as it was).
+enum MarkerCode {
+  greyClipped('grey_clipped'),
+  greyNotUniform('grey_not_uniform'),
+  greyNotNeutral('grey_not_neutral'),
+  greyGainOutOfRange('grey_gain_out_of_range'),
+  skinPatchOff('skin_patch_off'),
+  cropInvalid('crop_invalid');
+
+  const MarkerCode(this.code);
+
+  final String code;
+}
+
 class MarkerCheck {
   const MarkerCheck({
     required this.used,
     this.reason = '',
+    this.code,
     this.gains,
     this.skinDeltaE = const {},
     required this.referenceSource,
@@ -93,6 +109,9 @@ class MarkerCheck {
 
   /// Why the sticker was rejected.
   final String reason;
+
+  /// The same reason as a fixed word; null when the sticker was used.
+  final MarkerCode? code;
 
   /// Per-channel linear gains (R, G, B).
   final List<double>? gains;
@@ -113,6 +132,17 @@ class SkinType {
   final String? fitzpatrick;
   final double? ita, meanL, meanB;
   final int skinPixels;
+
+  /// 'too_few_skin_pixels' when no skin type could be read, else null (the word Color Matric named for the gate).
+  SkinCode? get code => fitzpatrick == null ? SkinCode.tooFewSkinPixels : null;
+}
+
+enum SkinCode {
+  tooFewSkinPixels('too_few_skin_pixels');
+
+  const SkinCode(this.code);
+
+  final String code;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -244,22 +274,23 @@ MarkerCheck estimateGains(
   if (width <= 0 || height <= 0 || rgb.length != width * height * 3) {
     throw ArgumentError('the sticker picture must be $width x $height RGB bytes');
   }
-  MarkerCheck reject(String reason) => MarkerCheck(
+  MarkerCheck reject(String reason, MarkerCode code) => MarkerCheck(
     used: false,
     reason: reason,
+    code: code,
     referenceSource: reference.source,
     calibrationMode: layout.calibrationMode,
   );
 
   final grey = _patchPixels(rgb, width, height, layout.patches['grey']!, layout.sampleFraction);
   final n = grey.length ~/ 3;
-  if (n < kMinPatchPixels) return reject('grey patch has only $n pixels');
+  if (n < kMinPatchPixels) return reject('grey patch has only $n pixels', MarkerCode.cropInvalid);
   var clipped = 0;
   for (var i = 0; i < n; i++) {
     final r = grey[3 * i], g = grey[3 * i + 1], b = grey[3 * i + 2];
     if (math.max<int>(r, math.max<int>(g, b)) >= 250 || math.min<int>(r, math.min<int>(g, b)) <= 5) clipped++;
   }
-  if (clipped / n > kMaxClippedFraction) return reject('grey patch clipped (${(100 * clipped / n).round()}% of pixels)');
+  if (clipped / n > kMaxClippedFraction) return reject('grey patch clipped (${(100 * clipped / n).round()}% of pixels)', MarkerCode.greyClipped);
   var sum = 0.0, sumSq = 0.0;
   for (var i = 0; i < n; i++) {
     final l = _lab8(grey[3 * i], grey[3 * i + 1], grey[3 * i + 2])[0];
@@ -268,7 +299,7 @@ MarkerCheck estimateGains(
   }
   final mean = sum / n;
   final std = math.sqrt(math.max(sumSq / n - mean * mean, 0));
-  if (std > kMaxGreyLStd) return reject('grey patch not uniform (L* std ${std.toStringAsFixed(1)})');
+  if (std > kMaxGreyLStd) return reject('grey patch not uniform (L* std ${std.toStringAsFixed(1)})', MarkerCode.greyNotUniform);
 
   final greyLab = _medianLab(grey);
   final ref = reference.lab['grey']!;
@@ -276,6 +307,7 @@ MarkerCheck estimateGains(
   if (abError > kMaxGreyAbError) {
     return reject(
       'grey patch not neutral (a*b* ${abError.toStringAsFixed(1)} from the reference, limit ${kMaxGreyAbError.round()})',
+      MarkerCode.greyNotNeutral,
     );
   }
 
@@ -284,7 +316,7 @@ MarkerCheck estimateGains(
   final gains = [for (var c = 0; c < 3; c++) target[c] / math.max(srgbToLinear(med[c] / 255.0), 1e-6)];
   final gMin = gains.reduce(math.min), gMax = gains.reduce(math.max);
   if (gMin < kGainMin || gMax > kGainMax) {
-    return reject('grey patch gains out of range (${gMin.toStringAsFixed(2)}-${gMax.toStringAsFixed(2)})');
+    return reject('grey patch gains out of range (${gMin.toStringAsFixed(2)}-${gMax.toStringAsFixed(2)})', MarkerCode.greyGainOutOfRange);
   }
 
   final luts = [for (final g in gains) gainTable(g)];
@@ -310,6 +342,7 @@ MarkerCheck estimateGains(
     if (worst.value > kMaxSkinDeltaE) {
       return reject(
         '${worst.key} patch off by dE ${worst.value.toStringAsFixed(1)} after correction (limit ${kMaxSkinDeltaE.round()})',
+        MarkerCode.skinPatchOff,
       );
     }
   }

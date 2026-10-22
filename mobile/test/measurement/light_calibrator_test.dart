@@ -10,6 +10,16 @@ import 'package:melanin_wound_cdss/features/measurement/light_calibrator.dart';
 /// (research/IT23343702/colorimetric-calibration/tests/golden, synthetic pictures only). The tests are skipped when that
 /// folder is not in the checkout.
 const _goldenDir = '../research/IT23343702/colorimetric-calibration/tests/golden';
+
+/// The code each rejected golden crop must carry (Color Matric's message 10 list).
+const _markerCodeOf = {
+  'r01_grey_clipped': 'grey_clipped',
+  'r02_grey_uneven': 'grey_not_uniform',
+  'r03_too_small': 'crop_invalid',
+  'r04_grey_not_neutral': 'grey_not_neutral',
+  'r05_gain_out_of_range': 'grey_gain_out_of_range',
+  'r06_skin_patch_off': 'skin_patch_off',
+};
 const _layoutFile = '../research/IT23294066/area-measurement/marker_layout.json';
 
 class Png {
@@ -102,8 +112,24 @@ void main() {
       final r = estimateGains(crop.rgb, crop.w, crop.h, reference: needsPhotoRef ? photoRef : kStandInReference);
       expect(r.used, isFalse, reason: e.key);
       expect(r.reason, contains(e.value['reason_contains'] as String), reason: '${e.key}: ${r.reason}');
+      expect(r.code?.code, _markerCodeOf[e.key], reason: '${e.key}: the reason code');
     }
   }, skip: skip);
+
+  test('an accepted sticker has no reason code, and the codes are the agreed list', () async {
+    final crop = await readPng('$_goldenDir/crops/${(expected['grey_gains'] as Map<String, dynamic>).entries.firstWhere((e) => e.value['used'] == true).key}.png');
+    expect(estimateGains(crop.rgb, crop.w, crop.h).code, isNull);
+    expect([for (final c in MarkerCode.values) c.code], [
+      'grey_clipped', 'grey_not_uniform', 'grey_not_neutral', 'grey_gain_out_of_range', 'skin_patch_off', 'crop_invalid',
+    ]);
+  }, skip: skip);
+
+  test('too few skin pixels carries the code Color Matric named', () {
+    final tiny = Uint8List(4 * 4 * 4)..fillRange(0, 64, 255);
+    final r = skinType(tiny, 4, 4);
+    expect(r.fitzpatrick, isNull);
+    expect(r.code?.code, 'too_few_skin_pixels');
+  });
 
   test('the skin type matches the Python class and angle on the golden photos', () async {
     final skin = expected['skin_type'] as Map<String, dynamic>;
