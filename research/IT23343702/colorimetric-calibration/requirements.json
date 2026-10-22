@@ -1,0 +1,266 @@
+{
+ "version": 1,
+ "source": "Proposal Tables 5 and 6 (FR1-12, NFR1-9) plus FR13 and NFR10 added after the first presentation. Statuses: covered, partial, deviation, open; see scripts/trace_requirements.py.",
+ "requirements": [
+  {
+   "id": "FR1",
+   "text": "Accept a JPEG or PNG wound photograph and a wound bounding box as inputs.",
+   "status": "partial",
+   "note": "The module takes a decoded RGB array and an optional wound box (kept out of the skin sample). Decoding the JPEG or PNG is done by the caller (the app).",
+   "tests": [
+    "test_api.py::test_wound_bbox_is_accepted_and_shape_kept",
+    "test_ita.py::test_classify_image_excludes_wound_bbox",
+    "test_pipeline_steps.py::test_rejects_non_uint8_or_wrong_shape"
+   ]
+  },
+  {
+   "id": "FR2",
+   "text": "Detect the Fitzpatrick skin type from peri-wound skin pixels with ITA, classes I to VI.",
+   "status": "covered",
+   "note": "Implemented and tested. Accuracy is a separate matter: on 594 Fitzpatrick17k photos the ITA class agreed exactly with the dermatologist label 35.8% of the time (see NFR8); the app shows it as an estimate.",
+   "tests": [
+    "test_ita.py::test_compute_ita_known_values",
+    "test_ita.py::test_classify_fitzpatrick_boundaries",
+    "test_ita.py::test_classify_image_on_synthetic_swatch",
+    "test_ita.py::test_classify_image_raises_on_insufficient_skin_pixels",
+    "test_ita.py::test_very_dark_skin_now_gets_a_class"
+   ]
+  },
+  {
+   "id": "FR3",
+   "text": "Apply the adaptive CCM for FST IV-VI and skip it for FST I-III.",
+   "status": "covered",
+   "note": "The gate is ITA <= 28 degrees. The dark-skin guard also checks that the CCM follows the gate on seven synthetic skin tones.",
+   "tests": [
+    "test_pipeline.py::test_dark_skin_gets_ccm_and_light_skin_does_not",
+    "test_ccm.py::test_estimate_adaptive_ccm_none_for_light_fst",
+    "test_ita.py::test_gate_matches_fst_bands_at_standard_cutoff",
+    "test_fairness_guard.py::test_the_default_pipeline_does_not_hurt_dark_skin"
+   ]
+  },
+  {
+   "id": "FR4",
+   "text": "Apply Multi-Scale Retinex to the L* channel before FST classification.",
+   "status": "deviation",
+   "note": "MSR is implemented and tested, but the skin type is read from the RAW image on purpose: Step 1 and MSR moved ITA by about 13-14 degrees on average (measured on 50 ISIC images) while the gate cut-offs were fitted on raw photos. 'classify_on=processed' keeps the proposal's order for comparison.",
+   "tests": [
+    "test_pipeline.py::test_ita_is_read_from_the_raw_image_by_default",
+    "test_pipeline_steps.py::test_msr_reduces_shadow_and_keeps_mean_brightness",
+    "test_pipeline_steps.py::test_retinex_touches_only_lightness"
+   ]
+  },
+  {
+   "id": "FR5",
+   "text": "Detect and inpaint specular highlights that would mask wound colour.",
+   "status": "covered",
+   "note": "HSV highlight mask and Telea inpainting.",
+   "tests": [
+    "test_pipeline_steps.py::test_specular_mask_finds_white_spot_only",
+    "test_pipeline_steps.py::test_remove_specular_replaces_highlight_with_skin_tone",
+    "test_pipeline_steps.py::test_remove_specular_noop_without_highlights"
+   ]
+  },
+  {
+   "id": "FR6",
+   "text": "Apply CLAHE to the L* channel only, without distorting the chromatic channels.",
+   "status": "covered",
+   "note": "CLAHE on L*, then a 3x3 median filter on the result.",
+   "tests": [
+    "test_pipeline_steps.py::test_clahe_increases_contrast_and_preserves_hue"
+   ]
+  },
+  {
+   "id": "FR7",
+   "text": "Output a 512x512 float32 RGB tensor normalised per the agreed contract.",
+   "status": "deviation",
+   "note": "The 512x512 float32 tensor exists (uniform-scale letterbox, then ImageNet or z-score), but the calibrated IMAGE keeps the input's height and width. Stretching a 4:3 photo to a square changes the scales by x0.8 and x1.07, i.e. about +33% / -25% area error against a 10% target. Agreed with CV. The app's own segmentation uses its own 640x480 picture.",
+   "tests": [
+    "test_pipeline_steps.py::test_final_normalise_imagenet_and_zscore",
+    "test_pipeline_steps.py::test_letterbox_preserves_aspect_ratio_and_round_trips_masks",
+    "test_pipeline_steps.py::test_every_calibration_step_keeps_shape_on_non_square_image",
+    "test_api.py::test_default_runs_all_seven_stages_and_returns_contract_fields"
+   ]
+  },
+  {
+   "id": "FR8",
+   "text": "Output the Fitzpatrick class as a string in the wound analytics JSON.",
+   "status": "partial",
+   "note": "to_json() gives the class (snake_case, no image data). In the app, the analytics are built by CV's Dart code (measurement_pipeline.dart) and checked by Member 4's validator before saving; I did not run those. When no class is estimated the contract has no value for it, so the Dart side refuses to save instead of inventing one.",
+   "tests": [
+    "test_api.py::test_to_json_is_serialisable_and_has_no_image_data"
+   ]
+  },
+  {
+   "id": "FR9",
+   "text": "Expose a PipelineConfig that enables or disables each of the seven stages without code changes.",
+   "status": "covered",
+   "note": "Stage set <-> config round trip, every stage switchable, and the proposal's ablation variants run. The C++ port has the same stage bits.",
+   "tests": [
+    "test_api.py::test_each_stage_can_be_switched_off",
+    "test_api.py::test_stages_round_trip_through_config",
+    "test_api.py::test_no_stages_is_identity",
+    "test_pipeline.py::test_every_ablation_variant_runs_and_keeps_shape"
+   ],
+   "evidence_outside_pytest": [
+    "native/tests/api_test.cpp: all 128 stage sets x 4 illumination modes run on the arm64 emulator (38 checks pass)"
+   ]
+  },
+  {
+   "id": "FR10",
+   "text": "Run entirely on-device with no network for any processing step.",
+   "status": "partial",
+   "note": "Checked at code level: nothing in the module imports a network library. The C++ library was built for Android arm64 and run on an emulator. But the phone app today runs CV's Dart light calibration, not my C++ pipeline, so the full pipeline is not on a phone.",
+   "tests": [
+    "test_no_network_use.py::test_no_module_imports_a_network_library"
+   ],
+   "evidence_outside_pytest": [
+    "C++ build and parity run on the arm64 emulator (build_android.sh run); no real-phone run"
+   ]
+  },
+  {
+   "id": "FR11",
+   "text": "Expose per-stage latency timing in the CalibrationResult.",
+   "status": "covered",
+   "note": "Timing per stage and a total, in Python and in the C++ result struct.",
+   "tests": [
+    "test_pipeline.py::test_timings_logged_and_total_is_sum",
+    "test_api.py::test_default_runs_all_seven_stages_and_returns_contract_fields"
+   ],
+   "evidence_outside_pytest": [
+    "native/bench: median per-stage time at three photo sizes"
+   ]
+  },
+  {
+   "id": "FR12",
+   "text": "Preserve the a* channel throughout all processing steps.",
+   "status": "partial",
+   "note": "The CCM, MSR and CLAHE leave a* alone (tested). But Step 1's intensity stretch scales colour: on the synthetic photos a* of the skin rose by about +1.7 to +2.4 units, equally across skin types (the guard keeps that spread under 1.0). So a* is not literally unchanged through all steps.",
+   "tests": [
+    "test_ccm.py::test_relative_ccm_keeps_a_and_b_columns_identity",
+    "test_ccm.py::test_l_variance_normalisation_hits_target_and_keeps_mean_and_a",
+    "test_pipeline_steps.py::test_retinex_touches_only_lightness",
+    "test_pipeline_steps.py::test_process_raw_input_keeps_hue",
+    "test_fairness_guard.py::test_the_default_pipeline_does_not_hurt_dark_skin"
+   ]
+  },
+  {
+   "id": "NFR1",
+   "text": "End-to-end under 200 ms, 150 ms for the seven stages, on Snapdragon 695-class Android.",
+   "status": "open",
+   "note": "Not measured on a phone. On the arm64 EMULATOR the whole pipeline took about 96 ms at 512x384 (210-220 ms at 1600x1200, about 870 ms at 4000x3000); the Retinex stage (about 73 ms against a 10-30 ms budget) and the CCM stage (about 15 ms against 5-10) exceed their own stage budgets. An emulator is not the target hardware.",
+   "tests": [],
+   "evidence_outside_pytest": [
+    "native/bench output; emulator only, no device connected when last checked"
+   ]
+  },
+  {
+   "id": "NFR2",
+   "text": "AUROC for FST IV-VI of at least 0.88 after calibration (ISIC subset and SLIIT Kajanan).",
+   "status": "open",
+   "note": "Needs the wound model's predictions on labelled images; neither is available here. The fairness harness that computes it is tested (AUROC, gaps, equalized odds).",
+   "tests": [
+    "test_evaluation.py::test_auroc_matches_pair_counting",
+    "test_evaluation.py::test_meets_targets_flag_and_row"
+   ]
+  },
+  {
+   "id": "NFR3",
+   "text": "AUROC gap between FST I-III and IV-VI of at most 0.01 after the full pipeline.",
+   "status": "open",
+   "note": "Same as NFR2: the harness exists and is tested, the measurement needs the wound model's scores. The app does not test this claim (the wound model keeps the raw photo); only the offline Model A / Model B comparison does.",
+   "tests": [
+    "test_evaluation.py::test_biased_model_has_bigger_gaps_than_fair_model"
+   ]
+  },
+  {
+   "id": "NFR4",
+   "text": "Sensitivity and specificity gaps below 0.03 each.",
+   "status": "open",
+   "note": "Same as NFR3: computed by the tested harness, not measured without model scores.",
+   "tests": [
+    "test_evaluation.py::test_sensitivity_specificity",
+    "test_evaluation.py::test_meets_targets_flag_and_row"
+   ]
+  },
+  {
+   "id": "NFR5",
+   "text": "No patient image data transmitted; only anonymous analytics JSON goes to the backend.",
+   "status": "partial",
+   "note": "The module returns no image data in its JSON (tested) and works on the device. Not covered: the phone photos carried GPS location tags (found in the area-test photos); no code strips them before an image could leave the phone. Whether the app ever uploads images is Member 4's side and I did not check it.",
+   "tests": [
+    "test_api.py::test_to_json_is_serialisable_and_has_no_image_data",
+    "test_no_network_use.py::test_no_module_imports_a_network_library"
+   ]
+  },
+  {
+   "id": "NFR6",
+   "text": "Flutter FFI deployment: C++ callable from Dart, no platform SDK dependency.",
+   "status": "partial",
+   "note": "The C++ port exists behind a plain C interface and builds for Android arm64 with the NDK (OpenCV 5.0.0): 187 parity cases against Python and 38 edge-case checks pass on the emulator. No dart:ffi binding exists and the app does not use the library (Flutter is not installed on this machine).",
+   "tests": [],
+   "evidence_outside_pytest": [
+    "native/tests/parity_test.cpp (187 cases) and api_test.cpp (38 checks), emulator only"
+   ]
+  },
+  {
+   "id": "NFR7",
+   "text": "Any of the seven stages can be disabled via PipelineConfig without changing pipeline logic.",
+   "status": "covered",
+   "note": "Same evidence as FR9.",
+   "tests": [
+    "test_api.py::test_each_stage_can_be_switched_off",
+    "test_api.py::test_no_stages_is_identity"
+   ],
+   "evidence_outside_pytest": [
+    "native/tests/api_test.cpp: every stage set runs"
+   ]
+  },
+  {
+   "id": "NFR8",
+   "text": "At least 85% recall for FST IV-VI on Fitzpatrick17k, to avoid missed CCM application.",
+   "status": "partial",
+   "note": "Not re-runnable here: the Fitzpatrick17k images are not in this checkout. Earlier results (scripts/fst_gate_eval.py, 592 photos, documented in gate.py): the 28-degree ITA gate calls about 95% of dark skin dark, but also 61% of light skin. Exact class recall for FST VI was only about 0.53 on 594 photos. Which of the two NFR8 means is an interpretation to state openly.",
+   "tests": [
+    "test_evaluation.py::test_gate_metrics_counts",
+    "test_ita.py::test_fitted_gate_is_stricter_than_standard"
+   ]
+  },
+  {
+   "id": "NFR9",
+   "text": "100% of agreed integration contracts pass automated integration tests.",
+   "status": "partial",
+   "note": "The shared wound-event contract is checked in Member 4's CI, and the app validates analytics before saving. My module has no test against that schema (I decided the Dart side already does it). The reason codes of the capture gate are shared with CV through 23 vectors that the Dart side passes (CV's report; I did not run Flutter).",
+   "tests": [
+    "test_quality.py::test_vectors",
+    "test_marker_codes.py::test_the_code_list_is_the_one_agreed_with_cv"
+   ]
+  },
+  {
+   "id": "FR13",
+   "text": "Capture quality gate: say ok, warn or retake with a plain reason before the photo is used.",
+   "status": "covered",
+   "note": "Added after the first presentation. Python reference: a decision table (finder code + marker code + skin pixels), 23 shared vectors, reason codes, and a report tool. On 34 real photos: 32 ok and 2 retake (both glare). CV's Dart version passes the same vectors (CV's report) and runs in the app. No real photo triggered a colour warning; nothing here is validated on patients.",
+   "tests": [
+    "test_quality.py::test_vectors",
+    "test_quality.py::test_unknown_input_fails_loudly_instead_of_passing_a_bad_photo",
+    "test_marker_codes.py",
+    "test_quality_report.py::test_a_mirrored_sticker_must_be_retaken_with_the_rear_camera",
+    "test_quality_report.py::test_glare_is_never_passed_whatever_code_the_finder_gives"
+   ],
+   "added_after_pp1": true
+  },
+  {
+   "id": "NFR10",
+   "text": "A change to the pipeline must not hurt dark skin (automatic regression guard).",
+   "status": "covered",
+   "note": "Added after the first presentation. Seven synthetic skin tones with the same lesion: dark skin lifted, nothing darker, lesion contrast kept and equal, redness change equal, no blown highlights. The guard is shown to fail with the CCM off and with the old v1 CCM. Synthetic data only; limits come from the first measured run with margin.",
+   "tests": [
+    "test_fairness_guard.py::test_the_default_pipeline_does_not_hurt_dark_skin",
+    "test_fairness_guard.py::test_the_guard_catches_a_pipeline_without_the_ccm",
+    "test_fairness_guard.py::test_the_guard_catches_the_old_v1_ccm",
+    "test_fairness_guard.py::test_the_pipeline_is_deterministic"
+   ],
+   "added_after_pp1": true
+  }
+ ]
+}
