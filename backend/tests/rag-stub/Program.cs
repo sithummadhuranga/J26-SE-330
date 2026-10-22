@@ -1,4 +1,5 @@
-// RAG stub: STUB_DELAY_MS adds latency, STUB_FAIL_MODE = none|503|422|409|uncited; serves figures F1-F3.
+// A stand-in for the RAG service. STUB_DELAY_MS adds latency, STUB_FAIL_MODE picks a failure
+// (none, 503, 422, 409 or uncited), and it serves figures F1 to F3.
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
@@ -39,7 +40,7 @@ app.MapPost("/v1/recommendations", async (StubRequest request) =>
     };
 });
 
-// A transparent 1×1 PNG: real enough for Content-Type and byte pass-through tests.
+// A see-through 1×1 PNG. It's real enough for testing Content-Type and passing bytes through.
 var figurePng = Convert.FromBase64String(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
 

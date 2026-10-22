@@ -5,9 +5,10 @@ per topic are what make six the ceiling.
     python tests/evaluation/scaling.py orchestrator     # Recommendation Service takes 1 s; replicas handle one at a time
     python tests/evaluation/scaling.py persister        # a burst of captures; persister replicas
 
-For the orchestrator, each replica runs with Orchestrator__MaxConcurrency=1, so the replica count is the only
-parallelism; a last run uses one replica with per-partition concurrency (the default) for comparison.
-DISRUPTIVE: rescales services and restarts the rag-stub; everything is set back to one replica and defaults.
+For the orchestrator, each replica runs with Orchestrator__MaxConcurrency=1, so the number of replicas is the only
+source of parallelism. A final run uses one replica with per-partition concurrency (the default) to compare against.
+DISRUPTIVE: this rescales services and restarts the rag-stub. Afterwards everything goes back to one replica and
+the defaults.
 Results: tests/evaluation/results/<timestamp>-scaling-<group>/ and tests/evaluation/results/scaling.csv.
 """
 import argparse
@@ -22,7 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import run_experiment as rx  # noqa: E402
 
 GROUPS = {
-    # service, consumer group, simulator load, metric that reflects this consumer
+    # Each entry: the service, its consumer group, the simulator load, and the metric that shows how that consumer is doing.
     "orchestrator": {"service": "orchestrator", "group": "orchestrator", "devices": 20, "events": 6,
                      "capture_interval_ms": 200, "stub_delay_ms": "1000", "latency": "enqueue_to_delivered"},
     "persister": {"service": "ingest-persister", "group": "persister", "devices": 50, "events": 20,
@@ -43,7 +44,7 @@ def scale(service, replicas, concurrency=None):
 
 
 def drain_seconds(lag_csv, group):
-    """Seconds from the first backlog until the group's lag is back to zero for good."""
+    """How many seconds pass from the first backlog until the group's lag is back at zero and stays there."""
     with open(lag_csv, newline="", encoding="utf-8") as f:
         rows = [(float(r["t_s"]), int(r[group] or 0)) for r in csv.DictReader(f)]
     busy = [t for t, lag in rows if lag > 0]

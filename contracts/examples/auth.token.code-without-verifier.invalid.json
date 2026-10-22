@@ -1,0 +1,6 @@
+{
+  "grant_type": "authorization_code",
+  "client_id": "mobile",
+  "code": "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0",
+  "redirect_uri": "lk.sliit.cdss:/oauth2redirect"
+}

@@ -5,7 +5,7 @@ using Sync.Common.Kafka;
 
 namespace Orchestrator.Consumers;
 
-/// <summary>Partitions run in parallel, each in order; offsets commit only after work is durable.</summary>
+/// <summary>Partitions run side by side, each one in order. Offsets are only committed once the work is safely saved.</summary>
 public sealed class PartitionWorkers(
     Func<ConsumeResult<string, byte[]>, CancellationToken, Task> handle, int maxConcurrency, int maxQueuedPerPartition,
     ILogger logger, CancellationToken stopping)
@@ -24,7 +24,7 @@ public sealed class PartitionWorkers(
     private readonly HashSet<TopicPartition> _paused = [];
     private readonly SemaphoreSlim _slots = new(Math.Max(1, maxConcurrency));
 
-    /// <summary>Hands a consumed message to its partition's worker; pauses the partition when its queue is full.</summary>
+    /// <summary>Hands a consumed message to its partition's worker, and pauses the partition if its queue is full.</summary>
     public void Dispatch(IConsumer<string, byte[]> consumer, ConsumeResult<string, byte[]> result)
     {
         var worker = _workers.GetOrAdd(result.TopicPartition, Start);
@@ -34,7 +34,7 @@ public sealed class PartitionWorkers(
             consumer.Pause([result.TopicPartition]);
     }
 
-    /// <summary>Called on the consume thread between polls: commits finished work and resumes drained partitions.</summary>
+    /// <summary>Called on the consume thread between polls. Commits finished work and resumes partitions that have caught up.</summary>
     public void Tick(IConsumer<string, byte[]> consumer)
     {
         foreach (var (tp, worker) in _workers)
@@ -53,7 +53,7 @@ public sealed class PartitionWorkers(
         foreach (var tp in drained) _paused.Remove(tp);
     }
 
-    /// <summary>On rebalance or shutdown, finish the current message, commit what's done and leave the rest.</summary>
+    /// <summary>On a rebalance or shutdown, finish the current message, commit what's done and leave the rest.</summary>
     public void Stop(IConsumer<string, byte[]> consumer, IEnumerable<TopicPartition> partitions, bool commit)
     {
         var stopping = partitions.Select(tp => (tp, w: _workers.TryRemove(tp, out var w) ? w : null))
@@ -63,7 +63,8 @@ public sealed class PartitionWorkers(
             w!.Stopping = true;
             w.Queue.Writer.TryComplete();
         }
-        // The message in hand may be a Recommendation Service call: up to its 60 s attempt timeout plus retries.
+        // The current message might be a Recommendation Service call, which can take up to its 60-second timeout
+        // plus retries.
         Task.WaitAll(stopping.Select(x => x.w!.Loop).ToArray(), TimeSpan.FromSeconds(150));
 
         foreach (var (tp, w) in stopping)
@@ -99,7 +100,7 @@ public sealed class PartitionWorkers(
             await _slots.WaitAsync(CancellationToken.None);
             try
             {
-                // Keep retrying here so the partition never commits past unfinished work.
+                // Keep retrying here, so the partition never commits past work that isn't finished.
                 while (true)
                 {
                     try

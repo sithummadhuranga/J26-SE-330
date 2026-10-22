@@ -6,4 +6,35 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The WoundRag.* libraries live in sub-folders; keep the SDK from compiling them in here too. -->
+
+    <Compile Remove="WoundRag.*/**" />
+    <Content Remove="WoundRag.*/**" />
+    <None Remove="WoundRag.*/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="WoundRag.Core/WoundRag.Core.csproj" />
+    <ProjectReference Include="WoundRag.Infrastructure/WoundRag.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Member 4's contracts, copied next to the binary: requests and responses are checked against hers, never a copy. -->
+  <ItemGroup>
+    <None Include="../../../contracts/rag-request.schema.json" Link="contracts/rag-request.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../../contracts/rag-response.schema.json" Link="contracts/rag-response.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The follow-up chat's DRAFT contract: ours until the team agrees it and it moves to contracts/. -->
+  <ItemGroup>
+    <None Include="Contract/rag-chat.schema.json" Link="contracts/rag-chat.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

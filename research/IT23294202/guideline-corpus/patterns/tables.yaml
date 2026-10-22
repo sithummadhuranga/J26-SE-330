@@ -1,0 +1,478 @@
+# tables.yaml — how each captioned table of the IWGDF 2023 PDF is read (decisions 3, 4, 15).
+#
+# Written by `ingestion-pipeline -- propose-tables` (status: proposed), with a review copy of
+# every table in .cache/tables_review.md (gitignored: it holds table text). For each
+# table, compare the review copy with the PDF page and adjust mode, header_rows or regions
+# until it reads correctly — or set treatment: transcribe. Then set status: confirmed,
+# confirmed_by and confirmed_on. The chunker reads only a confirmed file.
+#
+# treatment:  extract          cells re-extracted from the PDF with these settings every run
+#             transcribe       two hand passes in transcriptions/ (gitignored), hashes here
+#             not_retrievable  not chunked; recorded in verified_tables with the reason
+# regions:    the grid only (not the caption), points, y from the top of the page.
+# No guideline text belongs in this file.
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-10-04"
+"source_pdf_sha256": "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36"
+"generated": "2026-09-28"
+"serializer": "table-v1"
+"tables":
+- "label": "Table 1"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "page": 10
+  "treatment": "not_retrievable"
+  "reason": "Practical Guidelines are not chunked (decisions 6, 15)"
+  "mode": 
+  "header_rows": 1
+  "regions": []
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 2"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "page": 21
+  "treatment": "not_retrievable"
+  "reason": "Practical Guidelines are not chunked (decisions 6, 15)"
+  "mode": 
+  "header_rows": 1
+  "regions": []
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1"
+  "sub_guideline": "IWGDF Prevention Guideline"
+  "page": 44
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 44
+    "top": 361.9
+    "left": 73
+    "bottom": 515.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1"
+  "sub_guideline": "IWGDF Classification Guideline"
+  "page": 80
+  "treatment": "not_retrievable"
+  "reason": "sits inside METHODS, which is excluded (decisions 14, 15)"
+  "mode": 
+  "header_rows": 1
+  "regions": []
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 2"
+  "sub_guideline": "IWGDF Classification Guideline"
+  "page": 84
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 84
+    "top": 119.9
+    "left": 73
+    "bottom": 325.9
+    "right": 523.4
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": true
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 3"
+  "sub_guideline": "IWGDF Classification Guideline"
+  "page": 86
+  "treatment": "extract"
+  "reason": "part 3 transcribed by hand: the PDF's Grade 0 cell holds the grade 1 criteria (decision 18)"
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 86
+    "top": 148.9
+    "left": 78
+    "bottom": 456.9
+    "right": 524
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": true
+    "single_pass": false
+  - "page": 86
+    "top": 489.9
+    "left": 78
+    "bottom": 581.9
+    "right": 524
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": true
+    "single_pass": false
+  - "page": 87
+    "top": 119.9
+    "left": 78
+    "bottom": 429.9
+    "right": 524
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions":
+    - "pass": 1
+      "file": "transcriptions/CLA-T3.part3.pass1.tsv"
+      "sha256": "0464d2371e0e46c843350c9013350611df689bf0edd055229266dd50c840cf76"
+      "by": "T. H. Nimnath Nadushka (Member 3)"
+      "on": "2026-09-29"
+    "title_above": true
+    "single_pass": true
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 4"
+  "sub_guideline": "IWGDF Classification Guideline"
+  "page": 89
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 89
+    "top": 119.9
+    "left": 73
+    "bottom": 342.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "page": 115
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 115
+    "top": 255.9
+    "left": 73
+    "bottom": 634.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 2"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "page": 117
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 117
+    "top": 134.9
+    "left": 73
+    "bottom": 412.9
+    "right": 523.4
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": true
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  - "page": 117
+    "top": 424.9
+    "left": 73
+    "bottom": 553.9
+    "right": 523.4
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 3"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "page": 122
+  "treatment": "extract"
+  "reason": "region = the ruled box under the caption; the detector found no grid"
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 122
+    "top": 320.7
+    "left": 73
+    "bottom": 518.1
+    "right": 523.4
+    "header_rows": 0
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 4"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "page": 126
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 126
+    "top": 594.9
+    "left": 73
+    "bottom": 723.9
+    "right": 531.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns":
+    - 0
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  - "page": 127
+    "top": 105.9
+    "left": 73
+    "bottom": 558.9
+    "right": 531.3
+    "header_rows": 0
+    "continues": true
+    "first_row_continues": true
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 5"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "page": 130
+  "treatment": "transcribe"
+  "reason": "transcribed by hand: its Bone/joint rows cannot be split by position; its second header row starts part 2 (decisions 18, 19)"
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 130
+    "top": 202.9
+    "left": 73
+    "bottom": 335.9
+    "right": 523.4
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions":
+  - "pass": 1
+    "file": "transcriptions/INF-T5.pass1.tsv"
+    "sha256": "cbf8c76e8001e1b2080b0ea20b84161f9ac124036214df10a6c6e5f2ecb8aecc"
+    "by": "T. H. Nimnath Nadushka (Member 3)"
+    "on": "2026-09-29"
+  "part_start_lines":
+  - 4
+  "single_pass": true
+- "label": "Table 1A"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "page": 171
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 171
+    "top": 202.9
+    "left": 73
+    "bottom": 350.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1B"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "page": 171
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 171
+    "top": 387.9
+    "left": 73
+    "bottom": 464.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1C"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "page": 171
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 171
+    "top": 501.9
+    "left": 73
+    "bottom": 679.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": false
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false
+- "label": "Table 1D"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "page": 172
+  "treatment": "transcribe"
+  "reason": "published as an image (A1 §6.1); decision 4"
+  "mode": 
+  "header_rows": 2
+  "regions": []
+  "transcriptions":
+  - "pass": 1
+    "file": "transcriptions/PAD-T1D.pass1.tsv"
+    "sha256": "351d4f01f9a62023f2a0d8cbddbf96987a99ba756e3001ae41b9c2e061d591c7"
+    "by": "T. H. Nimnath Nadushka (Member 3)"
+    "on": "2026-09-29"
+  "part_start_lines": []
+  "single_pass": true
+- "label": "Table 1E"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "page": 172
+  "treatment": "transcribe"
+  "reason": "published as an image (A1 §6.1); decision 4"
+  "mode": 
+  "header_rows": 2
+  "regions": []
+  "transcriptions":
+  - "pass": 1
+    "file": "transcriptions/PAD-T1E.pass1.tsv"
+    "sha256": "36557a5aa99b3b666c2c09a64583496a953f6dcf6c7d7491be3a7b976290c882"
+    "by": "T. H. Nimnath Nadushka (Member 3)"
+    "on": "2026-10-01"
+  "part_start_lines": []
+  "single_pass": true
+- "label": "Table 1"
+  "sub_guideline": "IWGDF Charcot Guideline"
+  "page": 307
+  "treatment": "extract"
+  "reason": 
+  "mode": "cells"
+  "header_rows": 1
+  "regions":
+  - "page": 307
+    "top": 118.9
+    "left": 73
+    "bottom": 734.9
+    "right": 523.3
+    "header_rows": 1
+    "continues": false
+    "first_row_continues": false
+    "split_lines": false
+    "group_label_rows": true
+    "carry_down_columns": []
+    "transcriptions": []
+    "title_above": false
+    "single_pass": false
+  "transcriptions": []
+  "part_start_lines": []
+  "single_pass": false

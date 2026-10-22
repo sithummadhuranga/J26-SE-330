@@ -14,7 +14,7 @@ void main() {
     db = AppDatabase.inMemory();
     gateway = FakeGateway();
     patients = PatientRepository(db, gateway);
-    token = (await gateway.login(username: 'n.silva', password: 'correct-password', deviceId: 'dev-1')).accessToken;
+    token = (await gateway.signInOnPage()).accessToken;
   });
   tearDown(() => db.close());
 

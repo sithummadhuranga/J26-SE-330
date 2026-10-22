@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates all Kafka topics; safe to re-run. Usage: bash infra/kafka/create-topics.sh [demo|later]
+# Creates all the Kafka topics, and it's safe to run again. Usage: bash infra/kafka/create-topics.sh [demo|later]
 set -euo pipefail
 
 TIER="${1:-demo}"
@@ -12,7 +12,7 @@ else
   MAIN=6; READY=3
 fi
 
-# Drop kafka-topics.sh's harmless '.' vs '_' warning but keep every other message.
+# Hide kafka-topics.sh's harmless warning about '.' and '_', but keep every other message.
 create() {
   local topic="$1" partitions="$2"
   docker exec kafka /opt/kafka/bin/kafka-topics.sh \

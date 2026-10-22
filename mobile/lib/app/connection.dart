@@ -6,7 +6,8 @@ import '../features/sync/engine/sync_scheduler.dart';
 
 enum Connection { connected, syncing, offline, signInNeeded, unknown }
 
-/// What the last sync run says about the link to the server (§6.2: reachability, not just "on a network").
+/// What the last sync run tells us about the connection to the server. Being on a network isn't enough;
+/// the server has to actually answer (§6.2).
 Connection connectionOf(SyncStatus s) {
   if (s.running) return Connection.syncing;
   return switch (s.last?.outcome) {
@@ -25,7 +26,7 @@ String connectionLabel(Connection c) => switch (c) {
   Connection.unknown => 'Not synced yet',
 };
 
-/// "Up to date", "Waiting to sync", ...: the line under "Data synchronization".
+/// The line under "Data synchronization", such as "Up to date" or "Waiting to sync".
 String syncSummary(SyncStatus s) => switch (connectionOf(s)) {
   Connection.connected => 'Up to date',
   Connection.syncing => 'Syncing…',
@@ -34,7 +35,7 @@ String syncSummary(SyncStatus s) => switch (connectionOf(s)) {
   Connection.unknown => 'Not synced yet',
 };
 
-/// The rounded pill in the Home header.
+/// The rounded status pill in the Home header.
 class ConnectionPill extends StatelessWidget {
   const ConnectionPill({super.key, required this.connection, this.onTap});
 

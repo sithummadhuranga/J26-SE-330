@@ -1,4 +1,5 @@
-# Admin dashboard served by nginx; build with: docker build -t melanin-wound-cdss/admin-dashboard frontend/admin_dashboard
+# The admin dashboard, served by nginx. Build it with:
+# docker build -t melanin-wound-cdss/admin-dashboard frontend/admin_dashboard
 
 FROM node:22-alpine AS build
 # The browser calls the API gateway directly, so this is the gateway as the browser sees it, not a Docker hostname.

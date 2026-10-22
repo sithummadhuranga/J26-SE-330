@@ -25,12 +25,12 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-    child: RefreshIndicator(
-      onRefresh: services.scheduler.syncNow,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-        children: [
-          Row(
+    child: Column(
+      children: [
+        // The greeting stays put, and only the cards below it scroll.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -64,20 +64,30 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _NewAssessmentCard(
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute<void>(builder: (_) => NewAssessmentScreen(services: services))),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: services.scheduler.syncNow,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: [
+                _NewAssessmentCard(
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => NewAssessmentScreen(services: services))),
+                ),
+                const SizedBox(height: 26),
+                SectionTitle(
+                  'Recent assessments',
+                  trailing: TextButton(key: const Key('viewAll'), onPressed: onViewAll, child: const Text('View all')),
+                ),
+                RecentAssessments(services: services, limit: 3),
+              ],
+            ),
           ),
-          const SizedBox(height: 26),
-          SectionTitle(
-            'Recent assessments',
-            trailing: TextButton(key: const Key('viewAll'), onPressed: onViewAll, child: const Text('View all')),
-          ),
-          RecentAssessments(services: services, limit: 3),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -144,7 +154,8 @@ class _NewAssessmentCard extends StatelessWidget {
   );
 }
 
-/// Latest assessments, newest first; [limit] null shows all, [scrollable] builds a lazy list.
+/// The latest assessments, newest first. Leave [limit] null to show all of them,
+/// and set [scrollable] to build a lazy scrolling list.
 class RecentAssessments extends StatelessWidget {
   const RecentAssessments({
     super.key,
@@ -172,7 +183,7 @@ class RecentAssessments extends StatelessWidget {
       return StreamBuilder<List<QueuedEvent>>(
         stream: services.queue.watchRecent(limit: 500),
         builder: (context, snap) {
-          // Scrollable: the loading and empty states scroll too, so pull-to-refresh works on them.
+          // When the list scrolls, the loading and empty states scroll too, so pull-to-refresh still works on them.
           Widget fixed(Widget child) => scrollable
               ? ListView(physics: const AlwaysScrollableScrollPhysics(), padding: padding, children: [child])
               : child;

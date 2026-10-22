@@ -8,7 +8,10 @@ interface Toast {
   kind: ToastKind;
 }
 
-/** A dismissible top-right toast shown above dialogs, one at a time; errors stay longer than confirmations. */
+/**
+ * A toast in the top-right corner that you can dismiss. It shows above dialogs, one at a time,
+ * and errors stay up longer than confirmations.
+ */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

@@ -6,13 +6,13 @@ namespace SyncGateway.Endpoints;
 
 public sealed record ChangeDto(long Seq, string Type, Guid AssessmentId, int Revision, string? Mode, JsonElement? Recommendation);
 
-/// <summary>GET /v1/sync/changes: returns changes after the cursor; re-sends are harmless.</summary>
+/// <summary>GET /v1/sync/changes returns the changes after the cursor. Sending something twice does no harm.</summary>
 public static class PullEndpoint
 {
     public const int DefaultLimit = 100;
     public const int MaxLimit = 500;
 
-    /// <summary>Rows can commit out of order, so recent changes in this window are re-sent regardless of cursor.</summary>
+    /// <summary>Rows can commit out of order, so recent changes within this window are sent again whatever the cursor says.</summary>
     public static readonly TimeSpan ResendWindow = TimeSpan.FromSeconds(60);
 
     public static RouteGroupBuilder MapPullEndpoint(this RouteGroupBuilder group)
@@ -28,7 +28,7 @@ public static class PullEndpoint
 
             await using var conn = await db.OpenConnectionAsync(ct);
 
-            // Record what the device says it already has; used to decide when change_log rows can be archived.
+            // Note what the phone says it already has. That's how we decide when change_log rows can be archived.
             await using (var save = new NpgsqlCommand("""
                 INSERT INTO sync.device_cursor (device_id, last_seq) VALUES (@d, @c)
                 ON CONFLICT (device_id) DO UPDATE SET last_seq = GREATEST(sync.device_cursor.last_seq, @c), updated_at = now()
@@ -39,7 +39,7 @@ public static class PullEndpoint
                 await save.ExecuteNonQueryAsync(ct);
             }
 
-            // (a) Rows after the cursor; only these drive nextCursor and hasMore so paging always moves forward.
+            // (a) Rows after the cursor. Only these decide nextCursor and hasMore, so paging always moves forward.
             var fresh = await ReadChangesAsync(conn, """
                 WHERE cl.facility_id = @f AND cl.server_seq > @c
                 ORDER BY cl.server_seq
@@ -48,7 +48,8 @@ public static class PullEndpoint
             var hasMore = fresh.Count > take;
             if (hasMore) fresh.RemoveAt(fresh.Count - 1);
 
-            // (b) Re-send up to `limit` recent rows at or below the cursor in case they committed late; the device upserts.
+            // (b) Send up to `limit` recent rows at or below the cursor again, in case they committed late.
+            // The phone upserts them, so that's fine.
             var resent = await ReadChangesAsync(conn, """
                 WHERE cl.facility_id = @f AND cl.server_seq <= @c AND cl.created_at > now() - @w
                 ORDER BY cl.server_seq DESC
@@ -57,7 +58,8 @@ public static class PullEndpoint
             resent.Reverse();
             var changes = resent.Concat(fresh).ToList();
 
-            // Last provenance stage (§12): advice handed to the device. Once per event; a re-pull adds nothing.
+            // The last provenance stage (§12): the advice was handed to the phone. It's recorded once per event,
+            // so pulling again adds nothing.
             var delivered = changes.Where(c => c.Type == "RECOMMENDATION_READY").ToList();
             if (delivered.Count > 0)
             {

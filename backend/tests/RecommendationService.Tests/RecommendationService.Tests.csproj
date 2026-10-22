@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\apps\recommendation-service\RecommendationService.csproj" />
+    <ProjectReference Include="..\..\apps\recommendation-service\WoundRag.Core\WoundRag.Core.csproj" />
+    <ProjectReference Include="..\..\libs\Sync.Common\Sync.Common.csproj" />
+  </ItemGroup>
+
+  <!-- The corpus schema and the frozen manifest the tests check against; the request contract comes with the service. -->
+  <ItemGroup>
+    <None Include="..\..\..\db\migrations\rag\0003_guideline_chunks.sql" Link="migrations\0003_guideline_chunks.sql"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\research\IT23294202\guideline-corpus\manifests\iwgdf-2023.r2.json" Link="manifests\iwgdf-2023.r2.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\Cases\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

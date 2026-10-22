@@ -1,0 +1,156 @@
+# figures.yaml — every guideline figure and table image (PLAN.md §M4 A5; decisions 4, 22).
+# Written by `ingestion-pipeline -- propose-figures`: IDs, pages, hashes and links. The
+# author confirms the file (status, confirmed_by, confirmed_on); re-running keeps those.
+# Figures are never served (author, 4 Oct 2026): a linked recommendation names the figure
+# and its page, and the image itself stays in the PDF. No guideline text is stored here.
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-10-04"
+"source_pdf_sha256": "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36"
+"generated": "2026-10-04"
+"extra_codes":
+  "IWGDF Practical Guidelines": "PRA"
+"figures":
+- "figure_id": "PRA-F1"
+  "label": "Figure 1"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 7
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "d3fe410f08905fb85e60b27368c4ba2a3a8baad14ed54ba719a8cef005652b5c"
+  "figure_sha256": "d3fe410f08905fb85e60b27368c4ba2a3a8baad14ed54ba719a8cef005652b5c"
+  "links": []
+- "figure_id": "PRA-F2"
+  "label": "Figure 2"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 10
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "f8ba380584bd9d75b2a1be202d73df00e9ea1003b5be2da658f10ae4e91bfa10"
+  "figure_sha256": "f8ba380584bd9d75b2a1be202d73df00e9ea1003b5be2da658f10ae4e91bfa10"
+  "links": []
+- "figure_id": "PRA-F3"
+  "label": "Figure 3"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 12
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "ced6746685a90622b5cca5f5c6bf888afc33fc7ad9fc991a2ae8abf9296663ff"
+  "figure_sha256": "ced6746685a90622b5cca5f5c6bf888afc33fc7ad9fc991a2ae8abf9296663ff"
+  "links": []
+- "figure_id": "PRA-F4"
+  "label": "Figure 4"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 27
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "aedafcb7108d637b6a98a3834c2b6f8f4a812c2d55177a8d239e174dbb11e1be"
+  "figure_sha256": "aedafcb7108d637b6a98a3834c2b6f8f4a812c2d55177a8d239e174dbb11e1be"
+  "links": []
+- "figure_id": "PRA-F5"
+  "label": "Figure 5"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 27
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "3c45025d3e2ba49d5e57610719620b6ee0605bda50ee22ea80fd603e4b095fbb"
+  "figure_sha256": "3c45025d3e2ba49d5e57610719620b6ee0605bda50ee22ea80fd603e4b095fbb"
+  "links": []
+- "figure_id": "PRA-F6"
+  "label": "Figure 6"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 28
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "ee57d3d34abe7b7fa7880c412d720ced95c61758661b2fbeca63003fbac93ae1"
+  "figure_sha256": "ee57d3d34abe7b7fa7880c412d720ced95c61758661b2fbeca63003fbac93ae1"
+  "links": []
+- "figure_id": "PRA-F7"
+  "label": "Figure 7"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 30
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "6c26dbbaa26bc0158879b1394262c0b81c6dc99a744ebfc528168089f5f1dd8c"
+  "figure_sha256": "6c26dbbaa26bc0158879b1394262c0b81c6dc99a744ebfc528168089f5f1dd8c"
+  "links": []
+- "figure_id": "PRA-F8"
+  "label": "Figure 8"
+  "sub_guideline": "IWGDF Practical Guidelines"
+  "pdf_index": 32
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "7993d9dec639cdab95334c65f59c9ee3426cadb2a2e19e180ce594b7b42682fa"
+  "figure_sha256": "7993d9dec639cdab95334c65f59c9ee3426cadb2a2e19e180ce594b7b42682fa"
+  "links": []
+- "figure_id": "INF-F1"
+  "label": "Figure 1"
+  "sub_guideline": "IWGDF Infection Guideline"
+  "pdf_index": 113
+  "media_type": "image/png"
+  "source_stream_sha256": "fcd5bec83adf1528cf1ed4a24004cfc8bfe3460c523c13493a4e3af10427ff27"
+  "figure_sha256": "2b1597f2350af7ce52aca151290e03ea19e34dc41b7e00eb70dfa4a7c6df758f"
+  "links": []
+- "figure_id": "PAD-T1D-IMG"
+  "label": "Table 1D"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "pdf_index": 172
+  "media_type": "image/png"
+  "source_stream_sha256": "8005e044551fa69c5e24d68ec749c351df332aac890b489359d2541afcd41187"
+  "figure_sha256": "1ae2b781cd9c3910bf83e609d05f5a5f60555397e7d452f64c7a6cf57091c879"
+  "links": []
+- "figure_id": "PAD-T1E-IMG"
+  "label": "Table 1E"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "pdf_index": 172
+  "media_type": "image/png"
+  "source_stream_sha256": "342a464a66633c42bc9c5e8cd5a43bb0a181e9907f3fec5a38c5ea347d5dda71"
+  "figure_sha256": "ee46df23f0c942fd91a555e9d720e87660579006c15212bf9c7b21dafc6cc7d9"
+  "links": []
+- "figure_id": "PAD-F1"
+  "label": "Figure 1"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "pdf_index": 175
+  "media_type": "image/png"
+  "source_stream_sha256": "d954252a16947b9c3e689458219d32fb5521d776db725df0f19b33acf31d357b"
+  "figure_sha256": "953fc2f3dcceb1acd25062e083186e520fa6ee9968522b42eb888df4eebf909c"
+  "links":
+  - "chunk_id": "PAD-R13"
+    "source_field": "rationale"
+    "text_chunk_id": "PAD-RAT13-1"
+- "figure_id": "PAD-F2"
+  "label": "Figure 2"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "pdf_index": 179
+  "media_type": "image/png"
+  "source_stream_sha256": "37092a0a6e3f95c25896b43820017e9c637eee6e9fe436a029f1ec7be078e523"
+  "figure_sha256": "95b78a71dac5457c25f007b82e34796103f4458e759e28d899eccd7c6d6247c0"
+  "links":
+  - "chunk_id": "PAD-R17"
+    "source_field": "rationale"
+    "text_chunk_id": "PAD-RAT18-4"
+  - "chunk_id": "PAD-R18"
+    "source_field": "rationale"
+    "text_chunk_id": "PAD-RAT18-4"
+- "figure_id": "PAD-F3"
+  "label": "Figure 3"
+  "sub_guideline": "Intersocietal PAD Guideline"
+  "pdf_index": 181
+  "media_type": "image/jpeg"
+  "source_stream_sha256": "7deea83360ecdcaeba1e16181604275ccfe0b8949181200f57423fd00a7cbb1d"
+  "figure_sha256": "7deea83360ecdcaeba1e16181604275ccfe0b8949181200f57423fd00a7cbb1d"
+  "links":
+  - "chunk_id": "PAD-R20"
+    "source_field": "rationale"
+    "text_chunk_id": "PAD-RAT20-1"
+- "figure_id": "OFF-F1"
+  "label": "Figure 1"
+  "sub_guideline": "IWGDF Offloading Guideline"
+  "pdf_index": 208
+  "media_type": "image/png"
+  "source_stream_sha256": "88415bf5b74f83378543e068510f1d849e29f05188308aa4984b9fda66265d26"
+  "figure_sha256": "96e6a6859696cf1412c7fecc70982433dd208340a5d4bc7824400e30a123f129"
+  "links": []
+- "figure_id": "CHA-F1"
+  "label": "Figure 1"
+  "sub_guideline": "IWGDF Charcot Guideline"
+  "pdf_index": 311
+  "media_type": "image/png"
+  "source_stream_sha256": "bf41495ea2aa31aa82e587711354432e2713e1df91eeee146ed6c1854a6518b7"
+  "figure_sha256": "8c2c19c3e59b3065d0a4d4f550e68e822e6136b9c53116ad8b8d8c92a45433e6"
+  "links":
+  - "chunk_id": "CHA-R10"
+    "source_field": "rationale"
+    "text_chunk_id": "CHA-RAT10-2"

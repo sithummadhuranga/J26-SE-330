@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- One flat green so the body, arms and tips merge into a single splat; white marks add the shine. -->
+  <g fill="#5BC21C" stroke="#5BC21C" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="32" cy="33" r="16"/>
+    <path d="M27 22 L29 9 L34 9 L37 22 Z" stroke-width="3"/>
+    <path d="M38 24 L46 14 L50 17 L44 28 Z" stroke-width="3"/>
+    <path d="M45 30 L55 31 L55 36 L45 37 Z" stroke-width="3"/>
+    <path d="M42 42 L47 50 L43 53 L37 45 Z" stroke-width="3"/>
+    <path d="M34 47 L32 57 L26 57 L27 47 Z" stroke-width="3"/>
+    <path d="M23 42 L14 49 L11 45 L20 37 Z" stroke-width="3"/>
+    <path d="M18 34 L9 30 L10 25 L20 28 Z" stroke-width="3"/>
+    <path d="M22 24 L16 15 L20 12 L27 21 Z" stroke-width="3"/>
+    <circle cx="31.5" cy="8.5" r="5"/>
+    <circle cx="48.5" cy="14.5" r="4"/>
+    <circle cx="56" cy="33.5" r="4.5"/>
+    <circle cx="46" cy="52.5" r="4"/>
+    <circle cx="29" cy="58" r="4.5"/>
+    <circle cx="11.5" cy="47.5" r="4"/>
+    <circle cx="8.5" cy="27" r="4"/>
+    <circle cx="17.5" cy="12.5" r="3.2"/>
+    <circle cx="6" cy="9" r="2.6"/>
+    <circle cx="58" cy="7" r="2"/>
+    <circle cx="60" cy="49" r="2.6"/>
+    <circle cx="6" cy="60" r="2.2"/>
+  </g>
+  <g fill="#FFFFFF">
+    <ellipse cx="25.5" cy="26.5" rx="5" ry="2.6" transform="rotate(-40 25.5 26.5)" opacity="0.8"/>
+    <ellipse cx="30" cy="6.5" rx="1.7" ry="1" opacity="0.8"/>
+    <ellipse cx="54.6" cy="32" rx="1.5" ry="0.9" opacity="0.8"/>
+    <ellipse cx="5.3" cy="8.2" rx="0.9" ry="0.6" opacity="0.8"/>
+  </g>
+</svg>

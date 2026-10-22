@@ -1,4 +1,4 @@
-"""DISRUPTIVE: checks the running stack against the architecture, including failure cases (local Docker only)."""
+"""DISRUPTIVE: checks the running stack against the architecture, failure cases included. Local Docker only."""
 import base64
 import gzip
 import hashlib
@@ -12,7 +12,8 @@ import time
 import urllib.error
 import urllib.request
 
-from client import GATEWAY, REPO_ROOT, Checks, create_clinician, http, login, pull_all, sql, uuid7, wait_for, wound_event
+from client import (GATEWAY, REPO_ROOT, Checks, compose, compose_project, create_clinician, http, login, pull_all, sql,
+                    uuid7, wait_for, wound_event)
 
 sys.stdout.reconfigure(encoding="utf-8")  # section titles use §; the Windows console defaults to cp1252
 
@@ -40,8 +41,7 @@ def sh(*args, timeout=180):
     return subprocess.run(list(args), cwd=REPO_ROOT, capture_output=True, text=True, timeout=timeout)
 
 
-def compose(*args, timeout=300):
-    return sh("docker", "compose", *args, timeout=timeout)
+print(f"Compose project: {compose_project()}")
 
 
 def kafka(*args, stdin=None, timeout=60):
@@ -59,7 +59,7 @@ def group_lag(group):
                 "--describe", "--group", group).stdout
     rows = [cols for cols in (line.split() for line in out.splitlines()[1:])
             if len(cols) >= 6 and cols[0] == group and cols[5].isdigit()]
-    # During a rebalance describe can list no partitions; that must not read as "no lag".
+    # During a rebalance, describe can come back with no partitions. That mustn't be read as "no lag".
     return sum(int(cols[5]) for cols in rows) if len(rows) == 6 else None
 
 
@@ -203,14 +203,17 @@ check("another facility does not see these changes (facility scope)",
       status == 200 and not any(c["assessmentId"] == a for c in changes_b), status)
 
 # ------------------------------------------------------------------------------------------------------------
-section("§7.3 / §12 / ADR 0003: identity and tokens")
+section("§7.3 / §12 / ADR 0003, 0006: identity and tokens")
 header = json.loads(base64.urlsafe_b64decode(token.split(".")[0] + "=="))
 claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
 check("access token is RS256 with a key id", header.get("alg") == "RS256" and header.get("kid"), header)
 check("claims sub, device_id, facility_id, role, client_id; 15-minute lifetime",
       {"sub", "device_id", "facility_id", "role", "client_id"} <= claims.keys() and
       840 <= claims["exp"] - int(time.time()) <= 905, claims)
-_, jwks = http("GET", "/.well-known/jwks.json")
+# Get the JWKS address from discovery, the same way a resource server finds it. OpenIddict serves it at
+# /.well-known/jwks.
+_, discovery = http("GET", "/.well-known/openid-configuration")
+_, jwks = http("GET", "/" + discovery["jwks_uri"].split("/", 3)[3])
 check("JWKS publishes only public key material", all("d" not in k and "p" not in k for k in jwks["keys"]), jwks)
 none_token = b64url(b'{"alg":"none","typ":"JWT"}') + "." + token.split(".")[1] + "."
 status, _ = http("GET", "/v1/sync/changes", token=none_token)
@@ -225,9 +228,11 @@ hs_head = b64url(b'{"alg":"HS256","typ":"JWT"}') + "." + token.split(".")[1]
 hs_token = hs_head + "." + b64url(_hmac.new(n, hs_head.encode(), hashlib.sha256).digest())
 status, _ = http("GET", "/v1/sync/changes", token=hs_token)
 check("HS256 token signed with the public key (algorithm confusion) is refused", status == 401, status)
+# OpenID Connect refresh tokens are encrypted (JWE) and never stored. The session row only keeps random bytes.
 digest = hashlib.sha256(refresh.encode()).hexdigest()
-check("refresh token is stored only as its SHA-256 hash",
-      sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = decode('{digest}', 'hex')") == "1"
+check("refresh token is an encrypted token that the database never stores, in any form",
+      len(refresh.split(".")) == 5
+      and sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = decode('{digest}', 'hex')") == "0"
       and sql(f"select count(*) from clinical.clinician_session where refresh_token_hash = convert_to('{refresh}', 'UTF8')") == "0")
 check("every credential has its own salt",
       sql("select count(*) - count(distinct password_salt) from clinical.clinician_credential") == "0")
@@ -272,7 +277,7 @@ sql("insert into sync.schema_migrations (schema_name, version, description, chec
 try:
     run = compose("run", "--rm", "--no-deps", "identity-service", timeout=120)
     check("a service refuses to start against an unexpected schema version",
-          # The guard's own message; not tied to the current version number, which moves with every migration.
+          # Check the guard's own message rather than the version number, which changes with every migration.
           run.returncode != 0 and "is at version 9999, but this build expects" in (run.stdout + run.stderr),
           (run.stdout + run.stderr)[-300:])
 finally:
@@ -281,7 +286,7 @@ finally:
 # ------------------------------------------------------------------------------------------------------------
 section("§11: failure handling (disruptive)")
 
-# Persister down: the device still gets a fast ACCEPTED; the event is persisted when it comes back.
+# With the persister down, the phone still gets a quick ACCEPTED, and the event is saved once the persister is back.
 compose("stop", "ingest-persister")
 evt = wound_event(uuid7(), uuid7(), DEVICE_A, FAC_A)
 start = time.time()
@@ -292,7 +297,7 @@ check("persister down: push still ACCEPTED quickly (clinician never waits)",
 compose("start", "ingest-persister")
 check("... and the event is persisted once the persister is back", wait_until(lambda: persisted(evt["eventId"]), 60))
 
-# Poison message: goes to the DLQ, the partition keeps moving.
+# A poison message goes to the DLQ, and the partition keeps moving.
 dlq_before = end_offsets("wound-events.dlq")
 for p in range(6):
     kafka("/opt/kafka/bin/kafka-console-producer.sh", "--bootstrap-server", "localhost:9092", "--topic", "wound-events",
@@ -304,7 +309,7 @@ push([evt], token)
 check("... and the next valid event is still persisted (no head-of-line blocking)",
       wait_until(lambda: persisted(evt["eventId"]), 60))
 
-# Kafka down: 503 with Retry-After, nothing confirmed; recovers when Kafka returns.
+# With Kafka down, we get a 503 with Retry-After and nothing is confirmed. It recovers once Kafka is back.
 compose("stop", "kafka")
 evt = wound_event(uuid7(), uuid7(), DEVICE_A, FAC_A)
 status, headers, body = raw_post("/v1/sync/push", json.dumps({"deviceId": DEVICE_A, "events": [evt]}).encode(),
@@ -324,7 +329,8 @@ def push_ok():
 check("Kafka back: the same event is ACCEPTED on retry", wait_until(push_ok, 120, 3))
 check("... and persisted", wait_until(lambda: persisted(evt["eventId"]), 120))
 
-# Replay the whole topic into two persister replicas: row counts unchanged, DEDUPLICATED rows written (§9.3).
+# Replay the whole topic into two persister replicas. Row counts shouldn't change, and DEDUPLICATED rows get
+# written (§9.3).
 time.sleep(3)
 rows_before = sql("select count(*) from clinical.wound_assessment")
 dedup_before = int(sql("select count(*) from audit.provenance where stage = 'DEDUPLICATED'"))
@@ -341,7 +347,7 @@ check("... and every absorbed repeat is recorded as DEDUPLICATED",
       int(sql("select count(*) from audit.provenance where stage = 'DEDUPLICATED'")) > dedup_before)
 compose("up", "-d", "--no-deps", "--scale", "ingest-persister=1", "ingest-persister")
 
-# Two outbox relays: FOR UPDATE SKIP LOCKED, so each outbox row is published once.
+# Run two outbox relays. Thanks to FOR UPDATE SKIP LOCKED, each outbox row is still published only once.
 compose("up", "-d", "--no-deps", "--scale", "outbox-relay=2", "outbox-relay")
 time.sleep(5)
 events = [wound_event(uuid7(), uuid7(), DEVICE_A, FAC_A) for _ in range(20)]
@@ -362,7 +368,8 @@ compose("up", "-d", "--no-deps", "--scale", "outbox-relay=1", "outbox-relay")
 section("Edge rate limit (ADR 0004), last because it blocks logins from this IP for a minute")
 codes = []
 for _ in range(130):
-    s, _ = http("POST", "/v1/auth/login", {"username": "nobody", "password": "x", "deviceId": "d"})
+    # The strict per-IP limit guards the login form, since that's where passwords are typed.
+    s, _ = http("POST", "/account/login", {"username": "nobody", "password": "x"})
     codes.append(s)
     if s == 429:
         break

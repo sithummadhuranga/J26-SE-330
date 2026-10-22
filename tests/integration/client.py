@@ -1,15 +1,19 @@
-"""Shared helpers for the integration scripts in this folder. Standard library only."""
+"""Helpers shared by the integration scripts in this folder. They only use the standard library."""
 import base64
 import hashlib
 import hmac
+import html
 import json
 import os
+import re
 import secrets
 import struct
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from http.cookiejar import CookieJar
 
 # Everything goes through the API gateway (ADR 0004).
 GATEWAY = os.environ.get("GATEWAY", "http://localhost:8080")
@@ -58,7 +62,7 @@ def http(method, path, body=None, token=None):
 
 
 def pull_all(token, cursor=0, limit=500):
-    """Pulls like a device (§7.2): page after page until hasMore is false. Returns (status, changes, next_cursor)."""
+    """Pulls the way a phone does (§7.2), page after page until hasMore is false. Returns (status, changes, next_cursor)."""
     changes = []
     for _ in range(1000):
         status, body = http("GET", f"/v1/sync/changes?cursor={cursor}&limit={limit}", token=token)
@@ -69,6 +73,36 @@ def pull_all(token, cursor=0, limit=500):
         if not body["hasMore"]:
             return status, changes, cursor
     raise AssertionError("pull never reached hasMore=false: the cursor is not advancing")
+
+
+_project = None
+
+
+def compose_project():
+    """The Compose project the running gateway belongs to. That way stop, start and recreate act on that stack, and
+    never start a second one under the default name (for example after `docker compose -p cdss-oidc up`).
+    COMPOSE_PROJECT_NAME takes priority if it's set."""
+    global _project
+    if _project is None:
+        if os.environ.get("COMPOSE_PROJECT_NAME"):
+            _project = os.environ["COMPOSE_PROJECT_NAME"]
+        else:
+            out = subprocess.run(["docker", "ps", "--filter", "label=com.docker.compose.service=api-gateway",
+                                  "--format", '{{.Label "com.docker.compose.project"}}'],
+                                 capture_output=True, text=True, timeout=60).stdout.split()
+            projects = sorted(set(out))
+            if len(projects) != 1:
+                raise SystemExit(f"Found {len(projects) or 'no'} running stacks {projects}: "
+                                 "set COMPOSE_PROJECT_NAME to the one to test.")
+            _project = projects[0]
+    return _project
+
+
+def compose(*args, env=None, timeout=300):
+    """Runs `docker compose` on the running stack's project. Use env to pass extra variables to the compose file,
+    such as STUB_FAIL_MODE."""
+    return subprocess.run(["docker", "compose", "-p", compose_project(), *args], cwd=REPO_ROOT, capture_output=True,
+                          text=True, timeout=timeout, env={**os.environ, **(env or {})})
 
 
 def sql(query):
@@ -87,7 +121,7 @@ def wait_for(query, expected, seconds=20):
 
 
 def dotenv():
-    """KEY=value pairs from the repo's .env, where docker compose reads the database passwords."""
+    """The KEY=value pairs from the repo's .env, which is where docker compose gets the database passwords."""
     values = {}
     try:
         with open(os.path.join(REPO_ROOT, ".env"), encoding="utf-8") as f:
@@ -101,14 +135,14 @@ def dotenv():
 
 
 def db_password(role):
-    """A service role's password (identity_svc -> DB_PASSWORD_IDENTITY), as db-migrate set it from .env."""
+    """A service role's password (identity_svc uses DB_PASSWORD_IDENTITY), as db-migrate set it from .env."""
     name = role.removesuffix("_svc")
     key = f"DB_PASSWORD_{name.upper()}"
     return os.environ.get(key) or dotenv().get(key) or f"{name}-local-dev"
 
 
 def _identity_env():
-    """A local `dotnet run` reads appsettings.json (cdss/cdss); give it the owner login from .env instead."""
+    """A local `dotnet run` reads appsettings.json (cdss/cdss), so give it the owner login from .env instead."""
     env = dict(os.environ)
     if "ConnectionStrings__Postgres" not in env:
         values = dotenv()
@@ -122,7 +156,7 @@ def _identity_env():
 
 
 def create_clinician(username, password, role, facility, full_name="Test User"):
-    """Uses the identity service's create-clinician command (the bootstrap path for a facility's first admin)."""
+    """Uses the identity service's create-clinician command, which is how a facility gets its first admin."""
     out = subprocess.run(
         ["dotnet", "run", "--no-build", "--project", "backend/apps/identity-service", "--",
          "create-clinician", username, password, role, facility, full_name],
@@ -131,15 +165,166 @@ def create_clinician(username, password, role, facility, full_name="Test User"):
         raise RuntimeError(f"create-clinician failed: {out.stderr or out.stdout}")
 
 
+def token_request(path, form):
+    """Posts OAuth form fields (ADR 0006) and returns the status and the parsed JSON, or None."""
+    req = urllib.request.Request(GATEWAY + path, data=urllib.parse.urlencode(form).encode(), method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read()
+            return r.status, (json.loads(raw) if raw else None)
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        return e.code, (json.loads(raw) if raw else None)
+
+
+def _tokens(status, body):
+    """The token response in the shape these scripts use: accessToken/refreshToken on success, code on failure."""
+    if status == 200:
+        return status, {"accessToken": body["access_token"], "refreshToken": body.get("refresh_token"),
+                        "expiresIn": body["expires_in"], "idToken": body.get("id_token")}
+    body = body or {}
+    return status, {"code": body.get("error_description") or body.get("error"), "error": body.get("error")}
+
+
 def login(username, password, device, totp=None):
-    body = {"username": username, "password": password, "deviceId": device}
+    """A phone signing in, using the password grant the local stack turns on for tests (Oidc:AllowPasswordGrant).
+    A failure is a 400, with the reason in code (such as INVALID_CREDENTIALS, CREDENTIAL_LOCKED or MFA_REQUIRED)."""
+    form = {"grant_type": "password", "client_id": "mobile", "username": username, "password": password,
+            "device_id": device, "scope": "openid offline_access"}
     if totp:
-        body["totp"] = totp
-    return http("POST", "/v1/auth/login", body)
+        form["totp"] = totp
+    return _tokens(*token_request("/connect/token", form))
+
+
+def refresh(refresh_token, client_id="mobile"):
+    """Swaps both tokens for new ones. A used, revoked or expired refresh token gets 400 invalid_grant."""
+    return _tokens(*token_request("/connect/token", {"grant_type": "refresh_token", "client_id": client_id,
+                                                     "refresh_token": refresh_token}))
+
+
+def logout(refresh_token, client_id="mobile"):
+    """Ends the session by revoking the token. It always answers 200."""
+    status, _ = token_request("/connect/revocation", {"client_id": client_id, "token": refresh_token,
+                                                      "token_type_hint": "refresh_token"})
+    return status
+
+
+DASHBOARD_REDIRECT = "http://localhost:3001/callback"
+MOBILE_REDIRECT = "lk.sliit.cdss:/oauth2redirect"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+class Browser:
+    """Acts like a browser on the login page. It keeps cookies, follows redirects inside the gateway, and stops when
+    the identity service sends it to a client's redirect URI."""
+
+    def __init__(self):
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()),
+                                                  _NoRedirect)
+        self.url = None  # the last page loaded; the login form posts back to it
+
+    def request(self, url, form=None):
+        data = urllib.parse.urlencode(form).encode() if form is not None else None
+        self.url = url if url.startswith(("http://", "https://")) else GATEWAY + url
+        try:
+            with self.opener.open(urllib.request.Request(self.url, data=data), timeout=30) as r:
+                return r.status, r.headers, r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers, e.read().decode()
+
+    def follow(self, url, form=None):
+        """Returns the final status, headers and body, plus the URL the browser was sent to outside the gateway (or None)."""
+        status, headers, body = self.request(url, form)
+        for _ in range(10):
+            location = headers.get("Location")
+            if status not in (301, 302, 303) or not location:
+                return status, headers, body, None
+            if not (location.startswith("/") or location.startswith(GATEWAY)):
+                return status, headers, body, location
+            status, headers, body = self.request(location)
+        raise AssertionError("too many redirects")
+
+
+def form_fields(page):
+    return {html.unescape(n): html.unescape(v) for n, v in
+            re.findall(r'<input[^>]*?name="([^"]+)"[^>]*?value="([^"]*)"', page)}
+
+
+def page_error(page):
+    """The reason the login page shows (data-code), such as CLIENT_NOT_ALLOWED."""
+    m = re.search(r'data-code="([^"]+)"', page)
+    return m.group(1) if m else None
+
+
+def pkce():
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+def authorize_url(client_id, redirect_uri, challenge, device=None, method="S256", scope="openid offline_access"):
+    params = {"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": scope,
+              "state": secrets.token_hex(8), "code_challenge": challenge, "code_challenge_method": method}
+    if device:
+        params["device_id"] = device
+    return "/connect/authorize?" + urllib.parse.urlencode(params)
+
+
+def sign_in(browser, url, username, password, totp=None, new_password=None, confirm=None):
+    """Goes through the login page. Returns where the browser was sent, the last page, and the reason shown on it.
+    new_password is used for the "choose your own password" step, which the page asks for when an admin set the
+    password."""
+    _, _, page, out = browser.follow(url)
+    if out:
+        return out, page, None
+    fields = form_fields(page)
+    fields.update(Username=username, Password=password)
+    _, _, page, out = browser.follow(browser.url, fields)
+    if not out and not page_error(page) and totp is not None and 'name="Totp"' in page:
+        fields = form_fields(page)
+        fields["Totp"] = totp
+        _, _, page, out = browser.follow(browser.url, fields)
+    if not out and new_password is not None and asks_for_new_password(page):
+        return choose_password(browser, page, new_password, confirm)
+    return out, page, page_error(page)
+
+
+def asks_for_new_password(page):
+    return 'name="NewPassword"' in page
+
+
+def choose_password(browser, page, new_password, confirm=None):
+    """Submits the login page's "choose your own password" step. Returns the same things as sign_in."""
+    fields = form_fields(page)
+    fields.update(NewPassword=new_password, ConfirmPassword=new_password if confirm is None else confirm)
+    _, _, page, out = browser.follow(browser.url, fields)
+    return out, page, page_error(page)
+
+
+def code_from(location):
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(location or "").query)
+    return query.get("code", [None])[0]
+
+
+def dashboard_login(username, password, totp=None):
+    """Signs in the way the admin dashboard does, with a code and PKCE through the login page. A failure is a 400,
+    with the reason the page showed in code (such as CLIENT_NOT_ALLOWED or INVALID_CREDENTIALS)."""
+    verifier, challenge = pkce()
+    out, _, reason = sign_in(Browser(), authorize_url("admin-dashboard", DASHBOARD_REDIRECT, challenge,
+                                                      scope="openid profile offline_access"), username, password, totp)
+    if not code_from(out):
+        return 400, {"code": reason}
+    return _tokens(*token_request("/connect/token", {
+        "grant_type": "authorization_code", "client_id": "admin-dashboard", "code": code_from(out),
+        "redirect_uri": DASHBOARD_REDIRECT, "code_verifier": verifier}))
 
 
 def totp_code(base32_secret, step=None):
-    """RFC 6238 code, matching the gateway's Totp class (SHA-1, 30 s, 6 digits)."""
+    """Makes an RFC 6238 code the same way the gateway's Totp class does (SHA-1, 30 seconds, 6 digits)."""
     key = base64.b32decode(base32_secret + "=" * (-len(base32_secret) % 8))
     step = int(time.time()) // 30 if step is None else step
     digest = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()

@@ -8,7 +8,7 @@ using OpenTelemetry.Trace;
 
 namespace Sync.Common.Telemetry;
 
-/// <summary>OpenTelemetry setup; exports only when OTEL_EXPORTER_OTLP_ENDPOINT is set.</summary>
+/// <summary>Sets up OpenTelemetry. It only exports when OTEL_EXPORTER_OTLP_ENDPOINT is set.</summary>
 public static class TelemetrySetup
 {
     public static OpenTelemetryBuilder AddSyncTelemetry(this IHostApplicationBuilder builder, string serviceName)
@@ -29,7 +29,7 @@ public static class TelemetrySetup
                 m.AddMeter(SyncMetrics.MeterName, "Npgsql")
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();
-                // Every 5 s instead of the default 60 s, so the dashboard follows an experiment as it runs.
+                // Every 5 seconds instead of the default 60, so the dashboard keeps up with an experiment as it runs.
                 if (export)
                     m.AddOtlpExporter((_, reader) => reader.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 5000);
             });

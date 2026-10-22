@@ -14,6 +14,7 @@ dependencies:
   drift: ^2.35.1
   sqlite3: ^3.7.0                    # bundles SQLite through Dart hooks; the SQLCipher build is chosen below
   flutter_secure_storage: ^11.2.0    # refresh token + database key in the Android Keystore (§6, §12)
+  flutter_appauth: ^12.1.0           # sign-in through the identity service in the system browser (ADR 0006)
   http: ^1.6.0
   uuid: ^4.6.0                       # client-generated UUIDv7 event ids (§5)
   connectivity_plus: ^7.3.1
@@ -34,7 +35,7 @@ dev_dependencies:
   drift_dev: ^2.35.1
   build_runner: ^2.16.1
 
-# package:sqlite3 bundles SQLCipher so the Drift queue is encrypted at rest.
+# package:sqlite3 bundles SQLCipher, so the Drift queue is encrypted on the phone.
 hooks:
   user_defines:
     sqlite3:
@@ -42,7 +43,8 @@ hooks:
 
 flutter:
   uses-material-design: true
-  # Inter (SIL Open Font License, assets/fonts/inter/LICENSE.txt), bundled so the app needs no network for fonts.
+  # The Inter font (SIL Open Font License, assets/fonts/inter/LICENSE.txt), bundled so the app doesn't need the
+  # network for fonts.
   fonts:
     - family: Inter
       fonts:

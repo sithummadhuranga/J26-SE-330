@@ -1,4 +1,4 @@
-"""DISRUPTIVE: tests the figures proxy through the gateway, including a 503 from the stub (local Docker only)."""
+"""DISRUPTIVE: tests the figures proxy through the gateway, including a 503 from the stub. Local Docker only."""
 import os
 import secrets
 import subprocess
@@ -7,7 +7,7 @@ import time
 import urllib.error
 import urllib.request
 
-from client import GATEWAY, REPO_ROOT, Checks, http, login
+from client import GATEWAY, Checks, compose, dashboard_login, http, login
 
 sys.stdout.reconfigure(encoding="utf-8")
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -28,8 +28,7 @@ def get(path, token=None, headers=None):
 
 
 def stub(mode):
-    subprocess.run(["docker", "compose", "up", "-d", "--no-deps", "--force-recreate", "rag-stub"], cwd=REPO_ROOT,
-                   capture_output=True, env={**os.environ, "STUB_FAIL_MODE": mode})
+    compose("up", "-d", "--no-deps", "--force-recreate", "rag-stub", env={"STUB_FAIL_MODE": mode})
     for _ in range(60):
         if subprocess.run(["curl", "-s", "-o", os.devnull, "-w", "%{http_code}", "http://localhost:5080/health"],
                           capture_output=True, text=True).stdout == "200":
@@ -61,14 +60,14 @@ for bad in ["stub-0/..%2F..%2Fhealth", "stub-0/F1%3Fx%3D1", "stub-0/F1..", "stub
     status, _, data = get(f"/v1/figures/{bad}", token)
     check(f"unsafe id refused by the proxy, never forwarded ({bad[:30]})",
           status == 400 and b"INVALID_FIGURE_ID" in data, f"{status} {data[:60]!r}")
-# An encoded ".." gets collapsed so nothing matches (empty 404); a forwarded one would say FIGURE_NOT_FOUND.
+# An encoded ".." gets collapsed, so nothing matches and we get an empty 404. If it were forwarded, the answer
+# would say FIGURE_NOT_FOUND.
 status, _, data = get("/v1/figures/%2E%2E/F1", token)
 check("encoded '..' never reaches the proxy (no route)", status == 404 and b"FIGURE_NOT_FOUND" not in data,
       f"{status} {data[:60]!r}")
 status, _, _ = get("/v1/figures/stub-0/F1")
 check("no token: 401", status == 401, status)
-dash_status, dash = http("POST", "/v1/auth/login",
-                         {"username": "admin.demo", "password": "Demo-Admin-2026!", "clientId": "admin-dashboard"})
+dash_status, dash = dashboard_login("admin.demo", "Demo-Admin-2026!")
 status, _, _ = get("/v1/figures/stub-0/F1", dash["accessToken"])
 check("admin-dashboard token: 401 (devices only)", status == 401, status)
 

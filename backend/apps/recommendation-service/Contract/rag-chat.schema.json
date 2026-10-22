@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://j26-se-330/contracts/rag-chat/0.1-draft",
+  "title": "RAG follow-up chat (DRAFT 0.1, not agreed)",
+  "description": "DRAFT for review with Member 4; not part of contract 1.x and not in contracts/. Bodies of the follow-up chat: POST /v1/chat/sessions takes a sessionRequest and answers with a session (201 new, 200 existing); GET /v1/chat/sessions/{sessionId} answers with a session; POST /v1/chat/sessions/{sessionId}/turns takes a turnRequest and answers with a turn. Errors use the same body as POST /v1/recommendations: {error, message?, fields?}.",
+  "$defs": {
+    "tag": { "type": "string", "pattern": "^S[1-9][0-9]*$" },
+    "language": { "enum": ["en", "si", "ta"] },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "sessionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "revision"],
+      "properties": {
+        "caseId": { "$ref": "#/$defs/uuid", "description": "The assessment id the answer was made for (rag-request caseId)." },
+        "revision": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "turnRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": {
+        "question": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "language": { "enum": ["auto", "en", "si", "ta"], "description": "Answer language; auto (the default) detects it from the question's script." }
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "cite"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "cite": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/tag" } }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chunkId", "source", "pdfIndex", "recommendation", "grade", "chunkHash"],
+      "properties": {
+        "chunkId": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "pdfIndex": { "type": "integer", "minimum": 1, "description": "PDF page index, not the printed page number." },
+        "recommendation": { "type": ["string", "null"] },
+        "grade": { "type": ["string", "null"] },
+        "chunkHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["turn", "question", "removed", "language", "outcome", "shownLanguage", "statements", "english", "message", "notices", "citations", "answeredBy", "createdAt"],
+      "properties": {
+        "turn": { "type": "integer", "minimum": 1 },
+        "question": { "type": "string", "description": "As stored: after names, identifiers, e-mails, dates and long numbers were removed." },
+        "removed": { "type": "array", "items": { "enum": ["name", "identifier", "email", "date", "number"] } },
+        "language": { "$ref": "#/$defs/language" },
+        "outcome": { "enum": ["answered", "not_covered", "out_of_scope", "blocked", "unavailable"] },
+        "shownLanguage": { "$ref": "#/$defs/language" },
+        "statements": { "type": "array", "items": { "$ref": "#/$defs/statement" }, "description": "What is shown; empty unless answered." },
+        "english": { "type": "array", "items": { "$ref": "#/$defs/statement" }, "description": "The verified English the statements were translated from." },
+        "message": { "type": ["string", "null"], "description": "Fixed text shown instead of statements; null when answered." },
+        "notices": { "type": "array", "items": { "type": "string" } },
+        "citations": {
+          "type": "object",
+          "description": "The passages the statements cite, keyed by tag.",
+          "patternProperties": { "^S[1-9][0-9]*$": { "$ref": "#/$defs/citation" } },
+          "additionalProperties": false
+        },
+        "answeredBy": { "type": ["string", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "caseId", "revision", "corpusVersion", "turns"],
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/uuid" },
+        "caseId": { "$ref": "#/$defs/uuid" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "corpusVersion": { "type": "string" },
+        "turns": { "type": "array", "items": { "$ref": "#/$defs/turn" } }
+      }
+    }
+  }
+}

@@ -1,14 +1,36 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import type { DeviceSummary } from '../core/models';
-import { Centered, LoadError, PageHeader, Spinner, StatusChip, TableCard } from '../ui/components';
+import { usePaged } from '../core/paging';
+import {
+  Centered,
+  EmptyState,
+  IconTile,
+  LoadError,
+  NoticeStrip,
+  PageHeader,
+  Spinner,
+  StatusChip,
+  TableCard,
+} from '../ui/components';
+import { InfoIcon, PhoneIcon } from '../ui/icons';
+import { Pagination } from '../ui/Pagination';
 import { useConfirm } from '../ui/confirmContext';
 import { useLoadFailureToast, useToast } from '../ui/toastContext';
 
 const devicesKey = ['devices'];
 
-/** Registered phones; revoking ends their sessions within 30 s but leaves unsynced data on the phone. */
+/** The last time anything happened to the device, whether it was revoked, used or registered. */
+const lastChange = (d: DeviceSummary) =>
+  Math.max(...[d.revokedAt, d.lastSeenAt, d.registeredAt].map((t) => (t ? Date.parse(t) : 0)));
+
+/** The latest change first, so a phone just used or just revoked is the top row. */
+const latestFirst = (a: DeviceSummary, b: DeviceSummary) =>
+  lastChange(b) - lastChange(a) || a.deviceId.localeCompare(b.deviceId);
+
+/** Registered phones. Revoking one ends its sessions within 30 seconds, but leaves unsynced data on the phone. */
 export function DevicesPage() {
   const session = useSession();
   const toast = useToast();
@@ -21,6 +43,8 @@ export function DevicesPage() {
   });
   useLoadFailureToast("Couldn't load devices", query.error);
   const reload = () => void queryClient.invalidateQueries({ queryKey: devicesKey });
+  const sorted = useMemo(() => [...(query.data ?? [])].sort(latestFirst), [query.data]);
+  const paged = usePaged(sorted);
 
   const revoke = async (d: DeviceSummary) => {
     const yes = await confirm({
@@ -52,6 +76,12 @@ export function DevicesPage() {
           </button>
         }
       />
+      <div className="page-body">
+        <NoticeStrip icon={<InfoIcon size={16} />}>
+          A phone registers itself the first time someone signs in on it. A revoked phone is signed out within 15
+          minutes and can never sign in or sync again; records it has not synced yet stay on the phone.
+        </NoticeStrip>
+      </div>
       {query.isError ? (
         <LoadError error={query.error} onRetry={reload} />
       ) : query.isPending ? (
@@ -59,9 +89,13 @@ export function DevicesPage() {
           <Spinner />
         </Centered>
       ) : query.data.length === 0 ? (
-        <Centered>No devices have signed in yet.</Centered>
+        <EmptyState
+          icon={<PhoneIcon size={24} />}
+          title="No devices yet"
+          message="Phones appear here after a clinician signs in on them."
+        />
       ) : (
-        <TableCard>
+        <TableCard footer={<Pagination paged={paged} noun="devices" />}>
           <thead>
             <tr>
               <th>Device</th>
@@ -74,9 +108,16 @@ export function DevicesPage() {
             </tr>
           </thead>
           <tbody>
-            {query.data.map((d) => (
+            {paged.rows.map((d) => (
               <tr key={d.deviceId}>
-                <td className="table__mono">{d.deviceId}</td>
+                <td>
+                  <span className="person">
+                    <IconTile>
+                      <PhoneIcon size={18} />
+                    </IconTile>
+                    <span className="table__mono">{d.deviceId}</span>
+                  </span>
+                </td>
                 <td>
                   {d.revokedAt ? (
                     <StatusChip label="Revoked" tone="error" title={`Revoked ${formatDateTime(d.revokedAt)}`} />

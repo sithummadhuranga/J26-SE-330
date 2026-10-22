@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// The WoundAI look: warm paper background, teal actions, slate-blue accent, white cards, Inter font.
+/// The WoundAI look: a warm paper background, teal buttons, a slate-blue accent, white cards and the Inter font.
 abstract final class WoundColors {
   static const accent = Color(0xFF0C6D5E);
   static const accentDark = Color(0xFF084E44);
@@ -38,6 +38,17 @@ abstract final class WoundShadows {
   ];
   static const raised = [BoxShadow(color: Color(0x2414120C), blurRadius: 24, offset: Offset(0, 8))];
   static const accent = [BoxShadow(color: Color(0x470C6D5E), blurRadius: 22, offset: Offset(0, 10))];
+}
+
+/// Lists stop at their ends instead of stretching, so a page that fits on screen stays still when dragged.
+class WoundScrollBehavior extends MaterialScrollBehavior {
+  const WoundScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const ClampingScrollPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) => child;
 }
 
 ThemeData woundTheme() {

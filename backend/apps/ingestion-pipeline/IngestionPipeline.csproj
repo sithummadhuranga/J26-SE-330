@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,5 +6,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Npgsql" />
+    <!-- The package id is "PdfPig"; "UglyToad.PdfPig" on nuget.org is an unrelated upload. -->
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="Tabula" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../recommendation-service/WoundRag.Shared/WoundRag.Shared.csproj" />
+    <!-- Retrieval: the rerank and verify steps run the service's own SQL. -->
+    <ProjectReference Include="../recommendation-service/WoundRag.Infrastructure/WoundRag.Infrastructure.csproj" />
+  </ItemGroup>
 
 </Project>

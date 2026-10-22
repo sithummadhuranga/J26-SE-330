@@ -5,24 +5,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/app/app_services.dart';
 import 'package:melanin_wound_cdss/app/app_shell.dart';
 import 'package:melanin_wound_cdss/core/theme.dart';
+import 'package:melanin_wound_cdss/features/account/account_api.dart';
+import 'package:melanin_wound_cdss/features/assessment/analysis/wound_analyzer.dart';
+import 'package:melanin_wound_cdss/features/sync/api/sync_api.dart';
 import 'package:melanin_wound_cdss/features/sync/auth/auth_session.dart';
 import 'package:melanin_wound_cdss/features/sync/data/app_database.dart';
 
 import '../sync/support/fakes.dart';
 
-/// App screens tested on the real sync layer with a fake gateway and in-memory database.
+/// Tests the app's screens on top of the real sync layer, with a fake gateway and an in-memory database.
 void main() {
   late AppServices services;
   late FakeGateway gateway;
+  late _FakeAccountApi account;
+  var signedOut = 0;
 
-  /// Lets the in-memory database (same isolate) and Drift's stream updates run on the test's fake clock.
+  /// Lets the in-memory database (on the same isolate) and Drift's stream updates run on the test's fake clock.
   Future<void> settle(WidgetTester tester, [int rounds = 25]) async {
     for (var i = 0; i < rounds; i++) {
       await tester.pump(const Duration(milliseconds: 20));
     }
   }
 
-  Future<void> open(WidgetTester tester, {bool signIn = true}) async {
+  Future<void> open(WidgetTester tester, {bool signIn = true, WoundAnalyzer? analyzer}) async {
+    account = _FakeAccountApi();
+    signedOut = 0;
     tester.view
       ..physicalSize = const Size(1080, 2340)
       ..devicePixelRatio = 2.6;
@@ -32,13 +39,16 @@ void main() {
       db: AppDatabase.inMemory(),
       secrets: MemorySecretStore(),
       api: gateway,
+      browser: FakeBrowserSignIn(gateway),
       online: const Stream.empty(),
+      analyzer: analyzer,
+      account: account,
     );
-    if (signIn) await services.signIn(username: 'n.silva', password: 'correct-password');
+    if (signIn) await services.signIn();
     await tester.pumpWidget(
       MaterialApp(
         theme: woundTheme(),
-        home: AppShell(services: services, onSignedOut: () {}),
+        home: AppShell(services: services, onSignedOut: () => signedOut++),
       ),
     );
     await settle(tester);
@@ -82,7 +92,7 @@ void main() {
     await tapAndSettle(tester, find.byKey(const Key('useImage')));
     expect(find.text('Analyzing Assessment'), findsOneWidget);
 
-    // Four analysis steps, the save, then the sync that brings the advice back.
+    // Four analysis steps, then the save, then the sync that brings the advice back.
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
@@ -97,7 +107,7 @@ void main() {
     expect(find.text('Assessment Summary'), findsOneWidget);
     expect(find.byKey(const Key('woundArea')), findsOneWidget);
     expect(find.text('Advice ready'), findsOneWidget);
-    // A long page: scroll down to the clinical answers and the guidance button, as a clinician would.
+    // It's a long page, so scroll down to the clinical answers and the guidance button like a clinician would.
     final page = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(find.text('Present'), 200, scrollable: page);
     expect(find.text('Absent'), findsOneWidget);
@@ -167,6 +177,28 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('a failed analysis says why on its step, and nothing reaches the queue', (tester) async {
+    await open(tester, analyzer: _FailingAnalyzer());
+    await tapAndSettle(tester, find.byKey(const Key('newAssessment')));
+    await tapAndSettle(tester, find.byKey(const Key('takePhoto')));
+    await tapAndSettle(tester, find.byKey(const Key('shutter')));
+    await tapAndSettle(tester, find.byKey(const Key('useImage')));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+    }
+    expect(find.text('Not saved'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget, reason: 'calibration finished before segmentation failed');
+    expect(
+      find.text('Needs attention — Wound not found in the frame. Retake the photo.'),
+      findsOneWidget,
+      reason: 'the message sits on the segmentation step',
+    );
+    expect(await services.queue.all(), isEmpty, reason: 'nothing reaches the queue');
+    expect(gateway.storedEvents, isEmpty);
+    await close(tester);
+  });
+
   testWidgets('when the session ends, tapping the banner signs in again in place and syncs', (tester) async {
     await open(tester, signIn: false);
     await services.queue.enqueue(sampleEvent());
@@ -176,9 +208,7 @@ void main() {
 
     await tapAndSettle(tester, find.byKey(const Key('offlineBanner')));
     expect(find.byKey(const Key('signInAgainNote')), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('username')), 'n.silva');
-    await tester.enterText(find.byKey(const Key('password')), 'correct-password');
-    await tapAndSettle(tester, find.byKey(const Key('signInButton')));
+    await tapAndSettle(tester, find.byKey(const Key('signInButton'))); // the login page opens and they sign in there
     await settle(tester);
 
     expect(find.byKey(const Key('signInAgainNote')), findsNothing, reason: 'back on the app, not a new start');
@@ -204,4 +234,161 @@ void main() {
     expect((await services.queue.counts()).waitingToSend, 1, reason: 'kept for the next sign-in');
     await close(tester);
   });
+
+  Future<void> openAccount(WidgetTester tester) async {
+    account.thisDevice = await services.queue.deviceId();
+    await tapAndSettle(tester, find.text('Profile'));
+    await tapAndSettle(tester, find.byKey(const Key('account')));
+  }
+
+  testWidgets('account: shows your details and sessions, marks this phone, and renames you', (tester) async {
+    await open(tester);
+    await openAccount(tester);
+    expect(find.text('N. Silva'), findsOneWidget);
+    expect(find.text('Nurse'), findsOneWidget);
+    expect(find.text('This phone'), findsOneWidget);
+    expect(find.text('Admin dashboard'), findsOneWidget);
+
+    await tapAndSettle(tester, find.byKey(const Key('editName')));
+    await tester.enterText(find.byKey(const Key('nameField')), '   ');
+    await tapAndSettle(tester, find.byKey(const Key('saveName')));
+    expect(find.text('Enter your full name.'), findsOneWidget, reason: 'checked before anything is sent');
+    expect(account.renamedTo, isNull);
+
+    await tester.enterText(find.byKey(const Key('nameField')), 'Nimali Silva');
+    await tapAndSettle(tester, find.byKey(const Key('saveName')));
+    expect(account.renamedTo, 'Nimali Silva');
+    expect(find.text('Nimali Silva'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('account: a password change signs this phone out but keeps unsynced assessments', (tester) async {
+    await open(tester);
+    gateway.reachable = false;
+    await services.queue.enqueue(sampleEvent());
+    await openAccount(tester);
+
+    await tapAndSettle(tester, find.byKey(const Key('changePassword')));
+    await tester.enterText(find.byKey(const Key('currentPassword')), 'old-password');
+    await tester.enterText(find.byKey(const Key('newPassword')), 'short');
+    await tester.enterText(find.byKey(const Key('confirmPassword')), 'short');
+    await tapAndSettle(tester, find.byKey(const Key('savePassword')));
+    expect(find.text('At least $minPasswordLength characters.'), findsOneWidget);
+
+    account.passwordError = ApiException(400, 'INVALID_CREDENTIALS');
+    await tester.enterText(find.byKey(const Key('newPassword')), 'new-password');
+    await tester.enterText(find.byKey(const Key('confirmPassword')), 'new-password');
+    await tapAndSettle(tester, find.byKey(const Key('savePassword')));
+    expect(find.text('Your current password isn\'t right.'), findsOneWidget);
+    expect(await services.auth.hasSession(), isTrue);
+
+    account.passwordError = null;
+    await tapAndSettle(tester, find.byKey(const Key('savePassword')));
+    expect(account.passwordChanges, 1);
+    expect(find.textContaining('Your password was changed'), findsOneWidget);
+    await tapAndSettle(tester, find.byKey(const Key('signedOutOk')));
+    expect(signedOut, 1, reason: 'the app goes back to sign-in');
+    expect(await services.auth.hasSession(), isFalse);
+    expect((await services.queue.counts()).waitingToSend, 1, reason: 'kept for the next sign-in');
+    await close(tester);
+  });
+
+  testWidgets('account: offline says why and offers to try again', (tester) async {
+    await open(tester);
+    account.offline = true;
+    await openAccount(tester);
+    expect(find.text('Couldn\'t load your account'), findsOneWidget);
+    expect(find.textContaining('Can\'t reach the server'), findsOneWidget);
+
+    account.offline = false;
+    await tapAndSettle(tester, find.byKey(const Key('retry')));
+    expect(find.text('N. Silva'), findsOneWidget);
+    await close(tester);
+  });
+}
+
+/// Gets through calibration, then can't find the wound, the way a real segmentation model might fail.
+class _FailingAnalyzer implements WoundAnalyzer {
+  @override
+  Future<Map<String, dynamic>> analyze(WoundCapture capture, {void Function(AnalysisStage stage)? onStage}) async {
+    onStage?.call(AnalysisStage.calibration);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    onStage?.call(AnalysisStage.segmentation);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    throw AnalysisFailed('Wound not found in the frame. Retake the photo.', stage: AnalysisStage.segmentation);
+  }
+}
+
+/// The account endpoints, answered in memory.
+class _FakeAccountApi implements AccountApi {
+  String thisDevice = 'dev-test';
+  bool offline = false;
+  String? renamedTo;
+  int passwordChanges = 0;
+  Object? passwordError;
+  var _profile = MyProfile(
+    username: 'n.silva',
+    fullName: 'N. Silva',
+    role: 'nurse',
+    facilityId: 'fac-001',
+    mfaEnabled: false,
+    createdAt: DateTime(2026, 10, 20, 9),
+  );
+
+  void _online() {
+    if (offline) throw TransportException('unreachable');
+  }
+
+  @override
+  Future<MyProfile> profile() async {
+    _online();
+    return _profile;
+  }
+
+  @override
+  Future<MyProfile> rename(String fullName) async {
+    _online();
+    renamedTo = fullName;
+    return _profile = MyProfile(
+      username: _profile.username,
+      fullName: fullName,
+      role: _profile.role,
+      facilityId: _profile.facilityId,
+      mfaEnabled: _profile.mfaEnabled,
+      createdAt: _profile.createdAt,
+    );
+  }
+
+  @override
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    _online();
+    if (passwordError case final e?) throw e;
+    passwordChanges++;
+  }
+
+  @override
+  Future<List<MySession>> sessions() async {
+    _online();
+    return [
+      MySession(
+        sessionId: 's-phone',
+        client: 'mobile',
+        deviceId: thisDevice,
+        signedInAt: DateTime(2026, 10, 20, 9),
+        lastUsedAt: DateTime(2026, 10, 20, 10),
+      ),
+      MySession(
+        sessionId: 's-dashboard',
+        client: 'admin-dashboard',
+        signedInAt: DateTime(2026, 10, 20, 8),
+        lastUsedAt: DateTime(2026, 10, 20, 8, 30),
+      ),
+    ];
+  }
+
+  @override
+  Future<void> endSession(String sessionId) async => _online();
+
+  @override
+  Future<void> endAllSessions() async => _online();
 }

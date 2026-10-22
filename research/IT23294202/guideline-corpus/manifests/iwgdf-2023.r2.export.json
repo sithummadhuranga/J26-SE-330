@@ -1,0 +1,70 @@
+{
+  "corpus_version": "iwgdf-2023.r2",
+  "manifest_sha256": "cd48521a59eb4cf2bf6989f513a3c83d5400e4b221e0cf033cd4ba097e643329",
+  "frozen_at": "2026-10-15T05:27:50.7244490+00:00",
+  "export_file": "iwgdf-2023.r2.sql",
+  "export_sha256": "7988972f9197ec42402e27696e57fff347d16061481e1715cc2e46ec389151c6",
+  "export_bytes": 8243646,
+  "pg_dump": "pg_dump (PostgreSQL) 16.15 (Debian 16.15-1.pgdg12+2)",
+  "exported_at": "2026-10-15T05:55:47.5771170+00:00",
+  "format": "pg_dump --data-only --schema=rag; the version row is loaded unfrozen and frozen again by the last UPDATE (decision 68)",
+  "restore": "as rag_svc into a database built by db-migrator whose rag tables are empty: psql -X -v ON_ERROR_STOP=1 -f iwgdf-2023.r2.sql (one transaction)",
+  "restore_check": {
+    "database": "rag_restore_check",
+    "restored_as": "rag_svc",
+    "rag_migrations": "6 applied, checksums equal to the source's",
+    "tables": {
+      "corpus_versions": {
+        "rows": 1,
+        "sha256": "b6eb8f29d2c7223ff71f803f0a375823da774ffa1dab466d88d6826f6ef822fd",
+        "identical": true
+      },
+      "derivation_thresholds": {
+        "rows": 2,
+        "sha256": "a80b27fbeb15d06912308425d22e88763c211d36880c813ff5f47f94125b4bf9",
+        "identical": true
+      },
+      "embedding_canaries": {
+        "rows": 5,
+        "sha256": "e3f86c7a9599217ec5cbb66ba6ee796457d3e159c9173774a5b02f620ac62ce7",
+        "identical": true
+      },
+      "figure_links": {
+        "rows": 5,
+        "sha256": "03244487e1757e799b8e3c980acd0c030047bfceafb4c6070f01271ff2f32a91",
+        "identical": true
+      },
+      "figures": {
+        "rows": 16,
+        "sha256": "a831275268df6bad4160d72e261c5c96f9bb83117c0651f315fbc11594350d33",
+        "identical": true
+      },
+      "guideline_chunks": {
+        "rows": 626,
+        "sha256": "a4919c52f4f1aa68904a3fd7e8e19113c6805b7b90eadcdd642bf624c84f13be",
+        "identical": true
+      },
+      "query_vectors": {
+        "rows": 59,
+        "sha256": "6da50aaff422c9a056ce1c83983907e263aa3a1351194a7cd5a20ced95af7985",
+        "identical": true
+      },
+      "rerank_scores": {
+        "rows": 1180,
+        "sha256": "b933ef664d7caed27554648cb375129bdf198e94c09a8ef95e65bb8ab31ee71b",
+        "identical": true
+      },
+      "verified_tables": {
+        "rows": 18,
+        "sha256": "3f96d72f2889323666bcf7758067b8b70de36f36c0984f65cf79aad0e589dc85",
+        "identical": true
+      }
+    },
+    "checks": {
+      "every rag table identical (rows, SHA-256)": "9 of 9 tables",
+      "chunk_hash recomputes in C# and SQL": "626 chunks, 0 differ in C#, 0 in SQL",
+      "every vector 256-d with unit norm": "675 vectors, 0 bad",
+      "the restored version refuses a change": "UPDATE rejected by the frozen guard"
+    }
+  }
+}

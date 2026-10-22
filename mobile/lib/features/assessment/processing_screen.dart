@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_services.dart';
@@ -6,7 +8,7 @@ import '../../core/widgets.dart';
 import '../sync/data/queue_repository.dart';
 import '../sync/data/tables.dart';
 import '../sync/engine/sync_engine.dart';
-import '../sync/ui/sample_assessment.dart';
+import 'analysis/wound_analyzer.dart';
 import 'assessment_detail_screen.dart';
 import 'assessment_draft.dart';
 import 'assessment_view.dart';
@@ -21,20 +23,19 @@ class _Step {
   String? note;
 }
 
-/// Runs the assessment: save to the encrypted queue first, then sync and wait for advice (or just queue if offline).
+/// Runs the assessment. It saves to the encrypted queue first, then syncs and waits for advice.
+/// If the phone is offline, the assessment just waits in the queue.
 class ProcessingScreen extends StatefulWidget {
   const ProcessingScreen({
     super.key,
     required this.services,
     required this.draft,
-    this.stepDuration = const Duration(milliseconds: 900),
     this.adviceTimeout = const Duration(seconds: 45),
     this.adviceRetry = const Duration(milliseconds: 2500),
   });
 
   final AppServices services;
   final AssessmentDraft draft;
-  final Duration stepDuration;
   final Duration adviceTimeout;
   final Duration adviceRetry;
 
@@ -43,12 +44,9 @@ class ProcessingScreen extends StatefulWidget {
 }
 
 class _ProcessingScreenState extends State<ProcessingScreen> {
-  // The first four are stand-ins until Members 1–2's pipeline is plugged in.
+  // The first four steps are the analyzer's own stages, then saving and the guidance.
   final _steps = [
-    _Step('Skin tone calibration'),
-    _Step('Wound segmentation'),
-    _Step('Area measurement'),
-    _Step('Color distribution analysis'),
+    for (final stage in AnalysisStage.values) _Step(stage.label),
     _Step('Saved on this phone'),
     _Step('Evidence retrieval'),
   ];
@@ -70,13 +68,18 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   }
 
   Future<void> _run() async {
-    for (var i = 0; i < 4; i++) {
-      _set(i, StepState.active);
-      await Future<void>.delayed(widget.stepDuration);
-      if (!mounted) return;
-      _set(i, StepState.done);
+    if (widget.draft.analytics == null) {
+      if (!await _analyse()) {
+        if (mounted) setState(() => _finished = true);
+        return;
+      }
+    } else {
+      // Analysed already (for example on an earlier try that couldn't save), so don't run it again.
+      for (final stage in AnalysisStage.values) {
+        _set(stage.index, StepState.done);
+      }
     }
-    widget.draft.analytics ??= sampleAnalytics();
+    if (!mounted) return;
 
     _set(4, StepState.active);
     final saveError = await _save();
@@ -94,14 +97,38 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     try {
       (state, note) = await _waitForAdvice();
     } catch (_) {
-      // The assessment is already committed to the queue; whatever failed here, it syncs later.
+      // The assessment is already saved in the queue, so whatever went wrong here, it will still sync later.
       (state, note) = (StepState.attention, 'Saved — guidance will arrive once it syncs');
     }
     _set(5, state, note);
     if (mounted) setState(() => _finished = true);
   }
 
-  /// Null when the event is committed to the queue; otherwise why not, in words.
+  /// Runs the on-device analysis, ticking off each stage as the analyzer reaches it. Returns false if it failed.
+  /// Then the failed stage says why, and nothing is saved.
+  Future<bool> _analyse() async {
+    var active = -1;
+    void reached(AnalysisStage stage) {
+      for (var i = max(active, 0); i < stage.index; i++) {
+        _set(i, StepState.done);
+      }
+      active = stage.index;
+      _set(active, StepState.active);
+    }
+
+    try {
+      widget.draft.analytics = await runWoundAnalysis(widget.services.analyzer, widget.draft.capture, onStage: reached);
+    } on AnalysisFailed catch (e) {
+      _set(e.stage?.index ?? max(active, 0), StepState.attention, e.message);
+      return false;
+    }
+    for (var i = max(active, 0); i < AnalysisStage.values.length; i++) {
+      _set(i, StepState.done);
+    }
+    return true;
+  }
+
+  /// Null once the event is saved in the queue. Otherwise, a plain explanation of why it wasn't.
   Future<String?> _save() async {
     final s = widget.services;
     final who = await s.cachedClinician();

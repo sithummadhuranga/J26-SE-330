@@ -1,11 +1,11 @@
-"""DISRUPTIVE: tests the REST baseline's duplicates and waiting-for-advice behavior (local Docker only)."""
+"""DISRUPTIVE: tests how the REST baseline handles duplicates and waiting for advice. Local Docker only."""
 import os
 import secrets
 import subprocess
 import sys
 import time
 
-from client import REPO_ROOT, Checks, create_clinician, http, login, sql, uuid7, wait_for, wound_event
+from client import Checks, compose, create_clinician, http, login, sql, uuid7, wait_for, wound_event
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -19,8 +19,8 @@ check = t.check
 
 
 def stub(mode="none", delay_ms="0"):
-    subprocess.run(["docker", "compose", "up", "-d", "--no-deps", "--force-recreate", "rag-stub"], cwd=REPO_ROOT,
-                   capture_output=True, timeout=300, env={**os.environ, "STUB_FAIL_MODE": mode, "STUB_DELAY_MS": delay_ms})
+    compose("up", "-d", "--no-deps", "--force-recreate", "rag-stub",
+            env={"STUB_FAIL_MODE": mode, "STUB_DELAY_MS": delay_ms})
     deadline = time.time() + 60
     while time.time() < deadline:
         if subprocess.run(["curl", "-s", "-o", os.devnull, "-w", "%{http_code}", "http://localhost:5080/health"],
