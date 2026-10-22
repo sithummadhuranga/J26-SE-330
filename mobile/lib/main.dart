@@ -1,6 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'app/app_services.dart';
+import 'features/assessment/media_store.dart';
+import 'features/assessment/photo_source.dart';
+import 'features/measurement/cv_wound_analyzer.dart';
 import 'app/background_sync.dart';
 import 'features/sync/ui/sign_in_screen.dart';
 import 'app/app_shell.dart';
@@ -8,7 +14,10 @@ import 'core/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final services = await AppServices.open();
+  // The real wound analysis (model on the phone, sticker as the scale) and the phone's camera; tests and the prototype use the samples.
+  // Photos stay in the app's own storage on this phone, one file per assessment; they are never uploaded.
+  final photos = Directory('${(await getApplicationSupportDirectory()).path}/photos');
+  final services = await AppServices.open(analyzer: CvWoundAnalyzer(), photoSource: DevicePhotoSource(), media: FileMediaStore(photos));
   // The app lives as long as its process, so the listener is never cancelled.
   BackgroundSync.listen(services.db);
   runApp(WoundCdssApp(services: services));

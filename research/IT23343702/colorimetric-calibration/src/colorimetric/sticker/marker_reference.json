@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "source": "stand-in",
+  "source_note": "source is one of: stand-in (nominal aims from marker_layout.json, NOT what the printed patches look like), reference-photos (read from photos of the printed sticker in steady light, relative calibration), measured (spectrophotometer; needs marker.MEASURED = True).",
+  "lab": {
+    "grey": [50, 0, 0],
+    "skin_a": [38, 14, 14],
+    "skin_b": [25, null, null]
+  },
+  "lab_note": "null = not specified; only L* is compared for that patch."
+}
