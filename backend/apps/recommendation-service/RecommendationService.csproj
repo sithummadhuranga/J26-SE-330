@@ -31,4 +31,10 @@
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The follow-up chat's DRAFT contract: ours until the team agrees it and it moves to contracts/. -->
+  <ItemGroup>
+    <None Include="Contract/rag-chat.schema.json" Link="contracts/rag-chat.schema.json"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

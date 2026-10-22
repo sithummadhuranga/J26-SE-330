@@ -23,12 +23,13 @@ public sealed class ProtocolService(IPassageRepository passages, IFigureReposito
         if (missing.Count > 0) throw new InvalidOperationException($"delivered chunks not found in {version}: {string.Join(", ", missing)}");
         var delivered = Delivery.Deliver(outcome, stored, placement);
 
+        // Also stored for a later chat on this answer, so it is built even when nothing is delivered.
+        var findings = FindingsSummary.Build(QuerySlots.For(input.Clinical, outcome.Trajectory), frozen.StalledRule);
         var generation = new GenerationResult(GenerationModes.Extractive, null, [], Alert: false);
         AnswerResult? answer = null;
         string? promptHash = null;
         if (delivered.Count > 0)
         {
-            var findings = FindingsSummary.Build(QuerySlots.For(input.Clinical, outcome.Trajectory), frozen.StalledRule);
             var prompt = PromptBuilder.Build(findings, Delivery.PromptSections(delivered));
             var tags = delivered.Select(d => d.Tag).ToHashSet(StringComparer.Ordinal);
             generation = await chain.RunAsync(prompt, text => AnswerReader.Read(text, ResponseSections.All, tags).Problem, ct);
@@ -40,6 +41,6 @@ public sealed class ProtocolService(IPassageRepository passages, IFigureReposito
         var corpus = new ServedCorpus(version, frozen.Info.EmbeddingModel, frozen.Info.EmbeddingDimensions, frozen.Info.RerankerModel,
             frozen.Info.InstructHash, frozen.StalledRule.RuleId, placement.Sha256);
         var body = ResponseComposer.Compose(new ResponseInputs(input, corpus, outcome, delivered, generation, answer, promptHash, linked));
-        return new ComposedProtocol(body, delivered, generation, promptHash);
+        return new ComposedProtocol(body, delivered, generation, promptHash, findings);
     }
 }

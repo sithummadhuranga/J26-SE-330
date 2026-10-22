@@ -13,6 +13,7 @@ if (!settings.Generation.HasKeys)
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapRecommendationsEndpoint();
 app.MapFiguresEndpoint();
+app.MapChatEndpoints();
 app.Run();
 
 // The test host (WebApplicationFactory) needs a public entry type.

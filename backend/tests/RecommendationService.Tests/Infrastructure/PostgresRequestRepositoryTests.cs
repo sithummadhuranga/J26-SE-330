@@ -23,7 +23,8 @@ public sealed class PostgresRequestRepositoryTests : IDisposable
             "extractive", "hybrid", body ?? [1, 2, 3],
             [new CitationRow("S1", "PAD-R17", Hash17)],
             [new AuditRow("generation_attempt", "p", "m", "m2", 1, "unavailable", null, null, 20000, "{\"detail\":\"timeout\"}"),
-             new AuditRow("response", null, null, null, null, "extractive", null, null, null, "{}")]);
+             new AuditRow("response", null, null, null, null, "extractive", null, null, null, "{}")],
+            new ChatContext("Findings: placeholder.", ["protectiveSensation"], ["pedalPulses"]));
 
         public async ValueTask DisposeAsync()
         {
@@ -74,7 +75,7 @@ public sealed class PostgresRequestRepositoryTests : IDisposable
             Assert.Null(await repo.FindAsync(conn, tx, caseId, 1, new string('b', 64), CancellationToken.None));
             Assert.Equal(SaveStatus.Saved, (await repo.SaveAsync(conn, tx, t.Answer(caseId, new string('b', 64)), CancellationToken.None)).Status);
 
-            foreach (var (table, rows) in new[] { ("request_keys", 1L), ("requests", 1L), ("retrievals", 2L), ("protocols", 1L), ("protocol_citations", 1L), ("audit", 2L) })
+            foreach (var (table, rows) in new[] { ("request_keys", 1L), ("requests", 1L), ("retrievals", 2L), ("protocols", 1L), ("protocol_citations", 1L), ("audit", 2L), ("chat_contexts", 1L) })
                 Assert.Equal(rows, await CountAsync(conn, tx, table, caseId));
             var found = await repo.FindAsync(conn, tx, caseId, 1, new string('b', 64), CancellationToken.None);
             Assert.Equal(StableHash, found!.StableSha256);

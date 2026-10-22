@@ -52,6 +52,19 @@ class RecommendationLocal extends Table {
   Set<Column> get primaryKey => {assessmentId, revision};
 }
 
+/// DRAFT (Member 3, not agreed): the follow-up chat on one advice, as the service last returned it (its session body),
+/// so the conversation stays readable offline. Questions are stored as the service stored them, after identifiers
+/// were removed.
+class ChatLocal extends Table {
+  TextColumn get assessmentId => text()();
+  IntColumn get revision => integer()();
+  TextColumn get sessionJson => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {assessmentId, revision};
+}
+
 /// Cached guideline figures. They survive restarts and never go out of date.
 class FiguresLocal extends Table {
   TextColumn get corpusVersion => text()();

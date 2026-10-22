@@ -90,6 +90,20 @@ public class RecommendationUseCaseTests
     }
 
     [Fact]
+    public async Task Each_answer_keeps_what_a_later_chat_starts_from_and_no_identifier()
+    {
+        var world = new World();
+        await world.Send(Request(pedalPulses: GateFields.NotRecorded));
+
+        var chat = Assert.Single(world.Requests.Saved).Chat;
+        Assert.Equal([GateFields.UlcerLocation, GateFields.ProtectiveSensation, GateFields.ProbeToBone, GateFields.InfectionGrade,
+            GateFields.HealingTrajectory], chat.Observed);
+        Assert.Equal([GateFields.PedalPulses], chat.Withheld);
+        Assert.False(string.IsNullOrWhiteSpace(chat.Findings));
+        Assert.DoesNotContain(CaseId, chat.Findings);
+    }
+
+    [Fact]
     public async Task The_same_body_again_replays_the_stored_bytes_without_asking_the_model()
     {
         var world = new World();

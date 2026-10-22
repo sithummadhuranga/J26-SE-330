@@ -153,6 +153,26 @@ public class EndpointTests
     }
 
     [Fact]
+    public async Task A_chat_start_outside_the_draft_contract_is_a_422_without_touching_the_database()
+    {
+        await using var host = Host();
+        var response = await host.CreateClient().PostAsync("/v1/chat/sessions", new StringContent("""{"caseId": "x"}""", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("validation_failed", (string)JsonNode.Parse(await response.Content.ReadAsStringAsync())!["error"]!);
+    }
+
+    [Fact]
+    public async Task A_chat_start_or_read_with_the_database_unreachable_is_a_503()
+    {
+        await using var host = Host();
+        var client = host.CreateClient();
+        var start = await client.PostAsync("/v1/chat/sessions",
+            new StringContent("""{"caseId": "6f1d3c9e-8a2b-4c5d-9e0f-1a2b3c4d5e6f", "revision": 2}""", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, start.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync($"/v1/chat/sessions/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
     public async Task A_figure_with_the_database_unreachable_is_a_503()
     {
         await using var host = Host();

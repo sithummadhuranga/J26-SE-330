@@ -3,17 +3,23 @@ import 'package:flutter/material.dart';
 import '../../app/app_services.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import 'chat_api.dart';
+import 'chat_repository.dart';
+import 'chat_screen.dart';
 import 'guideline_figure.dart';
 
 /// The Recommendation Service's guidance (contracts/rag-response.schema.json 1.0) as delivered, readable offline.
 /// Section text is shown exactly as sent; everything else (escalation, withheld, figures, evidence) is what the
 /// service's code wrote beside it. Keys the response does not carry are simply not shown.
 class GuidanceScreen extends StatelessWidget {
-  const GuidanceScreen({super.key, required this.services, required this.payload, required this.receivedAt});
+  const GuidanceScreen({super.key, required this.services, required this.payload, required this.receivedAt, this.chatApi});
 
   final AppServices services;
   final Map<String, dynamic> payload;
   final DateTime receivedAt;
+
+  /// DRAFT follow-up chat; the gateway's routes unless a test passes its own.
+  final ChatApi? chatApi;
 
   List<Map<String, dynamic>> _list(String key) =>
       ((payload[key] as List?) ?? const []).whereType<Map<String, dynamic>>().toList();
@@ -164,6 +170,21 @@ class GuidanceScreen extends StatelessWidget {
                   children: [for (final c in citationList) _EvidenceRow(c)],
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (payload['caseId'] case final String caseId when payload['revision'] is int) ...[
+            OutlinedButton.icon(
+              key: const Key('askAboutGuidance'),
+              icon: const Icon(Icons.forum_outlined),
+              label: const Text('Ask about this guidance'),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => ChatScreen(
+                  chats: ChatRepository(services.db, chatApi ?? HttpChatApi(Uri.parse(syncBaseUrl)), services.auth),
+                  assessmentId: caseId,
+                  revision: payload['revision'] as int,
+                ),
+              )),
             ),
             const SizedBox(height: 12),
           ],

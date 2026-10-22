@@ -56,11 +56,24 @@ public class RequestTablesTests
     [MemberData(nameof(AppendOnlyTables))]
     public async Task Tables_are_never_truncated_even_by_their_owner(string table)
     {
-        await using var conn = await OpenAsync(TestDatabase.OwnerConnectionString()!);
-        await using var tx = await conn.BeginTransactionAsync();
-        var e = await Assert.ThrowsAsync<PostgresException>(() => ExecAsync(conn, tx, $"TRUNCATE rag.{table} CASCADE"));
+        var e = await RefusedTruncateAsync(TestDatabase.OwnerConnectionString()!, $"TRUNCATE rag.{table} CASCADE");
         Assert.Equal(PostgresErrorCodes.IntegrityConstraintViolation, e.SqlState);
-        await tx.RollbackAsync();
+    }
+
+    // TRUNCATE ... CASCADE locks every linked table while other test classes write to them; on 20 Oct 2026 that
+    // deadlocked twice and failed one side. Giving up after 500 ms, under PostgreSQL's 1 s deadlock check, means only
+    // this test ever waits, and it tries again in a new transaction.
+    private static async Task<PostgresException> RefusedTruncateAsync(string connectionString, string sql)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            await using var conn = await OpenAsync(connectionString);
+            await using var tx = await conn.BeginTransactionAsync();
+            await ExecAsync(conn, tx, "SET LOCAL lock_timeout = '500ms'");
+            var e = await Assert.ThrowsAsync<PostgresException>(() => ExecAsync(conn, tx, sql));
+            await tx.RollbackAsync();
+            if (e.SqlState != PostgresErrorCodes.LockNotAvailable || attempt == 10) return e;
+        }
     }
 
     [DatabaseFact]

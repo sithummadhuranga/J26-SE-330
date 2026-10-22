@@ -173,6 +173,7 @@ services:
       Jwt__MetadataAddress: "http://identity-service:8080/.well-known/openid-configuration"
       ReverseProxy__Clusters__identity__Destinations__d1__Address: "http://identity-service:8080/"
       ReverseProxy__Clusters__sync__Destinations__d1__Address: "http://sync-gateway:8080/"
+      ReverseProxy__Clusters__chat__Destinations__d1__Address: "http://sync-gateway:8080/"
     depends_on:
       - identity-service
       - sync-gateway
@@ -310,6 +311,9 @@ services:
     environment:
       <<: *backend-env
       ConnectionStrings__Postgres: "Host=postgres;Database=${POSTGRES_DB:-cdss};Username=rag_svc;Password=${DB_PASSWORD_RAG:?set DB_PASSWORD_RAG in .env};Maximum Pool Size=20"
+      # Model Studio keys (never committed). Without them advice stays extractive and the chat answers "unavailable".
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      MODELSTUDIO_WORKSPACE_ID: ${MODELSTUDIO_WORKSPACE_ID:-}
     depends_on:
       db-migrate:
         condition: service_completed_successfully

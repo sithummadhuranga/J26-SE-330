@@ -77,8 +77,12 @@ void main() {
       gateway.figures['iwgdf-2023.r2/$id'] = png;
     }
     services = await AppServices.open(
-        db: AppDatabase.inMemory(), secrets: MemorySecretStore(), api: gateway, online: const Stream.empty());
-    if (signIn) await services.signIn(username: 'n.silva', password: 'correct-password');
+        db: AppDatabase.inMemory(),
+        secrets: MemorySecretStore(),
+        api: gateway,
+        browser: FakeBrowserSignIn(gateway),
+        online: const Stream.empty());
+    if (signIn) await services.signIn();
     gateway.reachable = !offline;
     await tester.pumpWidget(MaterialApp(
       theme: woundTheme(),

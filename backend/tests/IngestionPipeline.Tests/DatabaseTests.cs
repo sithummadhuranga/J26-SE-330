@@ -130,13 +130,21 @@ public class DatabaseTests
     {
         var owner = TestDatabase.OwnerConnectionString();
         Assert.False(owner is null, "ConnectionStrings__Postgres (owner login) is needed for this test");
-        var (conn, tx) = await BeginAsync(owner);
-        await using (conn)
+        // CASCADE locks every table linked to the chunks while the recommendation tests write to them. Giving up after
+        // 500 ms, under PostgreSQL's 1 s deadlock check, means only this test ever waits; it tries again in a new transaction.
+        for (var attempt = 1; ; attempt++)
         {
-            await SeedAsync(conn, tx);
-            await FreezeAsync(conn, tx);
-            var ex = await RejectedAsync(conn, tx, "TRUNCATE rag.guideline_chunks CASCADE");
-            Assert.Equal(TriggerRejected, ex.SqlState);
+            var (conn, tx) = await BeginAsync(owner);
+            await using (conn)
+            {
+                await SeedAsync(conn, tx);
+                await FreezeAsync(conn, tx);
+                await ExecAsync(conn, tx, "SET LOCAL lock_timeout = '500ms'");
+                var ex = await RejectedAsync(conn, tx, "TRUNCATE rag.guideline_chunks CASCADE");
+                if (ex.SqlState == PostgresErrorCodes.LockNotAvailable && attempt < 10) continue;
+                Assert.Equal(TriggerRejected, ex.SqlState);
+                return;
+            }
         }
     }
 
