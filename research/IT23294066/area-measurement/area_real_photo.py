@@ -34,6 +34,29 @@ def classify(contour):
     return "triangle" if n == 3 else "rectangle" if n == 4 else "circle" if n >= 8 else None
 
 
+def measure_photo(rgb, side_mm):
+    """Stickers found in an RGB photo and, for each red shape, its area with the homography and with one scale.
+    Returns (stickers, rows); each row: kind, printed, hom, uni (mm2), hom_pct, uni_pct (errors in %), contour."""
+    stickers = SF.find_stickers(rgb, side_mm)
+    rows = []
+    if not stickers:
+        return stickers, rows
+    m = red_shapes(rgb)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    for c in sorted(cs, key=cv2.contourArea, reverse=True)[:3]:
+        kind = classify(c)
+        if kind is None or cv2.contourArea(c) < 2000:
+            continue
+        mask = np.zeros(m.shape, np.uint8)
+        cv2.drawContours(mask, [c], -1, 1, -1)
+        ctr = np.array(c.reshape(-1, 2).mean(axis=0))
+        st = min(stickers, key=lambda t: np.linalg.norm(t.corners.mean(axis=0) - ctr))
+        hom, uni = SF.area_mm2(mask, st), SF.area_uniform_mm2(mask, st)
+        rows.append(dict(kind=kind, printed=TRUTH[kind], hom=hom, uni=uni, hom_pct=100 * (hom - TRUTH[kind]) / TRUTH[kind],
+                         uni_pct=100 * (uni - TRUTH[kind]) / TRUTH[kind], contour=c))
+    return stickers, rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("photos", nargs="+")
@@ -46,29 +69,16 @@ def main():
         if bgr is None:
             print(path, ": cannot read"); continue
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        stickers = SF.find_stickers(rgb, a.side_mm)
+        stickers, rows = measure_photo(rgb, a.side_mm)
         print(f"\n{Path(path).name}: {rgb.shape[1]} x {rgb.shape[0]}, {len(stickers)} sticker(s) found" + (
             f", {min(s.px_per_mm for s in stickers):.1f}-{max(s.px_per_mm for s in stickers):.1f} px/mm" if stickers else ""))
-        if not stickers:
-            continue
-        m = red_shapes(rgb)
-        cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         dbg = bgr.copy()
-        for s in stickers:
-            cv2.polylines(dbg, [s.corners.astype(np.int32)], True, (0, 255, 0), max(2, rgb.shape[1] // 600))
-        for c in sorted(cs, key=cv2.contourArea, reverse=True)[:3]:
-            kind = classify(c)
-            if kind is None or cv2.contourArea(c) < 2000:
-                continue
-            mask = np.zeros(m.shape, np.uint8)
-            cv2.drawContours(mask, [c], -1, 1, -1)
-            ctr = np.array(c.reshape(-1, 2).mean(axis=0))
-            st = min(stickers, key=lambda t: np.linalg.norm(t.corners.mean(axis=0) - ctr))
-            hom, uni = SF.area_mm2(mask, st), SF.area_uniform_mm2(mask, st)
-            eh, eu = 100 * (hom - TRUTH[kind]) / TRUTH[kind], 100 * (uni - TRUTH[kind]) / TRUTH[kind]
-            all_hom.append(abs(eh)); all_uni.append(abs(eu))
-            print(f"  {kind:9s} printed {TRUTH[kind]:7.1f} mm2 | homography {hom:7.1f} ({eh:+.1f}%) | one scale {uni:7.1f} ({eu:+.1f}%)")
-            cv2.drawContours(dbg, [c], -1, (255, 0, 0), max(2, rgb.shape[1] // 800))
+        for s_ in stickers:
+            cv2.polylines(dbg, [s_.corners.astype(np.int32)], True, (0, 255, 0), max(2, rgb.shape[1] // 600))
+        for r in rows:
+            all_hom.append(abs(r["hom_pct"])); all_uni.append(abs(r["uni_pct"]))
+            print(f"  {r['kind']:9s} printed {r['printed']:7.1f} mm2 | homography {r['hom']:7.1f} ({r['hom_pct']:+.1f}%) | one scale {r['uni']:7.1f} ({r['uni_pct']:+.1f}%)")
+            cv2.drawContours(dbg, [r["contour"]], -1, (255, 0, 0), max(2, rgb.shape[1] // 800))
         if a.debug_dir:
             Path(a.debug_dir).mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(Path(a.debug_dir) / (Path(path).stem + "_debug.jpg")), dbg)

@@ -114,6 +114,31 @@ def boot(d, n=5000, seed=0):
     return float(np.percentile(m, 2.5)), float(np.percentile(m, 97.5))
 
 
+def evaluate_rule(results, o):
+    """The pass rule P0-P4 from the module header. results: condition -> raw, corrected, diff, diff_ci95, accepted; o: raw Dice on
+    the original photos. Returns dict(P=..., counted=..., verdict=...). The identity check (P1) is looked at first, so an
+    'unclear' result cannot hide that it failed."""
+    counted = {c: results[c]["raw"] <= o - 0.03 for c in JUDGED}
+    p = {"P0": dict(counted)}
+    r = results["identity"]
+    p["P1"] = abs(r["corrected"] - r["raw"]) <= 0.005 and r["accepted"] >= 0.99
+    p2 = {c: (results[c]["diff"] >= 0.02 and results[c]["diff_ci95"][0] > 0) for c in JUDGED if counted[c]}
+    p3 = {c: results[c]["corrected"] >= o - 0.02 for c in JUDGED if counted[c]}
+    p["P2"], p["P3"] = p2, p3
+    p["P4"] = all(results[c]["accepted"] >= 0.95 for c in BASE if c != "minus2")
+    if not p["P1"]:
+        verdict = "FAIL (P1: the identity light changed the result)"
+    elif not any(counted.values()):
+        verdict = "UNCLEAR (no judged condition hurt the raw model by 0.03 or more)"
+    elif sum(1 for v in p2.values() if not v) >= 2:
+        verdict = "FAIL"
+    elif all(p2.values()) and all(p3.values()) and p["P4"]:
+        verdict = "PASS"
+    else:
+        verdict = "UNCLEAR"
+    return dict(P=p, counted=counted, verdict=verdict)
+
+
 def self_check():
     """The synthetic sticker must give the same gains as the colour component's own golden-vector sticker."""
     import make_golden_vectors as G  # noqa: E402
@@ -175,27 +200,9 @@ def main():
         shutil.rmtree(tmp, ignore_errors=True)
 
     o = float(orig.mean())
-    counted = {c: results[c]["raw"] <= o - 0.03 for c in JUDGED}
-    p = {}
-    p["P0"] = {c: counted[c] for c in JUDGED}
-    r = results["identity"]
-    p["P1"] = abs(r["corrected"] - r["raw"]) <= 0.005 and r["accepted"] >= 0.99
-    p2 = {c: (results[c]["diff"] >= 0.02 and results[c]["diff_ci95"][0] > 0) for c in JUDGED if counted[c]}
-    p3 = {c: results[c]["corrected"] >= o - 0.02 for c in JUDGED if counted[c]}
-    p["P2"], p["P3"] = p2, p3
-    p["P4"] = all(results[c]["accepted"] >= 0.95 for c in BASE if c != "minus2")
-    n_counted = sum(counted.values())
-    if not p["P1"]:
-        verdict = "FAIL (P1: the identity light changed the result)"  # checked first, so an unclear result cannot hide it
-    elif n_counted == 0:
-        verdict = "UNCLEAR (no judged condition hurt the raw model by 0.03 or more)"
-    elif sum(1 for v in p2.values() if not v) >= 2:
-        verdict = "FAIL"
-    elif all(p2.values()) and all(p3.values()) and p["P4"]:
-        verdict = "PASS"
-    else:
-        verdict = "UNCLEAR"
-    results["rule"] = dict(P=p, counted=counted, verdict=verdict)
+    rule = evaluate_rule(results, o)
+    p, counted, verdict = rule["P"], rule["counted"], rule["verdict"]
+    results["rule"] = rule
     print("\nRULE:", json.dumps(p, default=str))
     print("VERDICT:", verdict, flush=True)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)

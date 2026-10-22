@@ -69,6 +69,35 @@ def rate_boot(flip_a, flip_b, n=5000, seed=0):
     return float(np.percentile(m, 2.5)), float(np.percentile(m, 97.5))
 
 
+def evaluate_rule(results, s1_shift, s1_flip):
+    """The pass rule S0-S4 from the module header. results: condition -> raw/corrected shift medians, class-change rates,
+    flip_gain_ci95, accepted; s1_shift, s1_flip: corrected against raw at identity light (median |ITA difference|, class change).
+    The identity check (S1) is looked at first."""
+    p = {"S1": s1_shift <= 1.0 and s1_flip <= 0.02, "S1_values": dict(median_difference=s1_shift, class_change=s1_flip)}
+    counted = {c: (results[c]["raw_shift_median"] >= 5.0 or results[c]["raw_flip"] >= 0.20) for c in L.JUDGED}
+    s2, s3 = {}, {}
+    for c in L.JUDGED:
+        if not counted[c]:
+            continue
+        r = results[c]
+        s2[c] = (r["cor_shift_median"] <= 0.5 * r["raw_shift_median"] and r["cor_flip"] <= 0.5 * r["raw_flip"]
+                 and r["flip_gain_ci95"][0] > 0)
+        s3[c] = r["cor_shift_median"] <= 3.0
+    p["S2"], p["S3"] = s2, s3
+    p["S4"] = all(results[c]["accepted"] >= 0.95 for c in L.BASE if c != "minus2")
+    if not p["S1"]:
+        verdict = "FAIL (S1: the identity light changed the result)"
+    elif not any(counted.values()):
+        verdict = "UNCLEAR (no judged condition moved the raw reading enough to count)"
+    elif sum(1 for v in s2.values() if not v) >= 2:
+        verdict = "FAIL"
+    elif all(s2.values()) and all(s3.values()) and p["S4"]:
+        verdict = "PASS"
+    else:
+        verdict = "UNCLEAR"
+    return dict(P=p, counted=counted, verdict=verdict)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -114,32 +143,11 @@ def main():
             name, r["raw_shift_median"], r["raw_shift_p90"], r["cor_shift_median"], r["cor_shift_p90"],
             100 * r["raw_flip"], 100 * r["cor_flip"], 100 * acc), flush=True)
 
-    # S1: identity light, corrected against raw
-    d = np.abs(ref_cor_ita - ref_raw_ita)
+    d = np.abs(ref_cor_ita - ref_raw_ita)  # S1 input: identity light, corrected against raw
     s1_shift, s1_flip = float(np.nanmedian(d)), float(np.mean([a != b for a, b in zip(ref_raw_cls, ref_cor_cls)]))
-    p = {"S1": s1_shift <= 1.0 and s1_flip <= 0.02, "S1_values": dict(median_difference=s1_shift, class_change=s1_flip)}
-    counted = {c: (results[c]["raw_shift_median"] >= 5.0 or results[c]["raw_flip"] >= 0.20) for c in L.JUDGED}
-    s2, s3 = {}, {}
-    for c in L.JUDGED:
-        if not counted[c]:
-            continue
-        r = results[c]
-        s2[c] = (r["cor_shift_median"] <= 0.5 * r["raw_shift_median"] and r["cor_flip"] <= 0.5 * r["raw_flip"]
-                 and r["flip_gain_ci95"][0] > 0)
-        s3[c] = r["cor_shift_median"] <= 3.0
-    p["S2"], p["S3"] = s2, s3
-    p["S4"] = all(results[c]["accepted"] >= 0.95 for c in L.BASE if c != "minus2")
-    if not p["S1"]:
-        verdict = "FAIL (S1: the identity light changed the result)"  # checked first, so an unclear result cannot hide it
-    elif not any(counted.values()):
-        verdict = "UNCLEAR (no judged condition moved the raw reading enough to count)"
-    elif sum(1 for v in s2.values() if not v) >= 2:
-        verdict = "FAIL"
-    elif all(s2.values()) and all(s3.values()) and p["S4"]:
-        verdict = "PASS"
-    else:
-        verdict = "UNCLEAR"
-    results["rule"] = dict(P=p, counted=counted, verdict=verdict)
+    rule = evaluate_rule(results, s1_shift, s1_flip)
+    p, counted, verdict = rule["P"], rule["counted"], rule["verdict"]
+    results["rule"] = rule
     print("\nCOUNTED:", counted)
     print("RULE:", json.dumps(p, default=str))
     print("VERDICT:", verdict, flush=True)

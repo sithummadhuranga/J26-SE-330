@@ -37,8 +37,8 @@ class Sticker:
     h_mm_to_px: np.ndarray     # 3 x 3, sticker plane in mm (origin top-left corner of the frame) to photo pixels
     px_per_mm: float           # photo pixels per mm at the sticker centre
     crop: np.ndarray           # CROP x CROP x 3 uint8 RGB, the straightened sticker
-    orientation_contrast: float  # how much darker the orientation corner is than the other three (higher = surer)
-    frame_contrast: float      # how much brighter the white inside is than the frame
+    orientation_contrast: float  # 0 to 1: how much darker the orientation corner is than the darkest of the other three, as a share of the black-to-white range
+    frame_contrast: float      # 0 to 1: how much darker the frame is than the white inside
 
 
 def _dark_mask(gray):
@@ -141,14 +141,15 @@ def _orient(gray_blur, q):
         qk = np.roll(q, -k, axis=0).astype(np.float32)
         canon = cv2.warpPerspective(gray_blur, cv2.getPerspectiveTransform(qk, dst), (W, W), flags=cv2.INTER_AREA)
         orient, others, frame, white = _regions(canon.astype(np.float32))
-        oc = min(others) / (orient + 1.0)
-        fc = white / (frame + 1.0)
+        span = max(white - frame, 1.0)             # the black-to-white range of this photo
+        oc = (min(others) - orient) / span         # how much darker the orientation corner is than the darkest other corner
+        fc = (white - frame) / (white + 1.0)       # how much darker the frame is than the white inside
         if best is None or oc > best[0]:
             best = (oc, fc, k)
     return best
 
 
-def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=1.8, min_frame=2.0):
+def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
     """All stickers found in an RGB photo (uint8), largest first. Empty list when none is found."""
     h, w = rgb.shape[:2]
     s = min(1.0, max_dim / max(h, w))
@@ -219,7 +220,7 @@ def main():
     print(f"{len(found)} sticker(s) found in a {rgb.shape[1]} x {rgb.shape[0]} photo")
     dbg = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     for i, s in enumerate(found):
-        print(f"  #{i}: {s.px_per_mm:.2f} px/mm at the centre, orientation contrast {s.orientation_contrast:.1f}, frame contrast {s.frame_contrast:.1f}")
+        print(f"  #{i}: {s.px_per_mm:.2f} px/mm at the centre, orientation contrast {s.orientation_contrast:.2f}, frame contrast {s.frame_contrast:.2f}")
         cv2.polylines(dbg, [s.corners.astype(np.int32)], True, (0, 255, 0), max(2, rgb.shape[1] // 600))
         cv2.putText(dbg, str(i), tuple(s.corners[0].astype(int)), cv2.FONT_HERSHEY_SIMPLEX, rgb.shape[1] / 1500, (0, 0, 255), 3)
     if a.debug:

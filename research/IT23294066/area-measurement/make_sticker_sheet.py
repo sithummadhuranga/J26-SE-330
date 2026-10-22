@@ -45,10 +45,12 @@ def sticker(d, ox, oy, layout):
         box(d, ox + cx - s / 2, oy + cy - s / 2, ox + cx + s / 2, oy + cy + s / 2, COLOURS[p["name"]])
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out-dir", required=True)
-    args = ap.parse_args()
+STICKER_ORIGINS = [(15 + 60 * c, 15 + 60 * r) for r in range(2) for c in range(3)]
+BAR = {"x": 15.0, "y": 150.0, "length": 100.0}
+
+
+def build_sheet():
+    """Draws the sheet. Returns (PIL image, info) with the sticker origins (mm), the scale bar and the counted shape areas (mm2)."""
     layout = json.loads(LAYOUT.read_text())
     img = Image.new("RGB", (px(A4_MM[0]), px(A4_MM[1])), (255, 255, 255))
     d = ImageDraw.Draw(img)
@@ -56,13 +58,12 @@ def main():
     big = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", px(4.0))
 
     # six stickers, 3 columns x 2 rows
-    for r in range(2):
-        for c in range(3):
-            sticker(d, 15 + 60 * c, 15 + 60 * r, layout)
+    for ox, oy in STICKER_ORIGINS:
+        sticker(d, ox, oy, layout)
 
     # 100 mm scale bar with ticks every 1 mm (2 mm long), 5 mm (4 mm) and 10 mm (6 mm, numbered)
-    x0, y0 = 15.0, 150.0
-    box(d, x0, y0, x0 + 100, y0 + 0.6, (0, 0, 0))
+    x0, y0 = BAR["x"], BAR["y"]
+    box(d, x0, y0, x0 + BAR["length"], y0 + 0.6, (0, 0, 0))
     for i in range(101):
         length = 6 if i % 10 == 0 else 4 if i % 5 == 0 else 2
         box(d, x0 + i - 0.15, y0 - length, x0 + i + 0.15, y0, (0, 0, 0))
@@ -90,7 +91,6 @@ def main():
     d.text((px(70), px(sy + 33)), "circle d 30 mm: %.1f mm2" % a_circ, fill=(0, 0, 0), font=font)
     d.text((px(120), px(sy + 33)), "triangle 40 x 30 mm: %.1f mm2" % a_tri, fill=(0, 0, 0), font=font)
     d.text((px(15), px(sy + 40)), "Areas counted from this file at 100% print size (about 1% tolerance from the printer).", fill=(0, 0, 0), font=font)
-    print("shape areas counted from the file: rectangle %.1f, circle %.1f, triangle %.1f mm2" % (a_rect, a_circ, a_tri))
 
     # instructions
     notes = ["PRINT AT 100% (actual size, NOT 'fit to page'). Use matte paper or matte sticker paper, no gloss.",
@@ -99,6 +99,15 @@ def main():
     for i, t in enumerate(notes):
         d.text((px(15), px(262 + 6 * i)), t, fill=(0, 0, 0), font=font)
 
+    return img, {"origins": list(STICKER_ORIGINS), "bar": dict(BAR), "areas": {"rectangle": a_rect, "circle": a_circ, "triangle": a_tri}}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out-dir", required=True)
+    args = ap.parse_args()
+    img, info = build_sheet()
+    print("shape areas counted from the file:", {k: round(v, 1) for k, v in info["areas"].items()}, "mm2")
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     img.save(out / "sticker_sheet_a4.png", dpi=(DPI, DPI))
