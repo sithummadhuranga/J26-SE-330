@@ -74,9 +74,9 @@ def render(sheet_small, Hmm, gain, wb, blur, noise, rng):
     to_mm = np.array([[1 / SMALL_PPM, 0, 0], [0, 1 / SMALL_PPM, 0], [0, 0, 1]])
     img = cv2.warpPerspective(sheet_small, Hmm @ to_mm, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=BG)
     lin = srgb_lin(img.astype(np.float32) / 255.0) * (gain * np.array(wb, dtype=np.float32))
-    img = np.clip(lin_srgb(lin) * 255.0, 0, 255).astype(np.float32)
     if blur > 0:
-        img = cv2.GaussianBlur(img, (0, 0), blur)
+        lin = cv2.GaussianBlur(np.clip(lin, 0, None).astype(np.float32), (0, 0), blur)   # a lens blurs light, not display values
+    img = np.clip(lin_srgb(lin) * 255.0, 0, 255).astype(np.float32)
     img = np.clip(img + rng.normal(0, noise, img.shape).astype(np.float32), 0, 255).astype(np.uint8)
     ok, enc = cv2.imencode(".jpg", cv2.cvtColor(img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 90])
     return cv2.cvtColor(cv2.imdecode(enc, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)

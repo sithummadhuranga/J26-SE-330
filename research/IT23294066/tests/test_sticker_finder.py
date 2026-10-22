@@ -160,6 +160,42 @@ class FinderTest(unittest.TestCase):
         self.assertEqual(ppms, sorted(ppms, reverse=True))
 
 
+class ScaleBiasTest(unittest.TestCase):
+    """The scale must not depend on how blurry the photo is (a darkness threshold shrinks a blurred black frame)."""
+
+    def mean_scale_error_pct(self, **kw):
+        img, Hmm = photo(ppm=11.0, **kw)
+        found = SF.find_stickers(img)
+        self.assertEqual(len(found), 6)
+        errs = []
+        for s in found:
+            _, (ox, oy) = true_top_left(Hmm, s.corners.mean(axis=0))
+            errs.append(100 * (s.px_per_mm / S.local_ppm(Hmm, ox + 25, oy + 25) - 1))
+        return float(np.mean(errs))
+
+    def test_scale_is_unbiased_for_sharp_and_blurry_photos(self):
+        for blur in (0.8, 1.5, 2.5):
+            for tilt in (0, 30):
+                self.assertLess(abs(self.mean_scale_error_pct(blur=blur, tilt=tilt)), 0.2, f"blur {blur} tilt {tilt}")
+
+    def test_scale_is_unbiased_with_noise_and_rotation(self):
+        self.assertLess(abs(self.mean_scale_error_pct(blur=2.0, noise=6.0, rot=33, tilt=15)), 0.25)
+
+    def test_edge_fit_keeps_the_corners_when_there_is_no_contrast(self):
+        flat = np.full((400, 400), 128, np.uint8)
+        q = np.array([[100, 100], [300, 100], [300, 300], [100, 300]], float)
+        np.testing.assert_allclose(SF._subpixel_corners(flat, q), q)
+
+    def test_edge_fit_moves_a_shrunken_outline_back_to_the_half_level(self):
+        lin = np.full((400, 400), 0.8, np.float32)
+        lin[100:300, 100:300] = 0.01                                            # black square: pixels 100..299, its edges lie at 99.5 and 299.5
+        lin = cv2.GaussianBlur(lin, (0, 0), 2.0)                                # a lens blurs light
+        img = (lin ** (1 / 2.2) * 255).astype(np.uint8)
+        q = np.array([[103, 103], [297, 103], [297, 297], [103, 297]], float)    # a threshold-style outline, 3 px inside
+        out = SF._subpixel_corners(img, q, frame_px=40.0)
+        self.assertLess(np.abs(out - [[99.5, 99.5], [299.5, 99.5], [299.5, 299.5], [99.5, 299.5]]).max(), 0.3)
+
+
 class AreaTest(unittest.TestCase):
     def shape_mask(self, img, name, Hmm):
         m = cv2.morphologyEx(S.red_mask(img), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))

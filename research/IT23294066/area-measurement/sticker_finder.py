@@ -8,6 +8,8 @@ Steps
   1. Mark dark pixels (darker than half of the local average) on a shrunken copy of the photo.
   2. Take dark shapes that have a hole (the frame), turn the outer outline into four corners.
   3. Go back to the full-size photo and fit a straight line to each of the four edges, then intersect them: sub-pixel corners.
+     The edge sits where the light is half way between the black frame and the paper outside (not at a darkness threshold,
+     which makes a blurred sticker look smaller and every area about 1% too large).
   4. Straighten the sticker and check it looks like the sticker (dark frame, bright inside, ONE dark inner corner, the patches where
      the layout puts them). The dark inner corner also tells which way up it is, so the four corners come out in the order they
      are printed. A mirrored sticker (a front camera, a mirrored preview) is rejected: its patches would be in the wrong places.
@@ -30,6 +32,7 @@ SIDE_MM = float(LAYOUT["side_mm"])
 CROP = int(LAYOUT["crop"]["width"])  # the straightened picture is CROP x CROP for the whole printed sticker
 SQ = LAYOUT["orientation_square"]
 FRAME_MM = float(LAYOUT["frame_mm"])
+GAMMA = 2.2  # the edge level is found in linear light: blur mixes light, so the geometric edge is half the light, not half the display value
 
 
 @dataclass
@@ -103,15 +106,69 @@ def _refine(gray_full, q):
             return q
         vx, vy, px, py = cv2.fitLine(pts[sel].astype(np.float32), cv2.DIST_HUBER, 0, 0.01, 0.01).ravel()
         lines.append((np.array([px, py], dtype=np.float64), np.array([vx, vy], dtype=np.float64)))
+    out = _intersect(lines)
+    return q if out is None else _subpixel_corners(gray_full, out)
+
+
+def _intersect(lines):
+    """Corners from four (point, direction) lines in order; None when two neighbours are parallel."""
     out = []
     for i in range(4):
         (p1, d1), (p2, d2) = lines[i - 1], lines[i]
         A = np.array([d1, -d2]).T
         if abs(np.linalg.det(A)) < 1e-6:
-            return q
+            return None
         s = np.linalg.solve(A, p2 - p1)
         out.append(p1 + s[0] * d1)
     return np.array(out)
+
+
+def _subpixel_corners(gray, q, frame_px=None, n_profiles=41, step=0.25, gamma=GAMMA):
+    """Moves the four corners to where the frame's outer edge really is: the half-way level between the black frame and what is
+    outside it, found on brightness profiles across each edge. A darkness threshold sits inside that point on a blurred photo, so
+    it makes the sticker look smaller and every area too large (about 1% at the blur of a phone photo). Returns q when an edge has
+    too little contrast or the fit moves more than a tenth of a side (then the first estimate stays)."""
+    g = (gray.astype(np.float32) / 255.0) ** gamma * 255.0 if gamma != 1.0 else gray.astype(np.float32)
+    c = q.mean(axis=0)
+    lines = []
+    for i in range(4):
+        a, b = q[i], q[(i + 1) % 4]
+        L = np.linalg.norm(b - a)
+        d = (b - a) / L
+        nrm = np.array([-d[1], d[0]])
+        if np.dot(nrm, (a + b) / 2 - c) < 0:
+            nrm = -nrm                                                           # pointing away from the sticker
+        f = frame_px if frame_px is not None else L * FRAME_MM / SIDE_MM         # the frame's width in pixels
+        s = np.arange(-0.8 * f, 0.8 * f, step)
+        t = np.linspace(0.15, 0.85, n_profiles)
+        pts = a[None, :] + t[:, None] * (b - a)[None, :]
+        mx = (pts[:, 0:1] + s[None, :] * nrm[0]).astype(np.float32)
+        my = (pts[:, 1:2] + s[None, :] * nrm[1]).astype(np.float32)
+        prof = cv2.remap(g, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        prof = cv2.blur(prof, (5, 1))
+        inside = np.median(prof[:, (s > -0.7 * f) & (s < -0.3 * f)], axis=1)
+        outside = np.median(prof[:, (s > 0.3 * f) & (s < 0.8 * f)], axis=1)
+        near = np.abs(s) < 0.35 * f
+        good = []
+        for k in range(n_profiles):
+            if outside[k] - inside[k] < 20:
+                continue
+            half = (inside[k] + outside[k]) / 2
+            p = prof[k]
+            idx = np.nonzero((p[:-1] < half) & (p[1:] >= half) & near[:-1])[0]
+            if len(idx) == 0:
+                continue
+            j = idx[np.argmin(np.abs(s[idx]))]
+            x = s[j] + step * (half - p[j]) / max(p[j + 1] - p[j], 1e-6)
+            good.append(pts[k] + x * nrm)
+        if len(good) < 15:
+            return q
+        vx, vy, px, py = cv2.fitLine(np.array(good, dtype=np.float32), cv2.DIST_HUBER, 0, 0.01, 0.01).ravel()
+        lines.append((np.array([px, py], dtype=np.float64), np.array([vx, vy], dtype=np.float64)))
+    out = _intersect(lines)
+    if out is None or np.linalg.norm(out - q, axis=1).max() > 0.1 * np.linalg.norm(q[1] - q[0]):
+        return q
+    return out
 
 
 def _regions(img):

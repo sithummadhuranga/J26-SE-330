@@ -8,6 +8,17 @@ import area_simulation as S
 import make_sticker_sheet as MS
 
 
+class RenderBlurTest(unittest.TestCase):
+    def test_blur_mixes_light_not_display_values(self):
+        """A lens blurs light: the middle of a black-to-white edge is half the light, which is 188 in sRGB, not 128."""
+        sheet = np.zeros((2400, 2000, 3), np.uint8)
+        edge = int(S.P0[0] * S.SMALL_PPM)                                      # the edge runs through the middle of the photo
+        sheet[:, edge:] = 255
+        Hmm = S.pose_homography(0, 0, S.SMALL_PPM)
+        img = S.render(sheet, Hmm, 1.0, (1, 1, 1), 3.0, 0.0, np.random.default_rng(0))
+        self.assertAlmostEqual(float(img[S.H // 2, S.W // 2 - 1:S.W // 2 + 1, 1].mean()), 188, delta=8)   # the pixels either side of the edge
+
+
 class SimulationHelpersTest(unittest.TestCase):
     def test_sticker_origins_match_the_print_sheet(self):
         _, info = MS.build_sheet()
