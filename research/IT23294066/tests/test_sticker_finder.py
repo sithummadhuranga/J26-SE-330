@@ -160,6 +160,92 @@ class FinderTest(unittest.TestCase):
         self.assertEqual(ppms, sorted(ppms, reverse=True))
 
 
+class DiagnoseTest(unittest.TestCase):
+    """diagnose_stickers says WHY no sticker was found, with a fixed code the app can turn into a sentence for the nurse."""
+
+    def one_sticker(self, edit=None, index=0, blur=0.8):
+        """A photo with only one sticker on the sheet; edit(block) may change that sticker's 750 x 750 picture in place."""
+        sheet, info = small_sheet()
+        ox, oy = info["origins"][index]
+        x0, y0 = int(ox * 15), int(oy * 15)
+        only = np.full_like(sheet, 255)
+        only[y0:y0 + 750, x0:x0 + 750] = sheet[y0:y0 + 750, x0:x0 + 750]
+        if edit is not None:
+            only[y0:y0 + 750, x0:x0 + 750] = edit(only[y0:y0 + 750, x0:x0 + 750].copy())
+        Hmm = S.pose_homography(0, 0, 10.0)
+        return S.render(only, Hmm, 1.0, (1, 1, 1), blur, 2.0, np.random.default_rng(1)), Hmm, (x0, y0)
+
+    def test_a_good_photo_has_no_code_and_the_same_stickers_as_find_stickers(self):
+        img, _ = photo()
+        d = SF.diagnose_stickers(img)
+        self.assertIsNone(d.code)
+        self.assertEqual(len(d.stickers), 6)
+        self.assertEqual([s.px_per_mm for s in d.stickers], [s.px_per_mm for s in SF.find_stickers(img)])
+        self.assertGreater(d.best_frame_contrast, 0.7)
+        self.assertGreater(d.best_orientation_contrast, 0.7)
+
+    def test_a_blank_photo_has_no_candidate(self):
+        d = SF.diagnose_stickers(np.full((900, 1200, 3), 140, np.uint8))
+        self.assertEqual((d.stickers, d.code, d.candidates), ([], "no_candidate", 0))
+
+    def test_skin_without_any_frame_has_no_candidate(self):
+        rng = np.random.default_rng(0)
+        skin = np.clip(rng.normal([180, 130, 110], 6, (1200, 1600, 3)), 0, 255).astype(np.uint8)
+        self.assertEqual(SF.diagnose_stickers(skin).code, "no_candidate")
+
+    def test_a_mirrored_sticker_is_called_mirrored_and_not_a_layout_problem(self):
+        img, _, _ = self.one_sticker(lambda b: b[:, ::-1])
+        d = SF.diagnose_stickers(img)
+        self.assertEqual((d.stickers, d.code), ([], "mirrored"))
+
+    def test_a_vertically_flipped_sticker_is_called_mirrored_too(self):
+        img, _, _ = self.one_sticker(lambda b: b[::-1])
+        self.assertEqual(SF.diagnose_stickers(img).code, "mirrored")
+
+    def test_a_whole_photo_seen_in_a_mirror_is_called_mirrored(self):
+        img, _, _ = self.one_sticker()
+        self.assertEqual(SF.diagnose_stickers(img).code, None)
+        self.assertEqual(SF.diagnose_stickers(cv2.flip(img, 1)).code, "mirrored")
+
+    def test_a_frame_without_the_orientation_square_is_weak_orientation(self):
+        def paint_white(b):
+            b[int(5 * 15):int(11 * 15), int(5 * 15):int(11 * 15)] = 255
+            return b
+        img, _, _ = self.one_sticker(paint_white)
+        d = SF.diagnose_stickers(img)
+        self.assertEqual((d.stickers, d.code), ([], "weak_orientation"))
+        self.assertLess(d.best_orientation_contrast, 0.5)
+
+    def test_a_sticker_cut_by_the_photo_edge_is_cut_by_edge(self):
+        img, Hmm, _ = self.one_sticker()
+        c = S.project(Hmm, [[15 + 25, 15 + 25]])[0]                          # the middle of the sticker
+        cut = img[:, int(c[0]):]                                             # cut off its left half
+        self.assertEqual(SF.diagnose_stickers(cut).code, "cut_by_edge")
+
+    def test_codes_come_from_the_contrast_and_layout_results_in_a_fixed_order(self):
+        rc = SF._reject_code
+        self.assertEqual(rc(oc=0.9, fc=0.31, layout=True, transposed=False, min_orient=0.5, min_frame=0.5), "weak_frame_contrast")
+        self.assertEqual(rc(oc=0.2, fc=0.9, layout=True, transposed=False, min_orient=0.5, min_frame=0.5), "weak_orientation")
+        self.assertEqual(rc(oc=0.2, fc=0.3, layout=False, transposed=True, min_orient=0.5, min_frame=0.5), "weak_frame_contrast")
+        self.assertEqual(rc(oc=0.9, fc=0.9, layout=False, transposed=True, min_orient=0.5, min_frame=0.5), "mirrored")
+        self.assertEqual(rc(oc=0.9, fc=0.9, layout=False, transposed=False, min_orient=0.5, min_frame=0.5), "layout_mismatch")
+        self.assertIsNone(rc(oc=0.9, fc=0.9, layout=True, transposed=False, min_orient=0.5, min_frame=0.5))
+
+    def test_contrasts_in_a_diagnosis_stay_between_zero_and_one(self):
+        """With a washed-out frame the black-to-white range is tiny and the raw orientation ratio explodes (seen: 83.9 on a glare photo)."""
+        from unittest import mock
+        img, _, _ = self.one_sticker()
+        canon = np.full((100, 100), 128, np.float32)
+        with mock.patch.object(SF, "_orient", return_value=(83.9, -0.01, 0, canon)):
+            d = SF.diagnose_stickers(img)
+        self.assertEqual(d.code, "weak_frame_contrast")
+        self.assertEqual((d.best_orientation_contrast, d.best_frame_contrast), (1.0, 0.0))
+
+    def test_the_codes_are_the_agreed_list(self):
+        self.assertEqual(SF.REJECT_CODES, ("no_candidate", "cut_by_edge", "weak_frame_contrast", "weak_orientation",
+                                           "layout_mismatch", "mirrored"))
+
+
 class ScaleBiasTest(unittest.TestCase):
     """The scale must not depend on how blurry the photo is (a darkness threshold shrinks a blurred black frame)."""
 

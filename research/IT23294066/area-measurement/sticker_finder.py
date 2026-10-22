@@ -223,18 +223,56 @@ def _layout_ok(canon, max_patch=0.9, min_empty=0.8):
     return max(patches) / white < max_patch and min(swapped) / white > min_empty
 
 
-def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
-    """All stickers found in an RGB photo (uint8), largest first. Empty list when none is found."""
+REJECT_CODES = ("no_candidate", "cut_by_edge", "weak_frame_contrast", "weak_orientation", "layout_mismatch", "mirrored")
+
+
+@dataclass
+class Diagnosis:
+    stickers: list                    # the same list find_stickers gives
+    code: object                      # None when at least one sticker was accepted, else one of REJECT_CODES
+    best_frame_contrast: float        # the best of the candidates that were looked at closely (0 when there were none)
+    best_orientation_contrast: float
+    candidates: int                   # how many frame-like shapes were looked at closely
+
+
+def _reject_code(oc, fc, layout, transposed, min_orient, min_frame):
+    """Why one frame-like shape was turned down, in a fixed order: a faint frame first (glare, shadow), then a missing or doubled
+    orientation square, then the patch layout. If the layout only fits with x and y swapped, the sticker is mirrored (the fix for
+    the nurse is different: use the rear camera). None when the shape is accepted."""
+    if fc < min_frame:
+        return "weak_frame_contrast"
+    if oc < min_orient:
+        return "weak_orientation"
+    if not layout:
+        return "mirrored" if transposed else "layout_mismatch"
+    return None
+
+
+def _touches_border_dark(dark, min_side):
+    """True when a big dark shape touches the edge of the photo: a frame that is cut off."""
+    cs, _ = cv2.findContours(dark, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    H, W = dark.shape[:2]
+    for c in cs:
+        if cv2.contourArea(c) < min_side ** 2:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        if x <= 1 or y <= 1 or x + w >= W - 1 or y + h >= H - 1:
+            return True
+    return False
+
+
+def _scan(rgb, side_mm, max_dim, min_orient, min_frame):
+    """Everything find_stickers does, plus a note for every frame-like shape that was turned down: (area, code, oc, fc)."""
     h, w = rgb.shape[:2]
     s = min(1.0, max_dim / max(h, w))
     gray_full = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     small = cv2.resize(gray_full, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else gray_full
     dark = _dark_mask(cv2.GaussianBlur(small, (3, 3), 0))
     cs, hier = cv2.findContours(dark, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
-    out = []
-    if hier is None:
-        return out
+    out, notes = [], []
     min_side = 0.04 * max(small.shape)
+    if hier is None:
+        return out, notes, dark, min_side
     for i, c in enumerate(cs):
         if hier[0][i][3] != -1 or hier[0][i][2] == -1 or cv2.contourArea(c) < min_side ** 2:
             continue
@@ -245,8 +283,12 @@ def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=
         q = _order_clockwise(_refine(gray_full, q))
         blur = cv2.GaussianBlur(gray_full, (0, 0), max(0.5, 0.6 * np.linalg.norm(q[0] - q[1]) / 100))
         oc, fc, k, canon = _orient(blur, q)
-        if oc < min_orient or fc < min_frame or not _layout_ok(canon):
+        layout = _layout_ok(canon)
+        code = _reject_code(oc, fc, layout, False if layout else _layout_ok(canon.T), min_orient, min_frame)
+        if code is not None:
+            notes.append((float(cv2.contourArea(c)), code, float(oc), float(fc)))
             continue
+        notes.append((float(cv2.contourArea(c)), None, float(oc), float(fc)))
         q = np.roll(q, -k, axis=0)
         mm = np.array([[0, 0], [side_mm, 0], [side_mm, side_mm], [0, side_mm]], dtype=np.float32)
         H = cv2.getPerspectiveTransform(mm, q.astype(np.float32)).astype(np.float64)
@@ -259,7 +301,31 @@ def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=
         f = f if f < 0.95 else 1.0
         crop = cv2.warpPerspective(src, cv2.getPerspectiveTransform((q * f).astype(np.float32), dstc), (CROP, CROP), flags=cv2.INTER_LINEAR)
         out.append(Sticker(q, H, ppm, crop, float(oc), float(fc)))
-    return sorted(out, key=lambda t: -t.px_per_mm)
+    return sorted(out, key=lambda t: -t.px_per_mm), notes, dark, min_side
+
+
+def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
+    """All stickers found in an RGB photo (uint8), largest first. Empty list when none is found."""
+    return _scan(rgb, side_mm, max_dim, min_orient, min_frame)[0]
+
+
+def diagnose_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
+    """find_stickers plus the reason when it finds nothing: a Diagnosis whose code is None if at least one sticker was accepted,
+    otherwise the code of the most prominent (largest) frame-like shape that was turned down, or 'cut_by_edge' / 'no_candidate'
+    when there was none."""
+    out, notes, dark, min_side = _scan(rgb, side_mm, max_dim, min_orient, min_frame)
+    best_fc = min(max(max((n[3] for n in notes), default=0.0), 0.0), 1.0)      # kept in 0..1: with a washed-out frame the raw ratio explodes
+    best_oc = min(max(max((n[2] for n in notes), default=0.0), 0.0), 1.0)
+    if out:
+        return Diagnosis(out, None, best_fc, best_oc, len(notes))
+    rejected = [n for n in notes if n[1] is not None]
+    if rejected:
+        code = max(rejected, key=lambda n: n[0])[1]
+    elif _touches_border_dark(dark, min_side):
+        code = "cut_by_edge"
+    else:
+        code = "no_candidate"
+    return Diagnosis(out, code, best_fc, best_oc, len(notes))
 
 
 def area_mm2(mask, sticker, res=0.1):
