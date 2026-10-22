@@ -66,7 +66,8 @@ class MeasurementResult {
     required this.timingsMs,
   });
 
-  /// The 640x480 picture that was segmented (calibrated if calibration worked), with the scale back to the photo.
+  /// The 640x480 picture the colour regions were read from (calibrated if calibration worked), with the scale back to the photo. The
+  /// model was given the uncalibrated picture; both have the same geometry, so the mask fits either.
   final PreparedImage image;
   final WoundSegmentation segmentation;
   final List<ColourRegion> colourRegions;
@@ -138,8 +139,9 @@ class MeasurementPipeline {
       calibration = _calibrate(rgba, width, height, notes, markerRgb);
       timings['calibration'] = _lap(clock);
       image = prepareImage(calibration?.rgba ?? rgba, width, height);
+      final raw = calibration == null ? image : prepareImage(rgba, width, height); // the model sees the photo as the camera made it
       timings['prepare'] = _lap(clock);
-      return _finish(image, calibration, scale, notes, timings, clock);
+      return _finish(raw, image, calibration, scale, notes, timings, clock);
     }
     image = prepareImage(rgba, width, height);
     timings['prepare'] = _lap(clock);
@@ -177,10 +179,13 @@ class MeasurementPipeline {
         );
       }
     }
-    return _finish(image, calibration, scale, notes, timings, clock);
+    return _finish(prepared, image, calibration, scale, notes, timings, clock);
   }
 
+  /// [raw] is what the wound model is given (it was trained on photos as the camera made them, and calibration did not improve it);
+  /// [image] is the calibrated picture (the same as [raw] when there is no calibration) that the colour regions are read from.
   MeasurementResult _finish(
+    PreparedImage raw,
     PreparedImage image,
     CalibrationResult? calibration,
     PlaneScale? scale,
@@ -188,7 +193,7 @@ class MeasurementPipeline {
     Map<String, double> timings,
     Stopwatch clock,
   ) {
-    final segmentation = segmenter.segment(rgbaToModelInput(image.rgba, kInputW, kInputH), conf: confidence);
+    final segmentation = segmenter.segment(rgbaToModelInput(raw.rgba, kInputW, kInputH), conf: confidence);
     timings['segmentation'] = _lap(clock);
     final regions = colourRegions(image.rgba, segmentation.mask);
     timings['colour'] = _lap(clock);

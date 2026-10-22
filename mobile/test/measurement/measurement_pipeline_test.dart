@@ -114,10 +114,13 @@ void main() {
     expect(WoundEventValidator.validate(event), isEmpty);
   });
 
-  test('the segmenter gets the calibrated picture', () {
-    final seg = FakeSegmenter(mask: blob(), found: true);
-    pipeline(seg, c: FakeCalibrator()).analyze(photo, 1280, 960);
-    expect(seg.lastInput![0], closeTo(75 / 255, 1e-6)); // red plane, first pixel
+  test('the segmenter gets the ORIGINAL picture (the model was trained on raw photos); the calibrated one is for the colours', () {
+    for (final on in CalibrationInput.values) {
+      final seg = FakeSegmenter(mask: blob(), found: true);
+      final result = pipeline(seg, c: FakeCalibrator(), on: on).analyze(photo, 1280, 960);
+      expect(seg.lastInput![0], closeTo(180 / 255, 1e-6), reason: '$on: red plane, first pixel, as the camera made it');
+      expect(result.colourRegions[0].centre, [75.0, 90.0, 60.0], reason: '$on: the colour regions come from the calibrated picture');
+    }
   });
 
   test('calibration can work on the original photo or on the 640x480 copy', () {

@@ -114,7 +114,7 @@ class _AssessmentDetailScreenState extends State<AssessmentDetailScreen> {
                       fit: StackFit.expand,
                       children: [
                         if (real != null)
-                          AssessmentPhoto(store: widget.services.media, assessmentId: v.assessmentId, showOutline: _segmentation, cacheWidth: 1400)
+                          AssessmentPhoto(store: widget.services.media, assessmentId: v.assessmentId, showOutline: _segmentation, cacheWidth: 1400, fit: BoxFit.contain)
                         else
                           WoundIllustration(seed: v.assessmentId.hashCode),
                         // Without a kept photo (the prototype, or another phone) the outline is the stand-in drawing.

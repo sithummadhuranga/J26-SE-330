@@ -56,6 +56,13 @@ void main() {
     expect(find.byType(Image), findsNothing);
   });
 
+  testWidgets('a photo shown in full is not cropped: BoxFit.contain when asked, so the whole wound is visible', (tester) async {
+    await show(tester, AssessmentPhoto(store: MemoryMediaStore(), assessmentId: 'a', bytes: png, fit: BoxFit.contain));
+    expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.contain);
+    await show(tester, AssessmentPhoto(store: MemoryMediaStore(), assessmentId: 'a', bytes: png));
+    expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.cover, reason: 'thumbnails still fill their square');
+  });
+
   testWidgets('the wound outline is drawn only when asked and only when there is one', (tester) async {
     final store = MemoryMediaStore();
     await store.save('c', png, _outline());

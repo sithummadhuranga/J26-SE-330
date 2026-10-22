@@ -2,6 +2,7 @@ name: migration-check
 
 on:
   pull_request:
+    branches: [develop, main]
     paths: ["db/**", "backend/tools/db-migrator/**"]
 
 jobs:

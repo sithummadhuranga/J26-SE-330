@@ -240,6 +240,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 store: widget.services.media,
                 assessmentId: widget.draft.assessmentId,
                 bytes: widget.draft.capture.imageBytes,
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 16),

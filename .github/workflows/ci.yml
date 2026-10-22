@@ -1,11 +1,27 @@
 name: ci
 
+# Branch flow: everyone opens a pull request into `develop`. After it has been tested there, `develop` is promoted to `main` with
+# one pull request (develop -> main). These tests run on every pull request into either branch and on every push to either, so a
+# promotion is tested again on the exact commits that reach `main`.
 on:
   pull_request:
+    branches: [develop, main]
   push:
-    branches: [main]
+    branches: [develop, main]
 
 jobs:
+  # Only `develop` (or an urgent `hotfix/...` branch) may be merged into `main`; everything else goes into `develop` first.
+  promotion-rule:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull requests into main must come from develop
+        run: |
+          case "${{ github.head_ref }}" in
+            develop|hotfix/*) echo "ok: ${{ github.head_ref }} -> main" ;;
+            *) echo "::error::Open your pull request into develop. Only develop (or hotfix/...) may be merged into main."; exit 1 ;;
+          esac
+
   backend:
     runs-on: ubuntu-latest
     steps:

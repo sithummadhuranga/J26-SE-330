@@ -92,6 +92,7 @@ class AssessmentPhoto extends StatelessWidget {
     this.borderRadius = WoundRadii.m,
     this.showOutline = false,
     this.cacheWidth = 900,
+    this.fit = BoxFit.cover,
   });
 
   final MediaStore store;
@@ -100,6 +101,9 @@ class AssessmentPhoto extends StatelessWidget {
   final double borderRadius;
   final bool showOutline;
   final int cacheWidth;
+
+  /// How the photo fills its box: cropped to fill (thumbnails) or shown whole ([BoxFit.contain], where the wound must be visible).
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +125,7 @@ class AssessmentPhoto extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // With an outline the whole photo must show, so the outline lands on the wound; without one a thumbnail may be cropped.
-        Image.memory(photo, fit: outline == null ? BoxFit.cover : BoxFit.contain, cacheWidth: cacheWidth, gaplessPlayback: true),
+        Image.memory(photo, fit: outline == null ? fit : BoxFit.contain, cacheWidth: cacheWidth, gaplessPlayback: true),
         if (outline != null)
           CustomPaint(
             key: const Key('woundOutline'),
