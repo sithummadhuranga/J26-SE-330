@@ -20,11 +20,10 @@ class CodeJudgement {
   final List<String> findings;
 }
 
-/// All codes in the agreed order (Color Matric's `quality.TABLE_ORDER`): the finder's six, the sticker's colour patches' six, skin.
+/// All codes in the agreed order, copied from Color Matric's `quality.TABLE_ORDER` (a test compares it with his vectors file).
 const kTableOrder = [
   'no_candidate', 'cut_by_edge', 'weak_frame_contrast', 'weak_orientation', 'layout_mismatch', 'mirrored',
-  'grey_clipped', 'grey_not_uniform', 'grey_not_neutral', 'grey_gain_out_of_range', 'skin_patch_off', 'crop_invalid',
-  'too_few_skin_pixels',
+  'crop_invalid', 'grey_clipped', 'grey_not_uniform', 'grey_not_neutral', 'grey_gain_out_of_range', 'skin_patch_off', 'too_few_skin_pixels',
 ];
 
 /// A sticker that cannot be found or read means retake (there is no scale). Everything else only warns: the scale comes from the

@@ -99,6 +99,8 @@ void main() {
       final list = raw is List ? raw : (raw['cases'] ?? raw['vectors']) as dynamic;
       final cases = list is Map ? list.values.toList() : list as List;
       expect(cases.length, greaterThanOrEqualTo(20));
+      if (raw is Map && raw['table_order'] != null) expect(raw['table_order'], kTableOrder, reason: 'the two sides use one order');
+      if (raw is Map && raw['min_skin_pixels'] != null) expect(raw['min_skin_pixels'], kMinSkinPixels);
       for (final c in cases) {
         final input = (c['input'] ?? c) as Map<String, dynamic>;
         final want = (c['expected'] ?? c['output'] ?? c) as Map<String, dynamic>;
