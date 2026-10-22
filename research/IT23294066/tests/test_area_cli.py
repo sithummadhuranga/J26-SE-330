@@ -57,6 +57,8 @@ class PhotoCliTest(unittest.TestCase):
             self.assertIn(kind, text)
         self.assertIn("All shapes: |error| median", text)
         self.assertIn("3 measurements", text)
+        self.assertEqual(text.count("| edge coverage"), 3)                   # one per shape: the reported figure
+        self.assertIn("with edge coverage", text)
         self.assertTrue(os.path.exists(os.path.join(self.dir, "d", "sheet_debug.jpg")))
 
     def test_an_unreadable_file_is_reported_not_a_crash(self):

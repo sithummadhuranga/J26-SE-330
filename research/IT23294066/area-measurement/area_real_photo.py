@@ -93,7 +93,7 @@ def main():
     ap.add_argument("--sheet", type=int, choices=(1, 2), default=1, help="which printed sheet: 1 (first) or 2 (shapes between two rows of stickers)")
     ap.add_argument("--debug-dir")
     a = ap.parse_args()
-    all_hom, all_uni = [], []
+    all_soft, all_uni = [], []
     truth = TRUTH
     if a.sheet == 2:
         import make_sticker_sheet
@@ -110,15 +110,15 @@ def main():
         for s_ in stickers:
             cv2.polylines(dbg, [s_.corners.astype(np.int32)], True, (0, 255, 0), max(2, rgb.shape[1] // 600))
         for r in rows:
-            all_hom.append(abs(r["hom_pct"])); all_uni.append(abs(r["uni_pct"]))
-            print(f"  {r['kind']:9s} printed {r['printed']:7.1f} mm2 | homography {r['hom']:7.1f} ({r['hom_pct']:+.1f}%) | one scale {r['uni']:7.1f} ({r['uni_pct']:+.1f}%)")
+            all_soft.append(abs(r["soft_pct"])); all_uni.append(abs(r["uni_pct"]))
+            print(f"  {r['kind']:9s} printed {r['printed']:7.1f} mm2 | edge coverage {r['soft']:7.1f} ({r['soft_pct']:+.1f}%) | hard threshold {r['hom']:7.1f} ({r['hom_pct']:+.1f}%) | one scale {r['uni']:7.1f} ({r['uni_pct']:+.1f}%)")
             cv2.drawContours(dbg, [r["contour"]], -1, (255, 0, 0), max(2, rgb.shape[1] // 800))
         if a.debug_dir:
             Path(a.debug_dir).mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(Path(a.debug_dir) / (Path(path).stem + "_debug.jpg")), dbg)
-    if all_hom:
-        print(f"\nAll shapes: |error| median {np.median(all_hom):.2f}% (max {max(all_hom):.2f}%) with the homography, "
-              f"{np.median(all_uni):.2f}% (max {max(all_uni):.2f}%) with one scale; {len(all_hom)} measurements")
+    if all_soft:
+        print(f"\nAll shapes: |error| median {np.median(all_soft):.2f}% (max {max(all_soft):.2f}%) with edge coverage and the sticker, "
+              f"{np.median(all_uni):.2f}% (max {max(all_uni):.2f}%) with one scale; {len(all_soft)} measurements")
 
 
 if __name__ == "__main__":
