@@ -75,6 +75,103 @@ class StickerSheetTest(unittest.TestCase):
         self.assertAlmostEqual(h / 72 * 25.4, 297.0, delta=0.1)
 
 
+class SheetV2Test(unittest.TestCase):
+    """Sheet v2: the shapes sit between two rows of stickers (about 20-30 mm from each row), as a wound would sit next to a sticker,
+    and there are places for a ten rupee coin."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.img, cls.info = MS.build_sheet_v2()
+        cls.arr = np.array(cls.img)
+
+    def test_page_is_a4_at_600_dpi(self):
+        self.assertEqual(self.img.size, (4961, 7016))
+
+    def test_two_rows_of_three_stickers_with_a_free_band_between(self):
+        self.assertEqual(self.info["origins"], [(15, 15), (75, 15), (135, 15), (15, 135), (75, 135), (135, 135)])
+        for ox, oy in self.info["origins"]:
+            self.assertTrue((self.arr[int((oy + 2.5) * PPM), int((ox + 25) * PPM)] == 0).all())      # frame
+            self.assertTrue((self.arr[int((oy + 40) * PPM), int((ox + 25) * PPM)] == 255).all())     # white inside
+            self.assertTrue((self.arr[int((oy + 8) * PPM), int((ox + 8) * PPM)] == 0).all())         # orientation square
+        gap = self.arr[int(66 * PPM):int(86 * PPM)]
+        self.assertFalse(((gap.sum(axis=2) < 30)).any(), "nothing black between the upper stickers and the shapes")
+
+    def test_every_shape_is_close_to_a_sticker_row_on_both_sides(self):
+        for name, (x0, y0, x1, y1) in self.info["shape_boxes"].items():
+            self.assertGreaterEqual(y0 - 65, 15, name)
+            self.assertLessEqual(y0 - 65, 30, name)              # gap to the bottom edge of the upper stickers
+            self.assertLessEqual(135 - y1, 30, name)             # gap to the top edge of the lower stickers
+
+    def test_shape_areas_are_counted_from_the_file(self):
+        a = self.info["areas"]
+        self.assertAlmostEqual(a["rectangle"], 1000.0, delta=3.0)
+        self.assertAlmostEqual(a["circle"], math_pi_r2(15.0), delta=0.02 * math_pi_r2(15.0))
+        self.assertAlmostEqual(a["triangle"], 600.0, delta=0.01 * 600.0)
+        red = (self.arr[:, :, 0] > 150) & (self.arr[:, :, 1] < 80) & (self.arr[:, :, 2] < 80)
+        self.assertAlmostEqual(red.sum() / PPM ** 2, sum(a.values()), delta=2.0)     # nothing else on the page is red
+
+    def test_shapes_do_not_touch_each_other_or_the_stickers(self):
+        boxes = list(self.info["shape_boxes"].values())
+        for i, (a, b) in enumerate(((boxes[i], boxes[j]) for i in range(3) for j in range(i + 1, 3))):
+            self.assertTrue(a[2] + 5 <= b[0] or b[2] + 5 <= a[0], "shapes at least 5 mm apart in x")
+
+    def test_coin_rings_are_thin_grey_circles_a_little_wider_than_the_coin(self):
+        rings = self.info["coin_rings"]
+        self.assertGreaterEqual(len(rings), 3)
+        for cx, cy, d in rings:
+            self.assertAlmostEqual(d, MS.COIN_RING_MM, delta=1e-6)
+            self.assertGreater(d, MS.COIN_DIAMETER_MM + 0.8)                                      # room to place the coin
+            r = d / 2
+            on = self.arr[int(round(cy * PPM)), int(round((cx + r + 0.15) * PPM))]                # the middle of the 0.3 mm line
+            self.assertTrue((on > 120).all() and (on < 215).all(), "ring is mid grey, not black: the finder must not see it")
+            self.assertTrue((self.arr[int(cy * PPM), int(cx * PPM)] == 255).all(), "inside the ring is empty paper")
+            self.assertTrue((self.arr[int(cy * PPM), int((cx + r + 2) * PPM)] == 255).all(), "outside the ring is empty paper")
+            self.assertTrue((self.arr[int(cy * PPM), int((cx + r - 0.3) * PPM)] == 255).all(), "the room inside the line is empty paper")
+            row = self.arr[int(round(cy * PPM)), :, 0]
+            xs = np.where(row[int((cx - r - 1) * PPM):int((cx + r + 1) * PPM)] < 215)[0]
+            self.assertAlmostEqual((xs.max() - xs.min()) / PPM, d + 0.6, delta=0.3)               # outer width of the ring line
+
+    def test_one_coin_ring_is_near_the_stickers_and_two_are_far_from_them(self):
+        def edge_gap(cx, cy, ox, oy):
+            return max(ox - cx, cx - (ox + 50), oy - cy, cy - (oy + 50), 0)        # distance from the ring centre to the sticker square (rows are far apart: good enough)
+        d = [min(edge_gap(cx, cy, ox, oy) for ox, oy in self.info["origins"]) for cx, cy, _ in self.info["coin_rings"]]
+        self.assertLess(min(d), 45)
+        self.assertGreater(sorted(d)[-2], 50)
+
+    def test_scale_bar_is_100_mm(self):
+        bar = self.info["bar"]
+        row = self.arr[int((bar["y"] + 0.3) * PPM)]
+        black = np.where(row.sum(axis=1) < 30)[0]
+        black = black[(black >= int((bar["x"] - 1) * PPM)) & (black <= int((bar["x"] + 101) * PPM))]
+        self.assertAlmostEqual((black.max() + 1 - black.min()) / PPM, 100.0, delta=0.1)
+
+    def test_the_old_sheet_is_unchanged(self):
+        _, info = MS.build_sheet()
+        self.assertEqual(info["origins"], [(15, 15), (75, 15), (135, 15), (15, 75), (75, 75), (135, 75)])
+
+    def test_the_texts_under_the_shapes_do_not_overlap_each_other_or_the_stickers(self):
+        boxes = self.info["label_boxes"]                       # (x0, y0, x1, y1) in mm
+        self.assertEqual(len(boxes), 3)
+        for i in range(3):
+            for j in range(i + 1, 3):
+                a, b = boxes[i], boxes[j]
+                self.assertTrue(a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], f"labels {i} and {j} overlap")
+            self.assertLess(boxes[i][3], 135 - 2, "label stays clear of the lower stickers")
+
+    def test_command_line_writes_the_v2_files(self):
+        import sys, tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            old = sys.argv
+            sys.argv = ["make_sticker_sheet.py", "--out-dir", d, "--layout", "2"]
+            try:
+                MS.main()
+            finally:
+                sys.argv = old
+            self.assertTrue((Path(d) / "sticker_sheet_v2_a4.pdf").exists())
+            self.assertTrue((Path(d) / "sticker_sheet_v2_a4.png").exists())
+
+
 def math_pi_r2(r):
     import math
     return math.pi * r * r

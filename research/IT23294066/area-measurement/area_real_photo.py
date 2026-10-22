@@ -60,11 +60,12 @@ def shape_alpha(rgb, contour):
     return (np.clip((red - paper) / (fill - paper), 0, 1) * near).astype(np.float32)
 
 
-def measure_photo(rgb, side_mm):
+def measure_photo(rgb, side_mm, truth=None):
     """Stickers found in an RGB photo and, for each red shape, its area with the homography (hard mask: hom, and soft coverage:
     soft, the better one) and with one scale (uni). Returns (stickers, rows); each row: kind, printed, hom, soft, uni (mm2),
-    hom_pct, soft_pct, uni_pct (errors in %), contour."""
-    stickers =SF.find_stickers(rgb, side_mm)
+    hom_pct, soft_pct, uni_pct (errors in %), contour. truth: printed area per shape (default: the first sheet's)."""
+    truth = truth or TRUTH
+    stickers = SF.find_stickers(rgb, side_mm)
     rows = []
     if not stickers:
         return stickers, rows
@@ -80,8 +81,8 @@ def measure_photo(rgb, side_mm):
         st = min(stickers, key=lambda t: np.linalg.norm(t.corners.mean(axis=0) - ctr))
         hom, uni = SF.area_mm2(mask, st), SF.area_uniform_mm2(mask, st)
         soft = SF.area_mm2(shape_alpha(rgb, c), st)
-        rows.append(dict(kind=kind, printed=TRUTH[kind], hom=hom, soft=soft, uni=uni, hom_pct=100 * (hom - TRUTH[kind]) / TRUTH[kind],
-                         soft_pct=100 * (soft - TRUTH[kind]) / TRUTH[kind], uni_pct=100 * (uni - TRUTH[kind]) / TRUTH[kind], contour=c))
+        rows.append(dict(kind=kind, printed=truth[kind], hom=hom, soft=soft, uni=uni, hom_pct=100 * (hom - truth[kind]) / truth[kind],
+                         soft_pct=100 * (soft - truth[kind]) / truth[kind], uni_pct=100 * (uni - truth[kind]) / truth[kind], contour=c))
     return stickers, rows
 
 
@@ -89,15 +90,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("photos", nargs="+")
     ap.add_argument("--side-mm", type=float, default=SF.SIDE_MM)
+    ap.add_argument("--sheet", type=int, choices=(1, 2), default=1, help="which printed sheet: 1 (first) or 2 (shapes between two rows of stickers)")
     ap.add_argument("--debug-dir")
     a = ap.parse_args()
     all_hom, all_uni = [], []
+    truth = TRUTH
+    if a.sheet == 2:
+        import make_sticker_sheet
+        truth = make_sticker_sheet.build_sheet_v2()[1]["areas"]
     for path in a.photos:
         bgr = cv2.imread(path)
         if bgr is None:
             print(path, ": cannot read"); continue
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        stickers, rows = measure_photo(rgb, a.side_mm)
+        stickers, rows = measure_photo(rgb, a.side_mm, truth)
         print(f"\n{Path(path).name}: {rgb.shape[1]} x {rgb.shape[0]}, {len(stickers)} sticker(s) found" + (
             f", {min(s.px_per_mm for s in stickers):.1f}-{max(s.px_per_mm for s in stickers):.1f} px/mm" if stickers else ""))
         dbg = bgr.copy()

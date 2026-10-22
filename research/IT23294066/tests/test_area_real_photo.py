@@ -5,6 +5,8 @@ import numpy as np
 
 import common  # noqa: F401
 import area_real_photo as R
+import area_simulation as S
+import make_sticker_sheet as MS
 from test_sticker_finder import photo
 
 
@@ -68,6 +70,35 @@ class ShapeAlphaTest(unittest.TestCase):
         a = R.shape_alpha(img, c)
         self.assertEqual(a.shape, (200, 200))
         self.assertEqual(set(np.unique(a)), {0.0, 1.0})
+
+
+_v2 = None
+
+
+def v2_photo(tilt=0.0, rot=0.0, ppm=9.0, blur=1.0):
+    """A simulated photo of sheet v2 and the areas counted from its file."""
+    global _v2
+    if _v2 is None:
+        big, info = MS.build_sheet_v2()
+        q = S.SMALL_PPM / MS.PX_PER_MM
+        _v2 = (cv2.resize(np.array(big), None, fx=q, fy=q, interpolation=cv2.INTER_AREA), info)
+    sheet, info = _v2
+    return S.render(sheet, S.pose_homography(tilt, rot, ppm), 1.0, (1, 1, 1), blur, 1.5, np.random.default_rng(3)), info
+
+
+class SheetV2PhotoTest(unittest.TestCase):
+    def test_all_six_stickers_are_found_and_the_coin_rings_are_not_taken_for_stickers(self):
+        for tilt in (0, 25):
+            img, _ = v2_photo(tilt=tilt, rot=15)
+            self.assertEqual(len(R.SF.find_stickers(img)), 6, f"tilt {tilt}")
+
+    def test_areas_are_measured_against_the_truth_of_that_sheet(self):
+        img, info = v2_photo(tilt=25, rot=15)
+        stickers, rows = R.measure_photo(img, 50.0, truth=info["areas"])
+        self.assertEqual({r["kind"] for r in rows}, {"rectangle", "circle", "triangle"})
+        for r in rows:
+            self.assertEqual(r["printed"], info["areas"][r["kind"]])
+            self.assertLess(abs(r["soft_pct"]), 2.5, r["kind"])
 
 
 class MeasurePhotoTest(unittest.TestCase):
