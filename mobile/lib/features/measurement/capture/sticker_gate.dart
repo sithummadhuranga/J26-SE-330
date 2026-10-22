@@ -29,7 +29,7 @@ class GateSticker {
 
   final List<(double, double)> corners;
 
-  /// Roughly the pixels per mm along the sides. Good enough for a quality check, not for measuring.
+  /// Pixels per mm at the middle of the sticker (from its four corners).
   final double pxPerMm;
   final double orientationContrast;
   final double frameContrast;
@@ -113,7 +113,8 @@ GateScan diagnoseStickers(
   double minOrient = 0.5,
   double minFrame = 0.5,
 }) {
-  final (small, w, h, scale) = shrinkGray(toGray(rgba, width, height), width, height, maxDim);
+  final fullGray = toGray(rgba, width, height);
+  final (small, w, h, scale) = shrinkGray(fullGray, width, height, maxDim);
   final scan = _Scan(small, w, h);
   final strict = scan.run(minOrient, minFrame, lenient: false);
   var notes = strict.notes;
@@ -123,12 +124,18 @@ GateScan diagnoseStickers(
   final bestOc = clamp01(notes.fold(0.0, (a, n) => math.max(a, n.oc)));
   GateSticker toPhoto(_Hit s) {
     (double, double) back((double, double) p) => ((p.$1 + 0.5) / scale - 0.5, (p.$2 + 0.5) / scale - 0.5);
-    final c = [for (final p in s.corners) back(p)];
-    var side = 0.0;
-    for (var i = 0; i < 4; i++) {
-      side += _len(c[i], c[(i + 1) % 4]);
+    // The corners found on the shrunken picture are good to a few pixels; the edge fit on the full-size photo makes them exact.
+    final c = _subpixelCorners(fullGray, width, height, [for (final p in s.corners) back(p)]);
+    // Pixels per mm at the middle of the sticker, from the perspective map (what the Python finder calls px_per_mm).
+    final hm = _homography(const [(0.0, 0.0), (_sideMm, 0.0), (_sideMm, _sideMm), (0.0, _sideMm)], c);
+    (double, double) at(double x, double y) {
+      final d = hm[6] * x + hm[7] * y + hm[8];
+      return ((hm[0] * x + hm[1] * y + hm[2]) / d, (hm[3] * x + hm[4] * y + hm[5]) / d);
     }
-    return GateSticker(c, side / 4 / _sideMm, s.oc, s.fc);
+
+    final p0 = at(_sideMm / 2, _sideMm / 2), p1 = at(_sideMm / 2 + 1, _sideMm / 2), p2 = at(_sideMm / 2, _sideMm / 2 + 1);
+    final ppm = math.sqrt(((p1.$1 - p0.$1) * (p2.$2 - p0.$2) - (p2.$1 - p0.$1) * (p1.$2 - p0.$2)).abs());
+    return GateSticker(c, ppm, s.oc, s.fc);
   }
 
   final stickers = [for (final s in strict.stickers) toPhoto(s)]..sort((a, b) => b.pxPerMm.compareTo(a.pxPerMm));
@@ -170,6 +177,116 @@ Uint8List straightenSticker(Uint8List rgba, int width, int height, GateSticker s
     }
   }
   return out;
+}
+
+/// Moves the four corners (photo pixels, in order around the sticker) to where the frame's outer edge really is: the half-way
+/// light between the black frame and what is outside it, found on 41 brightness profiles across each edge, a line through those
+/// points, and the lines' intersections. A darkness threshold sits inside that point on a blurred photo, so it makes the sticker
+/// look smaller and every area too large. The level is found in linear light (blur mixes light). Returns [q] when an edge has too
+/// little contrast or the fit moves a corner by more than a tenth of a side. Same method as `_subpixel_corners` in the Python finder.
+List<(double, double)> _subpixelCorners(Uint8List gray, int w, int h, List<(double, double)> q) {
+  const profiles = 41;
+  const step = 0.25;
+  final cx = q.fold(0.0, (a, p) => a + p.$1) / 4, cy = q.fold(0.0, (a, p) => a + p.$2) / 4;
+  final lines = <(double, double, double, double)>[]; // point x, y and direction x, y
+  for (var i = 0; i < 4; i++) {
+    final a = q[i], b = q[(i + 1) % 4];
+    final len = _len(a, b);
+    final dx = (b.$1 - a.$1) / len, dy = (b.$2 - a.$2) / len;
+    var nx = -dy, ny = dx;
+    if (nx * ((a.$1 + b.$1) / 2 - cx) + ny * ((a.$2 + b.$2) / 2 - cy) < 0) {
+      nx = -nx;
+      ny = -ny; // pointing away from the sticker
+    }
+    final f = len * _frameMm / _sideMm; // the frame's width in pixels
+    final steps = ((1.6 * f) / step).floor();
+    final sAt = List<double>.generate(steps, (k) => -0.8 * f + k * step);
+    final pts = <(double, double)>[];
+    for (var m = 0; m < profiles; m++) {
+      final t = 0.15 + 0.7 * m / (profiles - 1);
+      final px = a.$1 + t * (b.$1 - a.$1), py = a.$2 + t * (b.$2 - a.$2);
+      // brightness along the normal, in linear light, smoothed over 5 samples
+      final raw = Float64List(steps);
+      for (var k = 0; k < steps; k++) {
+        final v = _bilinear(gray, w, h, px + sAt[k] * nx, py + sAt[k] * ny) / 255.0;
+        raw[k] = math.pow(v, 2.2).toDouble() * 255.0;
+      }
+      final p = Float64List(steps);
+      for (var k = 0; k < steps; k++) {
+        var sum = 0.0;
+        for (var d = -2; d <= 2; d++) {
+          sum += raw[math.min(math.max(k + d, 0), steps - 1)];
+        }
+        p[k] = sum / 5;
+      }
+      double median(double from, double to) {
+        final v = <double>[for (var k = 0; k < steps; k++) if (sAt[k] > from && sAt[k] < to) p[k]]..sort();
+        return v.isEmpty ? 0 : v[v.length ~/ 2];
+      }
+
+      final inside = median(-0.7 * f, -0.3 * f), outside = median(0.3 * f, 0.8 * f);
+      if (outside - inside < 20) continue;
+      final half = (inside + outside) / 2;
+      int? best;
+      for (var k = 0; k < steps - 1; k++) {
+        if (sAt[k].abs() < 0.35 * f && p[k] < half && p[k + 1] >= half && (best == null || sAt[k].abs() < sAt[best].abs())) best = k;
+      }
+      if (best == null) continue;
+      final x = sAt[best] + step * (half - p[best]) / math.max(p[best + 1] - p[best], 1e-6);
+      pts.add((px + x * nx, py + x * ny));
+    }
+    if (pts.length < 15) return q;
+    // a straight line through the points, dropping the ones that sit far from it (a speck on the edge) and fitting again
+    var line = _fitLine(pts);
+    for (var pass = 0; pass < 2; pass++) {
+      final dist = [for (final p in pts) _lineDistance(line, p).abs()]..sort();
+      final cut = math.max(0.6, dist[dist.length ~/ 2] * 3);
+      final keep = [for (final p in pts) if (_lineDistance(line, p).abs() <= cut) p];
+      if (keep.length < 15) return q;
+      line = _fitLine(keep);
+    }
+    lines.add(line);
+  }
+  final out = <(double, double)>[];
+  for (var i = 0; i < 4; i++) {
+    final l1 = lines[(i + 3) % 4], l2 = lines[i];
+    final det = l1.$3 * (-l2.$4) - (-l2.$3) * l1.$4;
+    if (det.abs() < 1e-9) return q;
+    final rx = l2.$1 - l1.$1, ry = l2.$2 - l1.$2;
+    final s0 = (rx * (-l2.$4) - (-l2.$3) * ry) / det;
+    out.add((l1.$1 + s0 * l1.$3, l1.$2 + s0 * l1.$4));
+  }
+  final side = _len(q[0], q[1]);
+  for (var i = 0; i < 4; i++) {
+    if (_len(out[i], q[i]) > 0.1 * side) return q;
+  }
+  return out;
+}
+
+/// Least-squares line through points: (point x, point y, direction x, direction y).
+(double, double, double, double) _fitLine(List<(double, double)> pts) {
+  final n = pts.length;
+  final mx = pts.fold(0.0, (a, p) => a + p.$1) / n, my = pts.fold(0.0, (a, p) => a + p.$2) / n;
+  var sxx = 0.0, sxy = 0.0, syy = 0.0;
+  for (final p in pts) {
+    final dx = p.$1 - mx, dy = p.$2 - my;
+    sxx += dx * dx;
+    sxy += dx * dy;
+    syy += dy * dy;
+  }
+  final angle = 0.5 * math.atan2(2 * sxy, sxx - syy);
+  return (mx, my, math.cos(angle), math.sin(angle));
+}
+
+double _lineDistance((double, double, double, double) l, (double, double) p) => (p.$1 - l.$1) * -l.$4 + (p.$2 - l.$2) * l.$3;
+
+/// Bilinear grey value at a position in photo pixels (pixel centres at whole numbers); outside the picture it repeats the edge.
+double _bilinear(Uint8List g, int w, int h, double x, double y) {
+  final fx = math.min(math.max(x, 0.0), w - 1.0), fy = math.min(math.max(y, 0.0), h - 1.0);
+  final ix = math.min(fx.floor(), w - 2), iy = math.min(fy.floor(), h - 2);
+  final ax = fx - ix, ay = fy - iy;
+  final i = iy * w + ix;
+  return (g[i] * (1 - ax) + g[i + 1] * ax) * (1 - ay) + (g[i + w] * (1 - ax) + g[i + w + 1] * ax) * ay;
 }
 
 double _len((double, double) a, (double, double) b) => math.sqrt(math.pow(a.$1 - b.$1, 2) + math.pow(a.$2 - b.$2, 2));

@@ -119,9 +119,10 @@ void main() {
             final cx = wc.reduce((a, b) => a + b) / 4, cy = wy.reduce((a, b) => a + b) / 4;
             final near = scan.stickers.reduce((a, b) => _dist(a.centre, (cx, cy)) < _dist(b.centre, (cx, cy)) ? a : b);
             expect(_dist(near.centre, (cx, cy)), lessThan(8), reason: 'sticker centre');
-            // the gate has no sub-pixel edge fit, so the corners may differ by a few pixels
+            // corners are refined to the half-light edge like the Python finder, so they agree to a pixel or two
             final err = [for (var i = 0; i < 4; i++) _dist(near.corners[i], (wc[i], wy[i]))].reduce(math.max);
-            expect(err, lessThan(14), reason: 'corners, largest miss $err px');
+            expect(err, lessThan(3.0), reason: 'corners, largest miss $err px');
+            expect(near.pxPerMm / (s['px_per_mm'] as num).toDouble(), closeTo(1.0, 0.025), reason: 'scale (px per mm) within 2.5% (these photos are small: one pixel of a corner is 0.7%)');
           }
           for (final s in scan.stickers) {
             expect(s.frameContrast, greaterThan(0.5));
