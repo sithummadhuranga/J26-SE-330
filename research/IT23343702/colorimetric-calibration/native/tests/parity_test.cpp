@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
         char err[256];
         void* p = cc_create(&cfg, err);
         cc_result r;
-        int rc = p ? cc_process(p, rgb.data, rgb.cols, rgb.rows, nullptr, &r) : -9;
+        int rc = p ? cc_process(p, rgb.data, rgb.total() * 3, rgb.cols, rgb.rows, nullptr, &r) : -9;
         if (rc != 0) {
           report(c, false, p ? cc_last_error(p) : err);
         } else {

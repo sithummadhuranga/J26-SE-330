@@ -81,9 +81,20 @@ CC_API const char* cc_timing_name(int32_t slot);
 CC_API void* cc_create(const cc_config* config, char* error);
 CC_API void cc_destroy(void* pipeline);
 
-/* rgb: width*height*3 uint8, row-major, no padding. Returns 0 on success, else a negative code;
- * cc_last_error() then describes it. wound may be NULL. */
-CC_API int32_t cc_process(void* pipeline, const uint8_t* rgb, int32_t width, int32_t height,
+/* Return codes of cc_process(). */
+enum {
+  CC_OK = 0,
+  CC_ERR_ARGUMENT = -1,   /* null pointer */
+  CC_ERR_SIZE = -2,       /* width/height not positive, above CC_MAX_SIDE, or width*height*3 too large */
+  CC_ERR_LENGTH = -3,     /* rgb_len is not width*height*3 */
+  CC_ERR_PROCESSING = -4  /* a stage failed; cc_last_error() says why */
+};
+enum { CC_MAX_SIDE = 32768 };
+
+/* rgb: width*height*3 uint8, row-major, no padding; rgb_len is its length in bytes and must be exactly
+ * width*height*3 (checked, so a short buffer is refused instead of read past its end). wound may be NULL.
+ * Returns CC_OK or a negative CC_ERR_* code; cc_last_error() then describes it. */
+CC_API int32_t cc_process(void* pipeline, const uint8_t* rgb, uint64_t rgb_len, int32_t width, int32_t height,
                           const cc_bbox* wound, cc_result* out);
 CC_API const char* cc_last_error(const void* pipeline);
 
