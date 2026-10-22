@@ -15,6 +15,7 @@ import common  # noqa: F401
 import litert_reference as R
 import make_accuracy_set as MA
 import make_resize_golden as MG
+import make_gate_fixtures as MGF
 from colorimetric import marker as M
 
 REPO = common.REPO
@@ -94,6 +95,35 @@ class AccuracySetTest(unittest.TestCase):
         with mock.patch.object(R, "segment", lambda it, rgb: {"union": np.zeros((480, 640), np.uint8)}):
             with self.assertRaises(AssertionError):
                 run(MA, ["make_accuracy_set.py", "--model", "m.tflite", "--images", self.images, "--dfuc-train", self.train, "--out", os.path.join(self.tmp, "o3")])
+
+
+GATE_DIR = REPO / "mobile" / "test" / "measurement" / "golden" / "gate"
+
+
+class GateFixtureTest(unittest.TestCase):
+    def test_writes_a_jpeg_per_simulated_case_and_the_python_answer_for_it(self):
+        d = tempfile.mkdtemp()
+        run(MGF, ["make_gate_fixtures.py", "--out", d])
+        meta = json.load(open(os.path.join(d, "gate_expected.json")))
+        self.assertEqual(meta["max_dim"], 1200)
+        want = {"sim_six_tilt25": None, "sim_one_ok": None, "sim_one_mirrored": "mirrored", "sim_one_no_orientation": "weak_orientation",
+                "sim_one_cut": "cut_by_edge", "sim_one_washed": "weak_frame_contrast", "blank": "no_candidate"}
+        for name, code in want.items():
+            self.assertEqual(meta["cases"][name]["code"], code, name)
+            img = cv2.imread(os.path.join(d, name + ".jpg"))
+            self.assertEqual((img.shape[1], img.shape[0]), (meta["cases"][name]["width"], meta["cases"][name]["height"]))
+            self.assertEqual(max(img.shape[:2]), 1200 if name != "sim_one_cut" else 1200)
+        self.assertEqual(meta["cases"]["sim_six_tilt25"]["found"], 6)
+        self.assertEqual(len(meta["cases"]["sim_six_tilt25"]["stickers"]), 6)
+
+    def test_the_committed_fixtures_match_what_the_finder_says_today(self):
+        meta = json.load(open(GATE_DIR / "gate_expected.json"))
+        self.assertGreaterEqual(len(meta["cases"]), 11)
+        import sticker_finder as SF
+        for name, exp in meta["cases"].items():
+            rgb = cv2.cvtColor(cv2.imread(str(GATE_DIR / (name + ".jpg"))), cv2.COLOR_BGR2RGB)
+            d = SF.diagnose_stickers(rgb, max_dim=meta["max_dim"])
+            self.assertEqual((d.code, len(d.stickers)), (exp["code"], exp["found"]), name)
 
 
 class LutGoldenTest(unittest.TestCase):
