@@ -20,7 +20,7 @@ SPEC = json.loads((Path(__file__).parent / "golden" / "quality_expected.json").r
 @pytest.mark.parametrize("case", SPEC["cases"], ids=[c["name"] for c in SPEC["cases"]])
 def test_vectors(case):
     v = Q.decide(case["finder_code"], case["marker_code"], case["skin_pixels"])
-    e = case["expect"]
+    e = case["expected"]
     assert v.level == e["level"] and v.code == e["code"]
     assert [f.code for f in v.findings] == e["findings"]
 

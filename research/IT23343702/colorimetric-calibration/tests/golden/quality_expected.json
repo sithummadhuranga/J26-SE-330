@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Capture quality gate vectors (spec, written before quality.py). Input: the finder's reject code (null when a sticker was accepted), the marker check's code ('' when used, null when not evaluated) and the number of skin pixels (null when not evaluated). Output: level, the primary code, and every finding in order (retake before warn, then table order).",
+ "note": "Capture quality gate vectors (spec, written before quality.py). Input: the finder's reject code (null when a sticker was accepted), the marker check's code ('' when used, null when not evaluated) and the number of skin pixels (null when not evaluated). Output (key \"expected\"): level, the primary code, and every finding in order (retake before warn, then table order).",
  "table_order": [
   "no_candidate",
   "cut_by_edge",
@@ -23,7 +23,7 @@
    "finder_code": null,
    "marker_code": "",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "ok",
     "code": null,
     "findings": []
@@ -34,7 +34,7 @@
    "finder_code": null,
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "ok",
     "code": null,
     "findings": []
@@ -45,7 +45,7 @@
    "finder_code": "no_candidate",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "no_candidate",
     "findings": [
@@ -58,7 +58,7 @@
    "finder_code": "cut_by_edge",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "cut_by_edge",
     "findings": [
@@ -71,7 +71,7 @@
    "finder_code": "weak_frame_contrast",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "weak_frame_contrast",
     "findings": [
@@ -84,7 +84,7 @@
    "finder_code": "weak_orientation",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "weak_orientation",
     "findings": [
@@ -97,7 +97,7 @@
    "finder_code": "layout_mismatch",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "layout_mismatch",
     "findings": [
@@ -110,7 +110,7 @@
    "finder_code": "mirrored",
    "marker_code": null,
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "mirrored",
     "findings": [
@@ -123,7 +123,7 @@
    "finder_code": null,
    "marker_code": "crop_invalid",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "crop_invalid",
     "findings": [
@@ -136,7 +136,7 @@
    "finder_code": null,
    "marker_code": "grey_clipped",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "grey_clipped",
     "findings": [
@@ -149,7 +149,7 @@
    "finder_code": null,
    "marker_code": "grey_not_uniform",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "grey_not_uniform",
     "findings": [
@@ -162,7 +162,7 @@
    "finder_code": null,
    "marker_code": "grey_not_neutral",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "grey_not_neutral",
     "findings": [
@@ -175,7 +175,7 @@
    "finder_code": null,
    "marker_code": "grey_gain_out_of_range",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "grey_gain_out_of_range",
     "findings": [
@@ -188,7 +188,7 @@
    "finder_code": null,
    "marker_code": "skin_patch_off",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "skin_patch_off",
     "findings": [
@@ -201,7 +201,7 @@
    "finder_code": null,
    "marker_code": "",
    "skin_pixels": 99,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "too_few_skin_pixels",
     "findings": [
@@ -214,7 +214,7 @@
    "finder_code": null,
    "marker_code": "",
    "skin_pixels": 100,
-   "expect": {
+   "expected": {
     "level": "ok",
     "code": null,
     "findings": []
@@ -225,7 +225,7 @@
    "finder_code": null,
    "marker_code": "",
    "skin_pixels": 0,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "too_few_skin_pixels",
     "findings": [
@@ -238,7 +238,7 @@
    "finder_code": null,
    "marker_code": "",
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "ok",
     "code": null,
     "findings": []
@@ -249,7 +249,7 @@
    "finder_code": "mirrored",
    "marker_code": "grey_clipped",
    "skin_pixels": 50,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "mirrored",
     "findings": [
@@ -264,7 +264,7 @@
    "finder_code": "cut_by_edge",
    "marker_code": "crop_invalid",
    "skin_pixels": null,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "cut_by_edge",
     "findings": [
@@ -278,7 +278,7 @@
    "finder_code": null,
    "marker_code": "grey_not_neutral",
    "skin_pixels": 10,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "grey_not_neutral",
     "findings": [
@@ -292,7 +292,7 @@
    "finder_code": null,
    "marker_code": "crop_invalid",
    "skin_pixels": 10,
-   "expect": {
+   "expected": {
     "level": "retake",
     "code": "crop_invalid",
     "findings": [
@@ -306,7 +306,7 @@
    "finder_code": null,
    "marker_code": "skin_patch_off",
    "skin_pixels": 5000,
-   "expect": {
+   "expected": {
     "level": "warn",
     "code": "skin_patch_off",
     "findings": [
