@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/features/measurement/capture/capture_messages.dart';
 import 'package:melanin_wound_cdss/features/measurement/capture/capture_verdict.dart';
@@ -62,6 +65,53 @@ void main() {
       final v = judgeCapture(scan: _scan(null, stickers: 1));
       expect(v.verdict, Verdict.ok);
     });
+  });
+
+  group('the table on plain codes', () {
+    test('lists every finding, retake before warn and then in the agreed order, and the first one is the verdict', () {
+      final j = judgeCodes(finderCode: null, markerCode: 'grey_clipped', skinPixels: 5);
+      expect(j.verdict, Verdict.warn);
+      expect(j.code, 'grey_clipped');
+      expect(j.findings, ['grey_clipped', 'too_few_skin_pixels']);
+      final k = judgeCodes(finderCode: null, markerCode: 'crop_invalid', skinPixels: 5);
+      expect(k.verdict, Verdict.retake);
+      expect(k.findings, ['crop_invalid', 'too_few_skin_pixels']);
+      final m = judgeCodes(finderCode: 'weak_orientation', markerCode: 'grey_clipped', skinPixels: null);
+      expect(m.verdict, Verdict.retake);
+      expect(m.findings, ['weak_orientation', 'grey_clipped']);
+    });
+
+    test('skin counts only when it was evaluated, and 100 pixels is enough', () {
+      expect(judgeCodes(finderCode: null, markerCode: '', skinPixels: 99).code, 'too_few_skin_pixels');
+      expect(judgeCodes(finderCode: null, markerCode: '', skinPixels: 100).verdict, Verdict.ok);
+      expect(judgeCodes(finderCode: null, markerCode: '', skinPixels: null).verdict, Verdict.ok);
+      expect(judgeCodes(finderCode: null, markerCode: null, skinPixels: null).verdict, Verdict.ok);
+    });
+
+    test('a code that is not in the list is an error, so a typo can never pass a photo', () {
+      expect(() => judgeCodes(finderCode: 'weak_frame', markerCode: null, skinPixels: null), throwsArgumentError);
+      expect(() => judgeCodes(finderCode: null, markerCode: 'clipped', skinPixels: null), throwsArgumentError);
+    });
+
+    const vectors = '../research/IT23343702/colorimetric-calibration/tests/golden/quality_expected.json';
+    test('agrees with Color Matric\'s vectors', () {
+      final raw = jsonDecode(File(vectors).readAsStringSync());
+      final list = raw is List ? raw : (raw['cases'] ?? raw['vectors']) as dynamic;
+      final cases = list is Map ? list.values.toList() : list as List;
+      expect(cases.length, greaterThanOrEqualTo(20));
+      for (final c in cases) {
+        final input = (c['input'] ?? c) as Map<String, dynamic>;
+        final want = (c['expected'] ?? c['output'] ?? c) as Map<String, dynamic>;
+        final j = judgeCodes(
+          finderCode: input['finder_code'] as String?,
+          markerCode: input['marker_code'] as String?,
+          skinPixels: input['skin_pixels'] as int?,
+        );
+        expect(j.verdict.name, want['level'], reason: '$c');
+        expect(j.code, want['code'], reason: '$c');
+        expect(j.findings, [for (final f in (want['findings'] as List)) f is Map ? f['code'] : f], reason: '$c');
+      }
+    }, skip: File(vectors).existsSync() ? null : 'Color Matric\'s quality vectors are not in this checkout yet');
   });
 
   group('the sentences', () {
