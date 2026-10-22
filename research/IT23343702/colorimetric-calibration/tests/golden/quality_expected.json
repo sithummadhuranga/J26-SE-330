@@ -1,0 +1,318 @@
+{
+ "version": 1,
+ "note": "Capture quality gate vectors (spec, written before quality.py). Input: the finder's reject code (null when a sticker was accepted), the marker check's code ('' when used, null when not evaluated) and the number of skin pixels (null when not evaluated). Output: level, the primary code, and every finding in order (retake before warn, then table order).",
+ "table_order": [
+  "no_candidate",
+  "cut_by_edge",
+  "weak_frame_contrast",
+  "weak_orientation",
+  "layout_mismatch",
+  "mirrored",
+  "crop_invalid",
+  "grey_clipped",
+  "grey_not_uniform",
+  "grey_not_neutral",
+  "grey_gain_out_of_range",
+  "skin_patch_off",
+  "too_few_skin_pixels"
+ ],
+ "min_skin_pixels": 100,
+ "cases": [
+  {
+   "name": "good photo",
+   "finder_code": null,
+   "marker_code": "",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "ok",
+    "code": null,
+    "findings": []
+   }
+  },
+  {
+   "name": "nothing evaluated",
+   "finder_code": null,
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "ok",
+    "code": null,
+    "findings": []
+   }
+  },
+  {
+   "name": "finder alone: no_candidate",
+   "finder_code": "no_candidate",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "no_candidate",
+    "findings": [
+     "no_candidate"
+    ]
+   }
+  },
+  {
+   "name": "finder alone: cut_by_edge",
+   "finder_code": "cut_by_edge",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "cut_by_edge",
+    "findings": [
+     "cut_by_edge"
+    ]
+   }
+  },
+  {
+   "name": "finder alone: weak_frame_contrast",
+   "finder_code": "weak_frame_contrast",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "weak_frame_contrast",
+    "findings": [
+     "weak_frame_contrast"
+    ]
+   }
+  },
+  {
+   "name": "finder alone: weak_orientation",
+   "finder_code": "weak_orientation",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "weak_orientation",
+    "findings": [
+     "weak_orientation"
+    ]
+   }
+  },
+  {
+   "name": "finder alone: layout_mismatch",
+   "finder_code": "layout_mismatch",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "layout_mismatch",
+    "findings": [
+     "layout_mismatch"
+    ]
+   }
+  },
+  {
+   "name": "finder alone: mirrored",
+   "finder_code": "mirrored",
+   "marker_code": null,
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "mirrored",
+    "findings": [
+     "mirrored"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: crop_invalid",
+   "finder_code": null,
+   "marker_code": "crop_invalid",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "retake",
+    "code": "crop_invalid",
+    "findings": [
+     "crop_invalid"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: grey_clipped",
+   "finder_code": null,
+   "marker_code": "grey_clipped",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "grey_clipped",
+    "findings": [
+     "grey_clipped"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: grey_not_uniform",
+   "finder_code": null,
+   "marker_code": "grey_not_uniform",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "grey_not_uniform",
+    "findings": [
+     "grey_not_uniform"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: grey_not_neutral",
+   "finder_code": null,
+   "marker_code": "grey_not_neutral",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "grey_not_neutral",
+    "findings": [
+     "grey_not_neutral"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: grey_gain_out_of_range",
+   "finder_code": null,
+   "marker_code": "grey_gain_out_of_range",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "grey_gain_out_of_range",
+    "findings": [
+     "grey_gain_out_of_range"
+    ]
+   }
+  },
+  {
+   "name": "marker alone: skin_patch_off",
+   "finder_code": null,
+   "marker_code": "skin_patch_off",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "skin_patch_off",
+    "findings": [
+     "skin_patch_off"
+    ]
+   }
+  },
+  {
+   "name": "skin: 99 pixels is too few",
+   "finder_code": null,
+   "marker_code": "",
+   "skin_pixels": 99,
+   "expect": {
+    "level": "warn",
+    "code": "too_few_skin_pixels",
+    "findings": [
+     "too_few_skin_pixels"
+    ]
+   }
+  },
+  {
+   "name": "skin: 100 pixels is enough",
+   "finder_code": null,
+   "marker_code": "",
+   "skin_pixels": 100,
+   "expect": {
+    "level": "ok",
+    "code": null,
+    "findings": []
+   }
+  },
+  {
+   "name": "skin: zero pixels",
+   "finder_code": null,
+   "marker_code": "",
+   "skin_pixels": 0,
+   "expect": {
+    "level": "warn",
+    "code": "too_few_skin_pixels",
+    "findings": [
+     "too_few_skin_pixels"
+    ]
+   }
+  },
+  {
+   "name": "skin not evaluated (sheet photo, no wound)",
+   "finder_code": null,
+   "marker_code": "",
+   "skin_pixels": null,
+   "expect": {
+    "level": "ok",
+    "code": null,
+    "findings": []
+   }
+  },
+  {
+   "name": "worst wins: retake beats warn",
+   "finder_code": "mirrored",
+   "marker_code": "grey_clipped",
+   "skin_pixels": 50,
+   "expect": {
+    "level": "retake",
+    "code": "mirrored",
+    "findings": [
+     "mirrored",
+     "grey_clipped",
+     "too_few_skin_pixels"
+    ]
+   }
+  },
+  {
+   "name": "tie among retakes: table order (finder first)",
+   "finder_code": "cut_by_edge",
+   "marker_code": "crop_invalid",
+   "skin_pixels": null,
+   "expect": {
+    "level": "retake",
+    "code": "cut_by_edge",
+    "findings": [
+     "cut_by_edge",
+     "crop_invalid"
+    ]
+   }
+  },
+  {
+   "name": "tie among warns: table order (marker before skin)",
+   "finder_code": null,
+   "marker_code": "grey_not_neutral",
+   "skin_pixels": 10,
+   "expect": {
+    "level": "warn",
+    "code": "grey_not_neutral",
+    "findings": [
+     "grey_not_neutral",
+     "too_few_skin_pixels"
+    ]
+   }
+  },
+  {
+   "name": "marker retake beats skin warn",
+   "finder_code": null,
+   "marker_code": "crop_invalid",
+   "skin_pixels": 10,
+   "expect": {
+    "level": "retake",
+    "code": "crop_invalid",
+    "findings": [
+     "crop_invalid",
+     "too_few_skin_pixels"
+    ]
+   }
+  },
+  {
+   "name": "two warns in marker table order",
+   "finder_code": null,
+   "marker_code": "skin_patch_off",
+   "skin_pixels": 5000,
+   "expect": {
+    "level": "warn",
+    "code": "skin_patch_off",
+    "findings": [
+     "skin_patch_off"
+    ]
+   }
+  }
+ ]
+}
