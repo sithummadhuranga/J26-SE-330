@@ -75,6 +75,28 @@ class StickerSheetTest(unittest.TestCase):
         self.assertAlmostEqual(h / 72 * 25.4, 297.0, delta=0.1)
 
 
+class FontFallbackTest(unittest.TestCase):
+    """The sheet must build on a machine without the macOS fonts (the CI runs on Linux)."""
+
+    def test_a_missing_font_file_falls_back_to_a_built_in_font_of_the_right_size(self):
+        f = MS._font(3.0, paths=("/no/such/font.ttf",))
+        left, top, right, bottom = f.getbbox("100 mm")
+        self.assertGreater(bottom - top, 0.5 * MS.px(3.0))                    # drawn at about 3 mm, not at the tiny default size
+        self.assertLess(bottom - top, 2.0 * MS.px(3.0))
+
+    def test_both_sheets_build_without_any_system_font(self):
+        old = MS.FONT_PATHS
+        MS.FONT_PATHS = ()
+        try:
+            img1, _ = MS.build_sheet()
+            img2, info2 = MS.build_sheet_v2()
+        finally:
+            MS.FONT_PATHS = old
+        self.assertEqual(img1.size, (4961, 7016))
+        self.assertEqual(img2.size, (4961, 7016))
+        self.assertEqual(len(info2["label_boxes"]), 3)
+
+
 class SheetV2Test(unittest.TestCase):
     """Sheet v2: the shapes sit between two rows of stickers (about 20-30 mm from each row), as a wound would sit next to a sticker,
     and there are places for a ten rupee coin."""

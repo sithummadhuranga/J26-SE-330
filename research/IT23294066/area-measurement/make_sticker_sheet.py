@@ -30,6 +30,21 @@ def px(mm):
     return int(round(mm * PX_PER_MM))
 
 
+FONT_PATHS = ("/System/Library/Fonts/Helvetica.ttc",                       # macOS
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",           # Debian / Ubuntu (the CI)
+              "/usr/share/fonts/dejavu/DejaVuSans.ttf")
+
+
+def _font(mm, paths=None):
+    """A font about `mm` tall: the first system font that exists, else Pillow's built-in one at the same size."""
+    for path in (FONT_PATHS if paths is None else paths):
+        try:
+            return ImageFont.truetype(path, px(mm))
+        except OSError:
+            continue
+    return ImageFont.load_default(size=px(mm))
+
+
 def box(d, x0, y0, x1, y1, fill):
     d.rectangle([px(x0), px(y0), px(x1) - 1, px(y1) - 1], fill=fill)
 
@@ -54,8 +69,8 @@ def build_sheet():
     layout = json.loads(LAYOUT.read_text())
     img = Image.new("RGB", (px(A4_MM[0]), px(A4_MM[1])), (255, 255, 255))
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", px(3.0))
-    big = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", px(4.0))
+    font = _font(3.0)
+    big = _font(4.0)
 
     # six stickers, 3 columns x 2 rows
     for ox, oy in STICKER_ORIGINS:
@@ -118,7 +133,7 @@ def build_sheet_v2():
     layout = json.loads(LAYOUT.read_text())
     img = Image.new("RGB", (px(A4_MM[0]), px(A4_MM[1])), (255, 255, 255))
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", px(3.0))
+    font = _font(3.0)
     for ox, oy in STICKER_ORIGINS_V2:
         sticker(d, ox, oy, layout)
 
@@ -153,7 +168,7 @@ def build_sheet_v2():
         if i % 10 == 0:
             d.text((px(bx + i - 2), px(by + 2)), str(i), fill=(0, 0, 0), font=font)
     d.text((px(bx + 103), px(by - 2)), "mm", fill=(0, 0, 0), font=font)
-    d.text((px(bx), px(by - 12)), "This bar must measure exactly 100 mm with a ruler.", fill=(0, 0, 0), font=ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", px(4.0)))
+    d.text((px(bx), px(by - 12)), "This bar must measure exactly 100 mm with a ruler.", fill=(0, 0, 0), font=_font(4.0))
 
     # coin guide rings: thin mid-grey (not dark, so a sticker finder does not take them for a frame)
     r = COIN_RING_MM / 2 + RING_LINE_MM                                       # outer radius: the line is drawn inwards from it
