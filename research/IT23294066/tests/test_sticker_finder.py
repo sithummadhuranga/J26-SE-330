@@ -112,6 +112,42 @@ class FinderTest(unittest.TestCase):
         img = S.render(edit, S.pose_homography(0, 0, 10.0), 1.0, (1, 1, 1), 0.8, 2.0, np.random.default_rng(1))
         self.assertEqual(len(SF.find_stickers(img)), 5)
 
+    def test_a_mirrored_sticker_is_rejected(self):
+        """A sticker seen in a mirror (a front camera, a mirrored preview) still has one dark corner, but its patches end up in
+        the wrong places, so the straightened picture would be misread. It must not be accepted."""
+        sheet, info = small_sheet()
+        ox, oy = info["origins"][0]
+        edit = sheet.copy()
+        x0, y0 = int(ox * 15), int(oy * 15)
+        edit[y0:y0 + 750, x0:x0 + 750] = edit[y0:y0 + 750, x0:x0 + 750][:, ::-1]      # mirror this one sticker left to right
+        img = S.render(edit, S.pose_homography(0, 0, 10.0), 1.0, (1, 1, 1), 0.8, 2.0, np.random.default_rng(1))
+        self.assertEqual(len(SF.find_stickers(img)), 5)
+
+    def test_a_vertically_flipped_sticker_is_rejected_too(self):
+        sheet, info = small_sheet()
+        ox, oy = info["origins"][1]
+        edit = sheet.copy()
+        x0, y0 = int(ox * 15), int(oy * 15)
+        edit[y0:y0 + 750, x0:x0 + 750] = edit[y0:y0 + 750, x0:x0 + 750][::-1]
+        img = S.render(edit, S.pose_homography(0, 0, 10.0), 1.0, (1, 1, 1), 0.8, 2.0, np.random.default_rng(1))
+        self.assertEqual(len(SF.find_stickers(img)), 5)
+
+    def test_a_whole_photo_in_a_mirror_gives_no_sticker(self):
+        img, _ = photo(rot=30)
+        self.assertEqual(len(SF.find_stickers(img)), 6)
+        self.assertEqual(SF.find_stickers(cv2.flip(img, 1)), [])
+        self.assertEqual(SF.find_stickers(cv2.flip(img, 0)), [])
+
+    def test_the_patches_of_an_accepted_crop_are_where_the_layout_says(self):
+        img, _ = photo(rot=200)
+        for s in SF.find_stickers(img):
+            gray = cv2.cvtColor(s.crop, cv2.COLOR_RGB2GRAY).astype(float)
+            cell = lambda cx, cy: gray[int((cy - 3) * 10):int((cy + 3) * 10), int((cx - 3) * 10):int((cx + 3) * 10)].mean()
+            self.assertLess(cell(12.5, 25), 200)                                # grey patch on the left of the middle row
+            self.assertLess(cell(37.5, 25), 200)                                # darkest skin patch on the right
+            self.assertGreater(cell(25, 12.5), 230)                             # white above and below the middle patch
+            self.assertGreater(cell(25, 37.5), 230)
+
     def test_a_sticker_cut_by_the_edge_of_the_photo_is_not_returned(self):
         img, Hmm = photo()
         c0 = S.project(Hmm, [[40, 40]])[0]                                   # inside the first sticker (origin 15,15 + 25)

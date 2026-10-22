@@ -8,8 +8,9 @@ Steps
   1. Mark dark pixels (darker than half of the local average) on a shrunken copy of the photo.
   2. Take dark shapes that have a hole (the frame), turn the outer outline into four corners.
   3. Go back to the full-size photo and fit a straight line to each of the four edges, then intersect them: sub-pixel corners.
-  4. Straighten the sticker and check it looks like the sticker (dark frame, bright inside, ONE dark inner corner). The dark inner
-     corner also tells which way up it is, so the four corners come out in the order they are printed.
+  4. Straighten the sticker and check it looks like the sticker (dark frame, bright inside, ONE dark inner corner, the patches where
+     the layout puts them). The dark inner corner also tells which way up it is, so the four corners come out in the order they
+     are printed. A mirrored sticker (a front camera, a mirrored preview) is rejected: its patches would be in the wrong places.
   5. Build the homography from the sticker plane (mm) to photo pixels, the scale at the sticker, and the 500 x 500 picture.
 
 Limits: the sticker must be flat, in the same plane as the wound, and all four corners must be visible and in focus.
@@ -145,8 +146,24 @@ def _orient(gray_blur, q):
         oc = (min(others) - orient) / span         # how much darker the orientation corner is than the darkest other corner
         fc = (white - frame) / (white + 1.0)       # how much darker the frame is than the white inside
         if best is None or oc > best[0]:
-            best = (oc, fc, k)
+            best = (oc, fc, k, canon.astype(np.float32))
     return best
+
+
+def _layout_ok(canon, max_patch=0.9, min_empty=0.8):
+    """The mid-tone patches must lie where marker_layout.json puts them, and the cells where a mirrored sticker would have them
+    (the patch layout with x and y swapped) must be bare white. A mirrored sticker still has one dark corner, but its patches end up
+    in a column instead of a row, so its straightened picture would be misread."""
+    s = canon.shape[0] / SIDE_MM
+
+    def cell(cx, cy, size):
+        half = 0.3 * size
+        return float(canon[int((cy - half) * s):int((cy + half) * s), int((cx - half) * s):int((cx + half) * s)].mean())
+
+    white = _regions(canon)[3] + 1.0
+    patches = [cell(*p["centre"], p["size"]) for p in LAYOUT["patches"]]
+    swapped = [cell(p["centre"][1], p["centre"][0], p["size"]) for p in LAYOUT["patches"] if p["centre"][0] != p["centre"][1]]
+    return max(patches) / white < max_patch and min(swapped) / white > min_empty
 
 
 def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
@@ -170,8 +187,8 @@ def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=
         q = _order_clockwise(q / s)
         q = _order_clockwise(_refine(gray_full, q))
         blur = cv2.GaussianBlur(gray_full, (0, 0), max(0.5, 0.6 * np.linalg.norm(q[0] - q[1]) / 100))
-        oc, fc, k = _orient(blur, q)
-        if oc < min_orient or fc < min_frame:
+        oc, fc, k, canon = _orient(blur, q)
+        if oc < min_orient or fc < min_frame or not _layout_ok(canon):
             continue
         q = np.roll(q, -k, axis=0)
         mm = np.array([[0, 0], [side_mm, 0], [side_mm, side_mm], [0, side_mm]], dtype=np.float32)
