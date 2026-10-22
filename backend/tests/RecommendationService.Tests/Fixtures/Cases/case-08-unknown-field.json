@@ -1,0 +1,51 @@
+{
+  "contractVersion": "1.0",
+  "caseId": "0198f2c4-7a90-7e02-8b1d-000000000008",
+  "revision": 1,
+  "capturedAt": "2026-10-03T09:00:00+05:30",
+  "receivedAt": "2026-10-03T09:20:00+05:30",
+  "woundAnalytics": {
+    "areaMm2": 360.0,
+    "colourRegions": [
+      {
+        "cluster": 1,
+        "percent": 70.0
+      },
+      {
+        "cluster": 2,
+        "percent": 30.0
+      }
+    ],
+    "pipeline": {
+      "calibration": "2.1.0",
+      "segmentation": "yolo11n-seg-0.4"
+    }
+  },
+  "clinicalAssessment": {
+    "ulcerLocation": "plantar_forefoot",
+    "protectiveSensation": "absent",
+    "pedalPulses": "present",
+    "probeToBone": "absent",
+    "infectionGrade": "mild",
+    "woundBedLabels": "not_recorded",
+    "fitzpatrickClass": "V"
+  },
+  "healingHistory": [
+    {
+      "capturedAt": "2026-08-29T09:00:00+05:30",
+      "areaMm2": 800.0,
+      "pipeline": {
+        "calibration": "2.1.0",
+        "segmentation": "yolo11n-seg-0.4"
+      }
+    },
+    {
+      "capturedAt": "2026-09-12T09:00:00+05:30",
+      "areaMm2": 600.0,
+      "pipeline": {
+        "calibration": "2.1.0",
+        "segmentation": "yolo11n-seg-0.4"
+      }
+    }
+  ]
+}

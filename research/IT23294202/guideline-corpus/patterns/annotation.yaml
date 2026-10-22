@@ -1,0 +1,182 @@
+# annotation.yaml — A4 patterns: population clause, Req(d) field terms, polarity, runtime
+# thresholds (PLAN.md §M4 A4; Architecture v2.1 §5.6; decisions 7 and 8).
+#
+# Written by hand on 1 Oct 2026 from MEASURED clause openings (decision 8: only each
+# statement's opening up to its population clause was shown in the working session). Every
+# list below cites what it was derived from. The author reviews the review copy
+# (corpus/.cache/annotation_review.md, written by `ingestion-pipeline -- annotate`), then
+# sets status: confirmed, confirmed_by and confirmed_on. Confirmed 4 Oct 2026; the author's
+# answers are marked "Author, 4 Oct 2026" below and recorded in decision 21's addendum.
+#
+# The file holds patterns, field names and chunk IDs only — no guideline text — so it is
+# committed, like label_aliases.yaml. Req(d) stays regex-derived and CLINICIAN-UNVALIDATED.
+#
+# Regexes are .NET syntax, matched case-insensitively against the statement with its GRADE
+# or best-practice marker removed.
+
+"status": "confirmed"
+"confirmed_by": "T. H. Nimnath Nadushka (Member 3)"
+"confirmed_on": "2026-10-04"
+
+# Which variant fills req_prerequisites: "A", "C" or "union". Both are always computed and
+# both distributions are reported (PLAN.md §M4 A4). null = not decided.
+# Author, 4 Oct 2026: the union. A misses clauses that do not open the statement (12 of the 14
+# chunks where A and C differ); C misses clauses that are not about a person (INF-R04 "For …",
+# INF-R12d "If …"). A field gates when either
+# variant finds it inside a clause, so a recommendation for a stated population is withheld
+# until that population's fields are recorded: over-withholding is the safer failure.
+"primary_variant": "union"
+
+# Variant A: a population clause that OPENS the statement.
+# Measured 1 Oct 2026 (151 statements, first two words): "In a" 53, "In people" 1,
+# "In specific" 1, "A person" 3, "If a" 1, "If evidence" 1, "If Magnetic" 1, "For diagnosing" 1,
+# "When using" 1, "When deformity" 1, "With the" 1. "With the exception of …" (WHL-R19) is not
+# a population clause, so "With" is not an opener.
+"variant_a_openers":
+- "^In\\b"
+- "^A person\\b"
+- "^If\\b"
+- "^When\\b"
+- "^For\\b"
+
+# Variant C: a person-clause anywhere in the statement (unanchored). Every match starts a
+# clause; a statement may have several (CHA-R23 has two).
+"variant_c_start": "\\b(?:a |an )?(?:person|people|persons|patients?|individuals?)\\s+(?:with|who|for whom|in whom|at risk)\\b"
+
+# Where a clause ends. A clause runs from its start to the FIRST of these; if none is found it
+# runs to the end of the statement (reported as a flag, never silent).
+# Derived 1 Oct 2026 from the single word after every comma/colon in the 61 anchored
+# statements, plus the sentence-initial verbs of all 151 statements.
+"clause_end":
+  # A comma or colon followed by the start of the main clause.
+  "main_clause_words": ["administer", "always", "assess", "avoid", "choose", "consider", "diagnose",
+    "do", "educate", "evaluate", "examine", "extend", "initiate", "obtain", "perform", "prescribe",
+    "provide", "re-evaluate", "reassess", "screen", "select", "take", "target", "use", "we", "•"]
+  # A comma followed by an adverb in -ly ("urgently", "objectively", "primarily": PAD-R14,
+  # PAD-R21, OFF-R07c).
+  "adverb_after_comma": true
+  # A comma followed by a subject of up to four words and a modal: ", it is suggested"
+  # (PAD-R09), ", a revascularisation procedure should" (PAD-R12), ", … gradients (toe-knee)
+  # may" (CHA-R04).
+  "subject_modal": ",\\s+(?:\\S+\\s+){0,4}?(?:should|may|must|is suggested)\\b"
+  # A modal inside the clause itself: "A person with diabetes, … gangrene should be …" (PAD-R22).
+  "modal": "\\s(?:should|may|must)\\b"
+  # The infinitive that starts the action: " to " + a word that is not a determiner or a
+  # number. Measured 1 Oct 2026 inside the first-run clauses: to allow, be, determine, diagnose,
+  # examine, help, identify, immobilise, measure, optimise, participate, protect, reduce,
+  # self-monitor, support, wash, wear (and "to rapidly/frequently …"); the non-verbs were
+  # a, an, the and "2" ("1 to 2 weeks"). Without it PRE-R07's clause ran into its action.
+  "infinitive": "\\sto\\s+(?!(?:a|an|the|\\d)\\b)\\w"
+  # Frequency adverbs that follow the person in an action sentence: "… (IWGDF risk 0) annually
+  # for signs or symptoms of …" (PRE-R01, whose clause otherwise took in the screened-for
+  # conditions as prerequisites). The only frequency adverbs measured inside clauses.
+  "words": ["annually", "daily"]
+
+# A field term preceded (within five words; a hyphenated word counts as two) by one of these
+# does NOT gate: it goes to mentioned_fields and the chunk is flagged. Author, 4 Oct 2026: a
+# recommendation on diagnosing a condition is how that field gets recorded, so requiring the
+# field first would withhold it for good (INF-R03 "a possible infected foot ulcer", INF-R04
+# "For diagnosing … infection", INF-R05). Measured: these three are the only chunks it affects.
+"qualifier_watch": "\\b(?:suspected|suspicion|possible|possibly|diagnosing|diagnose|diagnosis)\\b(?:\\W+\\w+){0,5}?\\W+$"
+
+# Req(d) vocabulary (decision 7). Concept → field follows Architecture v2.1 §9.2:
+# location → ulcerLocation, neuropathy → protectiveSensation, perfusion → pedalPulses,
+# infection → infectionGrade. A term matched INSIDE a clause enters Req(d); outside, it goes to
+# mentioned_fields and never gates.
+"field_terms":
+  "ulcerLocation":
+  # The contract values (v2.1 §9.2): plantar forefoot/midfoot/hindfoot, non-plantar.
+  # "toe" is deliberately absent: "toe pressure" is a perfusion measurement (PAD-R13 clause).
+  - "\\bnon-plantar\\b"
+  - "\\bplantar\\b"
+  - "\\bforefoot\\b"
+  - "\\bmidfoot\\b"
+  - "\\brearfoot\\b"
+  - "\\bhindfoot\\b"
+  - "\\bheel\\b"
+  - "\\bmetatarsal heads?\\b"
+  - "\\bhallux\\b"
+  - "\\bdigits?\\b"
+  - "\\bapex\\b"
+  "protectiveSensation":
+  # \bneuropath does not match "neuro-osteoarthropathy" (Charcot), which is not this field.
+  - "\\bneuropath(?:y|ic)\\b"
+  - "\\bloss of protective sensation\\b"
+  - "\\bLOPS\\b"
+  "pedalPulses":
+  - "\\bperipheral arter(?:y|ial) disease\\b"
+  - "\\bPAD\\b"
+  - "\\bisch(?:a)?emi(?:a|c)\\b"
+  "infectionGrade":
+  - "\\binfect(?:ion|ions|ed)\\b"
+  # v2.1 §9.2 uses probeToBone for the osteomyelitis SUB-QUERY only, not as a Req(d) field.
+  # Author, 4 Oct 2026: "osteomyelitis" does not gate on it (INF-R10, INF-R21). Osteomyelitis
+  # is also diagnosed by imaging or bone biopsy, and a patient with no probe-to-bone result
+  # recorded would be withheld the bone-infection recommendations.
+  "probeToBone": []
+  "healingTrajectory":
+  # A clause conditioned on failed care needs the trajectory (OFF-R05a–d "treatment fails",
+  # WHL-R13/R23 "has failed"). Author, 4 Oct 2026: "has not resolved" is not listed. INF-R12d
+  # uses it of the infection, not of wound-area reduction, which is what this field measures.
+  - "\\bfail(?:s|ed)?\\b"
+  - "\\bnon-healing\\b"
+  - "\\bnot healing\\b"
+
+# Prerequisites set by the author, added to Req(d) under any variant. Author, 4 Oct 2026: these
+# five state their condition about the ulcer or the infection, not about a person, so neither
+# variant finds a clause and they would otherwise pass for every patient. Each list is exactly
+# the fields the statement names, and each named field is part of the condition (measured from
+# the words before each term, 4 Oct 2026):
+#   WHL-R12  "in neuro-ischemic or ischemic …", "… alone has failed"
+#   WHL-R09  "in non-infected, neuro-ischaemic …"
+#   INF-R12c "if the infection …", "the patient has severe peripheral artery disease"
+#   INF-R18  "in cases of severe infection …" or "severe lower limb ischaemia". Both fields must
+#            be recorded: the gate has no "or".
+#   INF-R22  "(i) forefoot infection, and (ii) without peripheral artery disease"
+# The other 35 statements with no clause stay unconditional (31 name no field; INF-R01a, R01b,
+# R13 and R19 are about infection itself).
+"author_prerequisites":
+  "WHL-R09": ["infectionGrade", "pedalPulses"]
+  "WHL-R12": ["healingTrajectory", "pedalPulses"]
+  "INF-R12c": ["infectionGrade", "pedalPulses"]
+  "INF-R18": ["infectionGrade", "pedalPulses"]
+  "INF-R22": ["infectionGrade", "pedalPulses", "ulcerLocation"]
+
+# Polarity: PROHIBIT when the MAIN clause (the text after the variant-A clause, or the whole
+# statement when there is none) opens with one of these. Everything else is RECOMMEND.
+# Measured 1 Oct 2026: 21 statements start "Do not", 1 "We do not"; after a clause, "do not"
+# (OFF-R03) and "avoid" (PAD-R16); and 3 main clauses open "We suggest not" (PRE-R11,
+# CHA-R18, CHA-R22), which the first run classified RECOMMEND.
+"prohibit_main_clause":
+- "^(?:do not|don't)\\b"
+- "^we do not (?:suggest|recommend)\\b"
+- "^we (?:suggest|recommend) not\\b"
+- "^avoid\\b"
+# "We suggest not" / "we do not suggest" is a main-verb prohibition wherever it stands: WHL-R19
+# opens "With the exception of …" (no population clause) and then "we suggest not using".
+"prohibit_anywhere": "\\bwe (?:suggest|recommend) not\\b|\\bwe do not (?:suggest|recommend)\\b"
+# Statements classified RECOMMEND that still contain one of these are listed in the review.
+# Measured 1 Oct 2026: after the rules above, 9 RECOMMEND statements contain "not" — all in
+# subordinate parts ("has not resolved", "not available", "not tolerated", "should not be") or
+# bullets (PAD-R25); the author confirms each.
+# Author, 4 Oct 2026: all 9 stay RECOMMEND. PAD-R09 (second sentence) and PAD-R25 (third
+# bullet) do carry a "should not be …" instruction, but beside a positive main recommendation,
+# and the statement is always quoted whole.
+"negation_watch": "\\b(?:not|avoid|never)\\b"
+
+# Runtime thresholds only (Architecture v2.1 §5.6: "Every runtime threshold is stored in
+# derivation_thresholds"). The quoted source is the sentence of the chunk that contains the
+# token, extracted at build time. Measured 1 Oct 2026: the stalled-healing rule is PAD
+# guideline Best Practice Statement 15, pdf_index 176 (not "Wound Healing BPS 15, pdf_index
+# 175" as SKILL.md's example and v2.1 §7 say).
+"thresholds":
+- "threshold_id": "pad-bps15.par_percent"
+  "chunk_id": "PAD-R15"
+  "token": "50%"
+  "value": 50
+  "unit": "percent"
+- "threshold_id": "pad-bps15.weeks"
+  "chunk_id": "PAD-R15"
+  "token": "4 weeks"
+  "value": 4
+  "unit": "weeks"

@@ -1,0 +1,6 @@
+# The IWGDF 2023 guidelines PDF: © IWGDF; never committed.
+guideline-corpus/source/
+# Database dumps, caches and hand transcriptions hold guideline text.
+guideline-corpus/exports/
+guideline-corpus/.cache/
+guideline-corpus/transcriptions/

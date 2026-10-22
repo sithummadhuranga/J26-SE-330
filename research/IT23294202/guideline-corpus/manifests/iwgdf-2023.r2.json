@@ -1,0 +1,70 @@
+{
+  "corpus_version": "iwgdf-2023.r2",
+  "frozen_at": "2026-10-15T05:27:50.7244490+00:00",
+  "source_pdf_sha256": "81d8626c0104a655c49842a8b92b27947ab1e4fbd5a976c627676acee18a3f36",
+  "chunker_version": "git:7454f44d45a0fc0a9fec6fdd02cca17f7cb31bb8",
+  "verified_at_commit": "git:17ca9463255746174c77e23a70192526899938c3",
+  "embedding": {
+    "model": "qwen3.7-text-embedding",
+    "dimensions": 256,
+    "model_name_returned_by_api": false,
+    "documents_text_type": "document",
+    "queries_text_type": "query",
+    "canaries_text_type": "document"
+  },
+  "reranker": {
+    "model": "qwen3-rerank",
+    "instruction": "Given a diabetic foot ulcer assessment query, find IWGDF 2023 guideline passages that answer it.",
+    "instruct_hash": "f91b5658748e6e7a0f3d4160e8f29c6c3448aac2618cd90a0100a44d20d03fb0",
+    "scores": "scored fresh in this repository for iwgdf-2023.r2, not carried over from an earlier version; never re-scored (decisions 28, 65)"
+  },
+  "retrieval": {
+    "k": 20,
+    "fusion": "exact cosine + ts_rank_cd, RRF k = 60, ties by chunk_id (C collation)",
+    "retrieve_prose": false,
+    "retrieve_rationale": false,
+    "filters": {
+      "default": "the whole retrieval pool",
+      "vascular_escalation": "Intersocietal PAD Guideline"
+    }
+  },
+  "canonical_wording": "body; the list wording is stored as variant_text, never hashed, embedded or cited (decision 1)",
+  "recommendation_count": {
+    "convention": "B, amended by decision 9: gradeable list units, parent stems excluded, Infection list item 15 excluded as a misprint",
+    "total": 151,
+    "grade": 125,
+    "best_practice": 26
+  },
+  "table_serializer": "table-v1",
+  "alias_file_sha256": "abf61d7491610c2179c59ee2b86fdc88d08f2b53f7569f4224df6bb76f4824df",
+  "pattern_files_sha256": {
+    "label_aliases.yaml": "abf61d7491610c2179c59ee2b86fdc88d08f2b53f7569f4224df6bb76f4824df",
+    "sections.yaml": "e0ae05828ea27c6db0684f00be4daf5658d739d915afaeed4bfb4001c327807e",
+    "tables.yaml": "acea37c580ff12f0087d911cb201adda4c2ddf5de72529ed67037a0723222424",
+    "annotation.yaml": "db007c14841c60464ab9f046bda3891e5b7164ed83de25c3875e946b2c75e7b3",
+    "figures.yaml": "9529f8bec7cde30787358c90b1a0fd78fc3f9c1a29bbf537a90a37f6ccd15f9a",
+    "queries.yaml": "cb54d922cf6154174abbcb664d2ac0a80b9245e5c887b1538a275f1ba30e1e9d"
+  },
+  "database": {
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "pgvector": "0.8.7"
+  },
+  "rows": {
+    "guideline_chunks": 626,
+    "query_vectors": 59,
+    "rerank_scores": 1180,
+    "derivation_thresholds": 2,
+    "embedding_canaries": 5,
+    "figures": 16,
+    "figure_links": 5,
+    "verified_tables": 18
+  },
+  "chunks_by_type": {
+    "PROSE": 109,
+    "RATIONALE": 253,
+    "RECOMMENDATION": 151,
+    "TABLE": 15,
+    "TABLE_ROW": 98
+  },
+  "figures_served": true
+}

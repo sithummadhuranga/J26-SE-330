@@ -1,0 +1,27 @@
+<!-- The recommendation service's database access: the frozen corpus and retrieval (which the rerank and verify steps also run). -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../WoundRag.Core/WoundRag.Core.csproj" />
+    <ProjectReference Include="../WoundRag.Shared/WoundRag.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Sql/*.sql" LogicalName="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Composition/response_sections.yaml" LogicalName="response_sections.yaml" />
+  </ItemGroup>
+
+</Project>

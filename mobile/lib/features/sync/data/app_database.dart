@@ -31,6 +31,7 @@ abstract final class SyncStateKeys {
   SyncState,
   AuthLocal,
   PatientLocal,
+  ChatLocal, // DRAFT (Member 3)
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
@@ -54,14 +55,15 @@ class AppDatabase extends _$AppDatabase {
     raw.execute('PRAGMA busy_timeout = 5000');
   }
 
-  /// Version 2 added patient_local, for the Patients tab.
+  /// Version 2 added patient_local, for the Patients tab. Version 3 adds chat_local (DRAFT, Member 3's follow-up chat).
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(patientLocal);
+          if (from < 3) await m.createTable(chatLocal);
         },
       );
 }
