@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
-project(colorimetric VERSION 0.1.0 LANGUAGES CXX)
+project(colorimetric VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# -DCC_SANITIZE=address,undefined instruments everything we build (see build_android.sh sanitize).
+if(CC_SANITIZE)
+  # vptr misfires on OpenCV, which the Android SDK builds without RTTI
+  add_compile_options(-fsanitize=${CC_SANITIZE} -fno-sanitize=vptr -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=${CC_SANITIZE})
 endif()
 
 # Only the modules the pipeline uses: keeps the Android binary small (imgcodecs only for tests/bench).
@@ -29,6 +36,14 @@ target_link_libraries(parity_test PRIVATE colorimetric_core colorimetric opencv_
 add_executable(api_test tests/api_test.cpp)
 target_link_libraries(api_test PRIVATE colorimetric)
 add_executable(bench bench/bench.cpp)
+# Emulator on an Apple M4 host only: see tools/hide_sve.c. Built into the test executables so it also wins over
+# the sanitizer runtime's own getauxval interceptor.
+if(CC_HIDE_SVE)
+  foreach(t parity_test api_test bench)
+    target_sources(${t} PRIVATE tools/hide_sve.c)
+    target_link_options(${t} PRIVATE -Wl,--export-dynamic)
+  endforeach()
+endif()
 target_link_libraries(bench PRIVATE colorimetric opencv_core opencv_imgproc opencv_imgcodecs)
 
 enable_testing()
