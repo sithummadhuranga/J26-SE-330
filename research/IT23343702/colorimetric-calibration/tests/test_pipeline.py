@@ -89,3 +89,57 @@ def test_ablation_has_proposal_table1_configurations():
         assert name in ABLATION_VARIANTS
     res = process_image(skin(64, 64, DARK), ABLATION_VARIANTS["ssr"])
     assert "2_ssr" in res.timings_ms and "2_msr" not in res.timings_ms
+
+
+def test_default_gate_is_the_ita_rule():
+    assert PipelineConfig().gate == "ita"
+    assert ABLATION_VARIANTS["full_model_gate"].gate == "model"
+
+
+def test_unknown_gate_raises():
+    with pytest.raises(ValueError):
+        process_image(skin(64, 64, DARK), PipelineConfig(gate="nope"))
+
+
+def test_model_gate_decides_the_ccm(monkeypatch):
+    cfg = PipelineConfig(gate="model")
+    dark, light = skin(128, 128, DARK), skin(128, 128, LIGHT)
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: False)
+    assert not process_image(dark, cfg).ccm_applied  # the ITA rule alone would have corrected this one
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: True)
+    assert process_image(light, cfg).ccm_applied
+
+
+def test_model_gate_on_the_real_model_corrects_dark_skin():
+    res = process_image(skin(128, 128, DARK), PipelineConfig(gate="model"))
+    assert res.ccm_applied
+
+
+def test_model_gate_falls_back_to_ita_when_it_cannot_read(monkeypatch):
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: None)
+    res = process_image(skin(128, 128, DARK), PipelineConfig(gate="model"))
+    assert res.ccm_applied and any("using the ITA rule" in n for n in res.notes)
+
+
+def test_confidence_none_when_no_skin():
+    blue = np.full((64, 64, 3), (0, 0, 255), dtype=np.uint8)
+    assert process_image(blue).skin_type_confidence == "none"
+
+
+def test_confidence_unchecked_when_the_check_is_off():
+    res = process_image(skin(128, 128, DARK), PipelineConfig(check_agreement=False))
+    assert res.skin_type_confidence == "unchecked" and "gate_check" not in res.timings_ms
+
+
+def test_confidence_ok_when_rule_and_model_agree():
+    res = process_image(skin(128, 128, DARK))
+    assert res.skin_type_confidence == "ok" and "gate_check" in res.timings_ms
+
+
+def test_disagreement_is_flagged_and_does_not_change_the_decision(monkeypatch):
+    img = skin(128, 128, DARK)
+    before = process_image(img)
+    monkeypatch.setattr("colorimetric.pipeline.is_dark", lambda rgb: False)  # the model says light, the ITA rule says dark
+    res = process_image(img)
+    assert res.skin_type_confidence == "low" and any("disagree" in n for n in res.notes)
+    assert res.ccm_applied == before.ccm_applied and np.array_equal(res.image, before.image)
