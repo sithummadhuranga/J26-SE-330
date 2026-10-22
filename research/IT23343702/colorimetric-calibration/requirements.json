@@ -186,10 +186,13 @@
    "id": "NFR5",
    "text": "No patient image data transmitted; only anonymous analytics JSON goes to the backend.",
    "status": "partial",
-   "note": "The module returns no image data in its JSON (tested) and works on the device. Not covered: the phone photos carried GPS location tags (found in the area-test photos); no code strips them before an image could leave the phone. Whether the app ever uploads images is Member 4's side and I did not check it.",
+   "note": "The module returns no image data in its JSON (tested) and imports no network library. Phone photos carried GPS location tags (the area-test photos did, although location should be off), so scripts/strip_location.py now copies photos for sharing with the location removed and nothing else changed (checked on 9 real iPhone photos: location gone, pixels identical, orientation and time kept). Not covered: the app itself. Per Member 4's code comment the photo never leaves the phone, but whether the app stores or exports photos with their location is not checked by me.",
    "tests": [
     "test_api.py::test_to_json_is_serialisable_and_has_no_image_data",
     "test_no_network_use.py::test_no_module_imports_a_network_library"
+   ],
+   "evidence_outside_pytest": [
+    "scripts/strip_location.py and tests/test_strip_location.py (9 tests; they need Pillow and piexif and are skipped where those are not installed, e.g. the GitHub colour-python job)"
    ]
   },
   {
