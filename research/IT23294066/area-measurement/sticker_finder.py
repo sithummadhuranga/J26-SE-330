@@ -267,7 +267,7 @@ def _touches_border_dark(dark, gray, min_side):
     A solid dark object at the edge (a bag, a chair, a shadow) has no bright paper inside, so it does not count."""
     cs, _ = cv2.findContours(dark, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     H, W = dark.shape[:2]
-    paper = 0.75 * float(np.percentile(gray, 95))
+    paper = max(200.0, 0.85 * float(np.percentile(gray, 95)))      # paper is near white; skin and cloth are not
     for c in cs:
         if cv2.contourArea(c) < min_side ** 2:
             continue
@@ -277,6 +277,22 @@ def _touches_border_dark(dark, gray, min_side):
         if float((gray[y:y + h, x:x + w] > paper).mean()) >= 0.25:
             return True
     return False
+
+
+MIN_FRAME_SIGNAL = 0.08  # below this the shape has no brighter inside than its frame: it cannot be a sticker, glare or not
+HOLE_SHARE = (0.5, 0.8)   # the white inside of the frame is 64% of the sticker's area (40 x 40 of 50 x 50; measured 0.60-0.66 on real photos)
+
+
+def _hole_share_ok(cs, hier, i):
+    """Only a shape whose biggest hole is about 64% of its whole area can be the sticker's frame. Shadows, creases and dark folds
+    make hollow outlines too (thin rings with a hole of 90%+, thick blocks with a hole of a few percent), and they must not be
+    blamed on a sticker problem: on 60 wound photos with no sticker the share of the false candidates was 0.00-0.39."""
+    outer = cv2.contourArea(cs[i])
+    best, k = 0.0, hier[0][i][2]
+    while k != -1:
+        best = max(best, cv2.contourArea(cs[k]))
+        k = hier[0][k][0]
+    return outer > 0 and HOLE_SHARE[0] <= best / outer <= HOLE_SHARE[1]
 
 
 def _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=False):
@@ -296,6 +312,8 @@ def _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=False):
     for i, c in enumerate(cs):
         if hier[0][i][3] != -1 or hier[0][i][2] == -1 or cv2.contourArea(c) < min_side ** 2:
             continue
+        if not _hole_share_ok(cs, hier, i):
+            continue                                       # a dark outline, but not shaped like the sticker's frame
         q = _quad(c, min_side)
         if q is None:
             continue
@@ -303,6 +321,8 @@ def _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=False):
         q = _order_clockwise(_refine(gray_full, q))
         blur = cv2.GaussianBlur(gray_full, (0, 0), max(0.5, 0.6 * np.linalg.norm(q[0] - q[1]) / 100))
         oc, fc, k, canon = _orient(blur, q)
+        if fc < MIN_FRAME_SIGNAL:
+            continue                                       # no bright inside at all: a dark block or shadow, not a faded sticker
         layout = _layout_ok(canon)
         code = _reject_code(oc, fc, layout, False if layout else _layout_ok(canon.T), min_orient, min_frame,
                             washed=False if layout else _patches_washed(canon))

@@ -59,6 +59,8 @@ const _canon = 100; // the straightened picture is 100 x 100 pixels, 2 per mm
 const _sqLo = 5.0, _sqHi = 11.0;
 const _patches = [(12.5, 25.0, 10.0), (25.0, 25.0, 10.0), (37.5, 25.0, 10.0)];
 const _whiteX = (15.0, 35.0), _whiteY = (33.0, 42.0);
+const _holeShareMin = 0.5, _holeShareMax = 0.8; // measured 0.60-0.66 on real photos of the sticker
+const _minFrameSignal = 0.08; // a shape with no brighter inside than its frame cannot be a sticker, glare or not
 
 /// Grey values the way OpenCV makes them (fixed-point 0.299 R + 0.587 G + 0.114 B).
 Uint8List toGray(Uint8List rgba, int w, int h) {
@@ -338,11 +340,16 @@ class _Scan {
     final hits = <_Hit>[];
     final notes = <_Note>[];
     for (final c in comps.where((c) => c.holes > 0 && c.area + c.holeArea >= minSide * minSide)) {
+      // Only a shape whose biggest hole is about 64% of its whole area (the sticker's white inside) can be the sticker's frame. Shadows and
+      // creases make hollow outlines too, and must not be blamed on a sticker problem. Same rule as the Python finder.
+      final share = c.maxHole / (c.area + c.holeArea);
+      if (share < _holeShareMin || share > _holeShareMax) continue;
       final quad = _quad(c.boundary, minSide);
       if (quad == null) continue;
       final q = _orderClockwise(quad);
       final blur = _blurAround(q);
       final (oc, fc, k, canon) = _orient(blur, q);
+      if (fc < _minFrameSignal) continue;
       final layout = _layoutOk(canon);
       var code = _rejectCode(oc, fc, layout, layout ? false : _layoutOk(_transpose(canon)), minOrient, minFrame,
           washed: layout ? false : _patchesWashed(canon));
@@ -371,7 +378,7 @@ class _Scan {
         break;
       }
     }
-    final paper = 0.75 * p95;
+    final paper = math.max(200.0, 0.85 * p95); // paper is near white; skin and cloth are not
     for (final c in _components(dark, w, h)) {
       if (c.area < minSide * minSide) continue;
       if (!(c.minX <= 1 || c.minY <= 1 || c.maxX >= w - 2 || c.maxY >= h - 2)) continue;
@@ -630,7 +637,7 @@ Uint8List _morph(Uint8List m, int w, int h, bool grow) {
 }
 
 class _Comp {
-  int area = 0, holes = 0, holeArea = 0;
+  int area = 0, holes = 0, holeArea = 0, maxHole = 0;
   int minX = 1 << 30, minY = 1 << 30, maxX = -1, maxY = -1;
   final boundary = <(int, int)>[];
 }
@@ -672,6 +679,7 @@ List<_Comp> _components(Uint8List m, int w, int h) {
     if (owner == 0) continue;
     comps[owner].holes++;
     comps[owner].holeArea += size[l];
+    if (size[l] > comps[owner].maxHole) comps[owner].maxHole = size[l];
   }
   final wanted = [for (final c in comps) c.holes > 0 || c.area > 0];
   for (var y = 0; y < h; y++) {

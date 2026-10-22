@@ -230,6 +230,16 @@
    "best_orientation_contrast": 0.0,
    "stickers": []
   },
+  "sim_shadows_no_sticker": {
+   "width": 1200,
+   "height": 900,
+   "code": "no_candidate",
+   "found": 0,
+   "candidates": 0,
+   "best_frame_contrast": 0.0,
+   "best_orientation_contrast": 0.0,
+   "stickers": []
+  },
   "real_iphone_tilt": {
    "width": 900,
    "height": 1200,
@@ -372,7 +382,7 @@
    "height": 1200,
    "code": null,
    "found": 6,
-   "candidates": 7,
+   "candidates": 6,
    "best_frame_contrast": 0.858,
    "best_orientation_contrast": 0.97,
    "stickers": [
@@ -509,9 +519,9 @@
    "height": 1200,
    "code": "weak_frame_contrast",
    "found": 0,
-   "candidates": 2,
-   "best_frame_contrast": 0.171,
-   "best_orientation_contrast": 1.0,
+   "candidates": 6,
+   "best_frame_contrast": 0.561,
+   "best_orientation_contrast": 0.972,
    "stickers": []
   },
   "real_glare_b": {

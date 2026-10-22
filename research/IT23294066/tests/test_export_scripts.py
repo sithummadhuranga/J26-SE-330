@@ -108,7 +108,7 @@ class GateFixtureTest(unittest.TestCase):
         self.assertEqual(meta["max_dim"], 1200)
         want = {"sim_six_tilt25": None, "sim_one_ok": None, "sim_one_mirrored": "mirrored", "sim_one_no_orientation": "weak_orientation",
                 "sim_one_cut": "cut_by_edge", "sim_one_washed": "weak_frame_contrast", "sim_one_patch_glare": "weak_frame_contrast",
-                "blank": "no_candidate"}
+                "blank": "no_candidate", "sim_shadows_no_sticker": "no_candidate"}
         for name, code in want.items():
             self.assertEqual(meta["cases"][name]["code"], code, name)
             img = cv2.imread(os.path.join(d, name + ".jpg"))
@@ -119,7 +119,7 @@ class GateFixtureTest(unittest.TestCase):
 
     def test_the_committed_fixtures_match_what_the_finder_says_today(self):
         meta = json.load(open(GATE_DIR / "gate_expected.json"))
-        self.assertGreaterEqual(len(meta["cases"]), 12)
+        self.assertGreaterEqual(len(meta["cases"]), 13)
         import sticker_finder as SF
         for name, exp in meta["cases"].items():
             rgb = cv2.cvtColor(cv2.imread(str(GATE_DIR / (name + ".jpg"))), cv2.COLOR_BGR2RGB)

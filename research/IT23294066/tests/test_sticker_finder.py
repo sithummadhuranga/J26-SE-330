@@ -245,6 +245,24 @@ class DiagnoseTest(unittest.TestCase):
         img, _, _ = self.one_sticker(lambda b: b[:, ::-1])
         self.assertEqual(SF.diagnose_stickers(img).code, "mirrored")
 
+    def shadow_scene(self):
+        """Skin-coloured photo with dark shapes that make hollow outlines but are not a sticker: a thin ring (hole 90%+ of the shape)
+        and a dark block with a small hole (a few percent)."""
+        rng = np.random.default_rng(3)
+        img = np.clip(rng.normal([170, 120, 100], 5, (900, 1200, 3)), 0, 255).astype(np.uint8)
+        cv2.circle(img, (350, 450), 200, (30, 25, 25), 5)
+        cv2.rectangle(img, (700, 250), (1000, 650), (35, 30, 30), -1)
+        cv2.rectangle(img, (820, 400), (880, 460), (170, 120, 100), -1)
+        return img
+
+    def test_dark_shapes_that_are_not_sticker_shaped_are_never_blamed_on_a_sticker_problem(self):
+        """A wound photo has shadows and creases. Only a shape whose hole is about 64% of its area (the sticker's) may be called a
+        sticker problem; anything else is simply no sticker. 20 of 60 wound photos without any sticker used to get 'glare'."""
+        img = self.shadow_scene()
+        d = SF.diagnose_stickers(img)
+        self.assertEqual((d.stickers, d.code), ([], "no_candidate"))
+        self.assertEqual(d.candidates, 0)
+
     def test_a_dark_object_at_the_corner_of_the_photo_is_not_a_cut_sticker(self):
         img = np.full((900, 1200, 3), 150, np.uint8)
         img[780:900, 1050:1200] = 20                                         # a small dark corner, like a chair or a bag
@@ -265,10 +283,10 @@ class DiagnoseTest(unittest.TestCase):
         from unittest import mock
         img, _, _ = self.one_sticker()
         canon = np.full((100, 100), 128, np.float32)
-        with mock.patch.object(SF, "_orient", return_value=(83.9, -0.01, 0, canon)):
+        with mock.patch.object(SF, "_orient", return_value=(83.9, 0.2, 0, canon)):
             d = SF.diagnose_stickers(img)
         self.assertEqual(d.code, "weak_frame_contrast")
-        self.assertEqual((d.best_orientation_contrast, d.best_frame_contrast), (1.0, 0.0))
+        self.assertEqual((d.best_orientation_contrast, d.best_frame_contrast), (1.0, 0.2))
 
     def test_the_codes_are_the_agreed_list(self):
         self.assertEqual(SF.REJECT_CODES, ("no_candidate", "cut_by_edge", "weak_frame_contrast", "weak_orientation",
