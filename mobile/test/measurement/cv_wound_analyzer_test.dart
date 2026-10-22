@@ -67,21 +67,33 @@ void main() {
 
   testWidgets('a photo where no wound is found says so and names the segmentation step', (tester) async {
     await tester.runAsync(() async {
+      final stages = <AnalysisStage>[];
       await expectLater(
-        _analyzer(_NoWound()).analyze(_photo('sim_one_ok')),
+        _analyzer(_NoWound()).analyze(_photo('sim_one_ok'), onStage: stages.add),
         throwsA(isA<AnalysisFailed>()
             .having((e) => e.message, 'message', startsWith('No wound found'))
             .having((e) => e.stage, 'stage', AnalysisStage.segmentation)),
       );
+      expect(stages, [AnalysisStage.calibration, AnalysisStage.segmentation], reason: 'measurement and colour must not start when there is no wound');
     });
   });
 
   testWidgets('a missing model is reported plainly', (tester) async {
     await tester.runAsync(() async {
-      final a = CvWoundAnalyzer(pipeline: () async => throw const ModelMissing('x'));
+      final a = CvWoundAnalyzer(pipeline: () async => throw const ModelMissing('The model file is not on this phone yet (x).'));
       await expectLater(
         a.analyze(_photo('sim_one_ok')),
         throwsA(isA<AnalysisFailed>().having((e) => e.message, 'message', contains('wound model is not on this phone'))),
+      );
+    });
+  });
+
+  testWidgets('a model that is there but cannot be started is not reported as missing', (tester) async {
+    await tester.runAsync(() async {
+      final a = CvWoundAnalyzer(pipeline: () async => throw const ModelMissing('The model could not be loaded: x'));
+      await expectLater(
+        a.analyze(_photo('sim_one_ok')),
+        throwsA(isA<AnalysisFailed>().having((e) => e.message, 'message', contains('could not be started'))),
       );
     });
   });

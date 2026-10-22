@@ -139,6 +139,17 @@ void main() {
     expect(analyzer.calls, 0);
   });
 
+  testWidgets('the analysis screen only calls its numbers demonstration values when the analyzer is the sample one', (tester) async {
+    await show(tester, bytes: png, checker: (_) async => _checked(Verdict.ok), analyzer: _StopsEarly());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('useImage')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(ProcessingScreen), findsOneWidget);
+    expect(find.textContaining('use demonstration values'), findsNothing);
+    expect(find.textContaining('analysed on this phone'), findsOneWidget);
+  });
+
   testWidgets('a photo that cannot be opened says so and offers Retake', (tester) async {
     await show(tester, bytes: png, checker: (_) async => throw const FormatException('bad picture'));
     await tester.pumpAndSettle();

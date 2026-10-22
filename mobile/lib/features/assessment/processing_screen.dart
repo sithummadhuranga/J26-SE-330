@@ -239,9 +239,11 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Back')),
             ],
             const SizedBox(height: 16),
-            const NoticeStrip(
-              'Prototype: calibration, segmentation, measurement and color analysis use demonstration values until '
-              'the on-device pipeline is added. Saving and evidence retrieval are real.',
+            NoticeStrip(
+              widget.services.analyzer is SampleWoundAnalyzer
+                  ? 'Prototype: calibration, segmentation, measurement and color analysis use demonstration values until '
+                      'the on-device pipeline is added. Saving and evidence retrieval are real.'
+                  : 'The photo was analysed on this phone and was not uploaded. Saving and evidence retrieval are real.',
               icon: Icons.info_outline_rounded,
             ),
           ],

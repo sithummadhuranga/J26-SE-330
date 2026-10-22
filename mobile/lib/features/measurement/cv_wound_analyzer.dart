@@ -1,5 +1,7 @@
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
+
 import '../assessment/analysis/wound_analyzer.dart';
 import 'capture/capture_messages.dart';
 import 'capture/capture_runner.dart';
@@ -66,8 +68,15 @@ class CvWoundAnalyzer implements WoundAnalyzer {
     final MeasurementPipeline pipeline;
     try {
       pipeline = await _pipeline();
-    } on ModelMissing {
-      throw AnalysisFailed('The wound model is not on this phone yet. Ask for it to be installed, then try again.', stage: AnalysisStage.segmentation);
+    } on ModelMissing catch (e) {
+      debugPrint('wound model not available: ${e.reason}');
+      final notThere = e.reason.contains('not on this phone');
+      throw AnalysisFailed(
+        notThere
+            ? 'The wound model is not on this phone yet. Ask for it to be installed, then try again.'
+            : 'The wound model could not be started on this phone. Close the app and open it again.',
+        stage: AnalysisStage.segmentation,
+      );
     }
 
     final w = photo.width, h = photo.height;
@@ -81,6 +90,8 @@ class CvWoundAnalyzer implements WoundAnalyzer {
     onStage?.call(AnalysisStage.segmentation);
     await _paint();
     final result = pipeline.analyzePrepared(prepared, scale: scale, markerRgb: crop);
+    // Nothing found: stop here, so the screen does not show measurement and colour as if they had happened.
+    if (result.segmentation.detections.isEmpty) throw _failure('no wound');
     onStage?.call(AnalysisStage.measurement);
     await _paint();
     onStage?.call(AnalysisStage.colour);
