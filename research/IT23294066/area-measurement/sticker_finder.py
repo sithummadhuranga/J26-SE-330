@@ -45,10 +45,10 @@ class Sticker:
     frame_contrast: float      # 0 to 1: how much darker the frame is than the white inside
 
 
-def _dark_mask(gray):
+def _dark_mask(gray, factor=0.5, abs_max=140):
     k = max(15, (min(gray.shape) // 8) | 1)
     local = cv2.blur(gray.astype(np.float32), (k, k))
-    dark = (gray.astype(np.float32) < 0.5 * local) & (gray < 140)
+    dark = (gray.astype(np.float32) < factor * local) & (gray < abs_max)
     dark = cv2.morphologyEx(dark.astype(np.uint8) * 255, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     return dark
 
@@ -248,31 +248,37 @@ def _reject_code(oc, fc, layout, transposed, min_orient, min_frame):
     return None
 
 
-def _touches_border_dark(dark, min_side):
-    """True when a big dark shape touches the edge of the photo: a frame that is cut off."""
+def _touches_border_dark(dark, gray, min_side):
+    """True when a dark shape touches the edge of the photo and has bright paper inside its bounding box: a frame that is cut off.
+    A solid dark object at the edge (a bag, a chair, a shadow) has no bright paper inside, so it does not count."""
     cs, _ = cv2.findContours(dark, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     H, W = dark.shape[:2]
+    paper = 0.75 * float(np.percentile(gray, 95))
     for c in cs:
         if cv2.contourArea(c) < min_side ** 2:
             continue
         x, y, w, h = cv2.boundingRect(c)
-        if x <= 1 or y <= 1 or x + w >= W - 1 or y + h >= H - 1:
+        if not (x <= 1 or y <= 1 or x + w >= W - 1 or y + h >= H - 1):
+            continue
+        if float((gray[y:y + h, x:x + w] > paper).mean()) >= 0.25:
             return True
     return False
 
 
-def _scan(rgb, side_mm, max_dim, min_orient, min_frame):
-    """Everything find_stickers does, plus a note for every frame-like shape that was turned down: (area, code, oc, fc)."""
+def _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=False):
+    """Everything find_stickers does, plus a note for every frame-like shape that was turned down: (area, code, oc, fc).
+    lenient=True looks for frames that are only a little darker than their surroundings (glare lifts the blacks); it is used only
+    to explain a failure, and a shape found that way is never accepted as a sticker."""
     h, w = rgb.shape[:2]
     s = min(1.0, max_dim / max(h, w))
     gray_full = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     small = cv2.resize(gray_full, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else gray_full
-    dark = _dark_mask(cv2.GaussianBlur(small, (3, 3), 0))
+    dark = _dark_mask(cv2.GaussianBlur(small, (3, 3), 0), *((0.8, 215) if lenient else (0.5, 140)))
     cs, hier = cv2.findContours(dark, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
     out, notes = [], []
     min_side = 0.04 * max(small.shape)
     if hier is None:
-        return out, notes, dark, min_side
+        return out, notes, small, dark, min_side
     for i, c in enumerate(cs):
         if hier[0][i][3] != -1 or hier[0][i][2] == -1 or cv2.contourArea(c) < min_side ** 2:
             continue
@@ -285,6 +291,8 @@ def _scan(rgb, side_mm, max_dim, min_orient, min_frame):
         oc, fc, k, canon = _orient(blur, q)
         layout = _layout_ok(canon)
         code = _reject_code(oc, fc, layout, False if layout else _layout_ok(canon.T), min_orient, min_frame)
+        if lenient and code is None:
+            code = "weak_frame_contrast"                      # it passes only because the mask was loosened: the frame is not dark
         if code is not None:
             notes.append((float(cv2.contourArea(c)), code, float(oc), float(fc)))
             continue
@@ -301,7 +309,7 @@ def _scan(rgb, side_mm, max_dim, min_orient, min_frame):
         f = f if f < 0.95 else 1.0
         crop = cv2.warpPerspective(src, cv2.getPerspectiveTransform((q * f).astype(np.float32), dstc), (CROP, CROP), flags=cv2.INTER_LINEAR)
         out.append(Sticker(q, H, ppm, crop, float(oc), float(fc)))
-    return sorted(out, key=lambda t: -t.px_per_mm), notes, dark, min_side
+    return sorted(out, key=lambda t: -t.px_per_mm), notes, small, dark, min_side
 
 
 def find_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_frame=0.5):
@@ -313,7 +321,9 @@ def diagnose_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_fr
     """find_stickers plus the reason when it finds nothing: a Diagnosis whose code is None if at least one sticker was accepted,
     otherwise the code of the most prominent (largest) frame-like shape that was turned down, or 'cut_by_edge' / 'no_candidate'
     when there was none."""
-    out, notes, dark, min_side = _scan(rgb, side_mm, max_dim, min_orient, min_frame)
+    out, notes, small, dark, min_side = _scan(rgb, side_mm, max_dim, min_orient, min_frame)
+    if not out and not notes:
+        notes = _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=True)[1]
     best_fc = min(max(max((n[3] for n in notes), default=0.0), 0.0), 1.0)      # kept in 0..1: with a washed-out frame the raw ratio explodes
     best_oc = min(max(max((n[2] for n in notes), default=0.0), 0.0), 1.0)
     if out:
@@ -321,7 +331,7 @@ def diagnose_stickers(rgb, side_mm=SIDE_MM, max_dim=1600, min_orient=0.5, min_fr
     rejected = [n for n in notes if n[1] is not None]
     if rejected:
         code = max(rejected, key=lambda n: n[0])[1]
-    elif _touches_border_dark(dark, min_side):
+    elif _touches_border_dark(dark, small, min_side):
         code = "cut_by_edge"
     else:
         code = "no_candidate"

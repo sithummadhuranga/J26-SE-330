@@ -222,6 +222,20 @@ class DiagnoseTest(unittest.TestCase):
         cut = img[:, int(c[0]):]                                             # cut off its left half
         self.assertEqual(SF.diagnose_stickers(cut).code, "cut_by_edge")
 
+    def test_a_washed_out_frame_is_weak_frame_contrast_even_when_it_is_too_light_to_count_as_dark(self):
+        """Glare lifts the blacks. The strict dark mask then sees no frame at all, but a second, more lenient look still finds the shape."""
+        img, _, _ = self.one_sticker()
+        washed = np.clip(110 + 0.5 * img.astype(np.float32), 0, 255).astype(np.uint8)           # blacks 20 -> 120, white 255 -> 237
+        self.assertEqual(SF.find_stickers(washed), [])
+        d = SF.diagnose_stickers(washed)
+        self.assertEqual((d.stickers, d.code), ([], "weak_frame_contrast"))
+        self.assertGreater(d.candidates, 0)
+
+    def test_a_dark_object_at_the_corner_of_the_photo_is_not_a_cut_sticker(self):
+        img = np.full((900, 1200, 3), 150, np.uint8)
+        img[780:900, 1050:1200] = 20                                         # a small dark corner, like a chair or a bag
+        self.assertEqual(SF.diagnose_stickers(img).code, "no_candidate")
+
     def test_codes_come_from_the_contrast_and_layout_results_in_a_fixed_order(self):
         rc = SF._reject_code
         self.assertEqual(rc(oc=0.9, fc=0.31, layout=True, transposed=False, min_orient=0.5, min_frame=0.5), "weak_frame_contrast")
