@@ -84,14 +84,24 @@ void cc_destroy(void* pipeline) { delete static_cast<Pipeline*>(pipeline); }
 
 const char* cc_last_error(const void* pipeline) { return pipeline ? static_cast<const Pipeline*>(pipeline)->error.c_str() : "null pipeline"; }
 
-int32_t cc_process(void* handle, const uint8_t* data, int32_t width, int32_t height, const cc_bbox* wound, cc_result* out) {
-  if (!handle || !out) return -1;
+int32_t cc_process(void* handle, const uint8_t* data, uint64_t len, int32_t width, int32_t height, const cc_bbox* wound,
+                   cc_result* out) {
+  if (!handle || !out) return CC_ERR_ARGUMENT;
   auto& p = *static_cast<Pipeline*>(handle);
   p.error.clear();
   p.notes.clear();
-  if (!data || width < 1 || height < 1) {
-    p.error = "expected a non-empty width*height*3 uint8 RGB buffer";
-    return -2;
+  if (!data) {
+    p.error = "rgb is null";
+    return CC_ERR_ARGUMENT;
+  }
+  if (width < 1 || height < 1 || width > CC_MAX_SIDE || height > CC_MAX_SIDE ||
+      uint64_t(width) * uint64_t(height) * 3u > 0x7FFFFFFFu) {
+    p.error = "width and height must be 1.." + std::to_string(CC_MAX_SIDE) + " with width*height*3 below 2^31";
+    return CC_ERR_SIZE;
+  }
+  if (len != uint64_t(width) * uint64_t(height) * 3u) {
+    p.error = "rgb_len is " + std::to_string(len) + " but width*height*3 is " + std::to_string(uint64_t(width) * uint64_t(height) * 3u);
+    return CC_ERR_LENGTH;
   }
   try {
     const cc_config& c = p.cfg;
@@ -181,7 +191,7 @@ int32_t cc_process(void* handle, const uint8_t* data, int32_t width, int32_t hei
     return 0;
   } catch (const std::exception& e) {
     p.error = e.what();
-    return -3;
+    return CC_ERR_PROCESSING;
   }
 }
 

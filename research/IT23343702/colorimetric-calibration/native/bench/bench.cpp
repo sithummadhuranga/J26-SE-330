@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     std::vector<std::vector<double>> t(CC_T_COUNT + 1);
     for (int r = 0; r < runs + 1; ++r) {
       cc_result res;
-      if (cc_process(p, img.data, img.cols, img.rows, nullptr, &res) != 0) return 1;
+      if (cc_process(p, img.data, img.total() * 3, img.cols, img.rows, nullptr, &res) != 0) return 1;
       if (r == 0) continue;  // warm-up
       for (int i = 0; i < CC_T_COUNT; ++i) t[i].push_back(res.stage_ms[i]);
       t[CC_T_COUNT].push_back(res.total_ms);

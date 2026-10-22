@@ -26,8 +26,11 @@ target_compile_options(colorimetric PRIVATE -Wall -Wextra)
 
 add_executable(parity_test tests/parity_test.cpp)
 target_link_libraries(parity_test PRIVATE colorimetric_core colorimetric opencv_imgcodecs)
+add_executable(api_test tests/api_test.cpp)
+target_link_libraries(api_test PRIVATE colorimetric)
 add_executable(bench bench/bench.cpp)
 target_link_libraries(bench PRIVATE colorimetric opencv_core opencv_imgproc opencv_imgcodecs)
 
 enable_testing()
+add_test(NAME api COMMAND api_test)
 add_test(NAME parity COMMAND parity_test ${CMAKE_BINARY_DIR}/fixtures)
