@@ -16,6 +16,45 @@ import 'media_store.dart';
 
 enum StepState { pending, active, done, attention }
 
+/// What the guidance step says for the queue status and the last sync. Null while it is simply still working. The reason a sync
+/// gave ([SyncReport.detail]) is shown, so that a problem can be found from the screen instead of from the server's logs.
+@visibleForTesting
+(StepState, String?)? describeAdviceWait(QueueStatus? status, SyncReport report) {
+  String withDetail(String text) => report.detail == null || report.detail!.isEmpty ? text : '$text (${report.detail})';
+  if (status == QueueStatus.complete || status == QueueStatus.superseded) return (StepState.done, null);
+  if (status == QueueStatus.rejected) return (StepState.attention, withDetail('The server did not accept this assessment.'));
+  if (status == QueueStatus.adviceDeferred) {
+    return (
+      StepState.attention,
+      'The guideline service could not answer yet. It tries again by itself; the assessment is saved and synced.',
+    );
+  }
+  switch (report.outcome) {
+    case SyncOutcome.offline || SyncOutcome.serverBusy || SyncOutcome.backingOff:
+      return (StepState.attention, withDetail('Offline or the server is busy: the assessment is saved, and guidance will arrive once it syncs.'));
+    case SyncOutcome.needsSignIn:
+      return (StepState.attention, 'Sign in again to sync. The assessment is saved.');
+    default:
+      return null;
+  }
+}
+
+/// The guidance did not arrive in time: say what the last sync said.
+@visibleForTesting
+(StepState, String?) describeAdviceTimeout(SyncReport report) => (
+  StepState.attention,
+  'Synced, but still waiting for guidance (last sync: ${report.outcome.name}'
+      '${report.detail == null || report.detail!.isEmpty ? '' : ', ${report.detail}'}). It will appear when it is ready.',
+);
+
+/// Something unexpected went wrong while waiting: show what it was, cut to a readable length.
+@visibleForTesting
+(StepState, String?) describeAdviceError(Object error) {
+  final text = '$error'.replaceAll(RegExp(r'\s+'), ' ');
+  final short = text.length > 140 ? '${text.substring(0, 140)}…' : text;
+  return (StepState.attention, 'The assessment is saved, but checking for guidance failed: ${error.runtimeType}: $short');
+}
+
 class _Step {
   _Step(this.label);
 
@@ -109,9 +148,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     String? note;
     try {
       (state, note) = await _waitForAdvice();
-    } catch (_) {
-      // The assessment is already saved in the queue, so whatever went wrong here, it will still sync later.
-      (state, note) = (StepState.attention, 'Saved — guidance will arrive once it syncs');
+    } catch (e) {
+      // The assessment is already saved in the queue, so whatever went wrong here, it will still sync later. Say what it was.
+      (state, note) = describeAdviceError(e);
     }
     _set(5, state, note);
     if (mounted) setState(() => _finished = true);
@@ -169,18 +208,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     while (mounted) {
       final report = await s.scheduler.syncNow();
       final status = await _status();
-      if (status == QueueStatus.complete || status == QueueStatus.superseded) return (StepState.done, null);
-      if (status == QueueStatus.rejected) return (StepState.attention, 'The server did not accept this assessment.');
-      switch (report.outcome) {
-        case SyncOutcome.offline || SyncOutcome.serverBusy || SyncOutcome.backingOff:
-          return (StepState.attention, 'Offline — saved, and guidance will arrive once it syncs');
-        case SyncOutcome.needsSignIn:
-          return (StepState.attention, 'Sign in again to sync — the assessment is saved');
-        default:
-      }
-      if (DateTime.now().isAfter(deadline)) {
-        return (StepState.attention, 'Synced — guidance is taking longer and will appear when ready');
-      }
+      final described = describeAdviceWait(status, report);
+      if (described != null) return described;
+      if (DateTime.now().isAfter(deadline)) return describeAdviceTimeout(report);
       await Future<void>.delayed(widget.adviceRetry);
     }
     return (StepState.pending, null);
