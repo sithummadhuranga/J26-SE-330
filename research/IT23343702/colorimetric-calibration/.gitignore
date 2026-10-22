@@ -10,3 +10,6 @@ data/isic_subset/
 # Markdown/docs stay local (not in the repo)
 *.md
 docs/
+
+# C++ port build output
+native/build/
