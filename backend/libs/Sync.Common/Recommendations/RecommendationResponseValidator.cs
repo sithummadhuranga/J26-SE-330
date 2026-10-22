@@ -9,7 +9,7 @@ public sealed class RecommendationResponseValidator(JsonSchema schema)
 {
     private static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.List };
 
-    /// <summary>Loads contracts/rag-response.schema.json copied next to the service's binary.</summary>
+    /// <summary>Loads contracts/rag-response.schema.json, which is copied next to the service's binary.</summary>
     public static RecommendationResponseValidator FromOutputDirectory() => new(JsonSchema.FromText(File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "contracts", "rag-response.schema.json"))));
 

@@ -1,6 +1,6 @@
 namespace Sync.Common.Evaluation;
 
-/// <summary>Evaluation-only switch: turns off dedup and writes shadow rows to show duplicates.</summary>
+/// <summary>A switch just for the evaluation. It turns off duplicate removal and writes shadow rows so the duplicates can be seen.</summary>
 public sealed record AblationOptions(bool Enabled)
 {
     public const string ConfigKey = "Ablation:Enabled";

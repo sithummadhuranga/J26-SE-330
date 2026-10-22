@@ -12,5 +12,5 @@ public sealed record AssessmentContext(
     JsonElement ClinicalAssessment,
     IReadOnlyList<HistoryRow> History);
 
-/// <summary>An earlier capture of the same wound (latest revision of each earlier assessment).</summary>
+/// <summary>An earlier capture of the same wound (the latest revision of each earlier assessment).</summary>
 public sealed record HistoryRow(DateTimeOffset CapturedAt, JsonElement Analytics);

@@ -6,7 +6,7 @@ using Sync.Common.Kafka;
 
 namespace Orchestrator.Tests;
 
-/// <summary>The §8.3 retry chain: where a failed message goes next, and when it may be tried again.</summary>
+/// <summary>The §8.3 retry chain: where a failed message goes next, and when it can be tried again.</summary>
 public class RetryRoutingTests
 {
     [Theory]

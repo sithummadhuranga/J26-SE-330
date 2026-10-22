@@ -6,7 +6,7 @@ import 'package:melanin_wound_cdss/features/sync/domain/wound_event_validator.da
 
 import 'support/fakes.dart';
 
-/// The app's validator against the contract's own examples (contracts/examples), so it cannot drift from the schema.
+/// Runs the app's validator against the contract's own examples (contracts/examples), so the two can't drift apart.
 void main() {
   final examples = Directory('../contracts/examples')
       .listSync()

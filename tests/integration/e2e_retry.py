@@ -1,11 +1,12 @@
-"""DISRUPTIVE: retries recover without blocking new events, and persistent failures end in the DLQ (about two minutes)."""
+"""DISRUPTIVE: retries recover without holding up new events, and failures that keep happening end up in the DLQ.
+Takes about two minutes."""
 import os
 import secrets
 import subprocess
 import sys
 import time
 
-from client import REPO_ROOT, Checks, create_clinician, http, login, sql, uuid7, wait_for, wound_event
+from client import Checks, compose, create_clinician, http, login, sql, uuid7, wait_for, wound_event
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -17,11 +18,6 @@ NURSE = "retry.nurse." + secrets.token_hex(3)
 
 t = Checks()
 check = t.check
-
-
-def compose(*args, env=None):
-    return subprocess.run(["docker", "compose", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=300,
-                          env={**os.environ, **(env or {})})
 
 
 def wait(fn, seconds=60, interval=1.0):
@@ -77,7 +73,7 @@ try:
     a1 = uuid7()
     e1 = wound_event(a1, uuid7(), DEVICE, FAC)
     push(e1)
-    # Detected in the database (fast) so the newer event goes in well inside the first event's delay window.
+    # Watch the database, which is quick, so the newer event goes in well before the first event's delay is up.
     check("Recommendation Service down: event deferred (ADVICE_DEFERRED)",
           wait_for(f"select count(*) from sync.change_log where assessment_id = '{a1}' and change_type = 'ADVICE_DEFERRED'",
                    "1", 90))
@@ -91,7 +87,7 @@ try:
                     where assessment_id in ('{a1}', '{a2}')""")
     check("... the newer event got its advice first", order == f"{a2},{a1}", order)
     check("... and the copy went through wound-events.retry.30s", messages_for("wound-events.retry.30s", e1["eventId"]))
-    # Measured from the database, not from when this script spotted the retry message.
+    # Measure from the database, not from when this script noticed the retry message.
     waited = float(sql(f"""select extract(epoch from r.created_at - c.created_at) from sync.change_log c
                            join clinical.recommendation r using (assessment_id, revision)
                            where c.assessment_id = '{a1}' and c.change_type = 'ADVICE_DEFERRED'"""))

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Sync.Common.Web;
 
-/// <summary>Keeps data-protection keys in memory since bearer-only services never actually protect data with them.</summary>
+/// <summary>Keeps data-protection keys in memory, because services that only use bearer tokens never actually protect data with them.</summary>
 public static class InMemoryDataProtection
 {
     public static IServiceCollection AddInMemoryDataProtection(this IServiceCollection services)

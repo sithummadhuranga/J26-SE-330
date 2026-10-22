@@ -11,7 +11,7 @@ import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 
 import 'support/fakes.dart';
 
-/// The sync engine against a fake gateway (architecture §6.2, §7.1, §11).
+/// Tests the sync engine against a fake gateway (architecture §6.2, §7.1 and §11).
 void main() {
   late AppDatabase db;
   late QueueRepository queue;
@@ -21,11 +21,11 @@ void main() {
   late DateTime now;
 
   Future<void> signedIn() async =>
-      auth.signIn(username: 'n.silva', password: 'correct-password', deviceId: await queue.deviceId());
+      auth.signIn(deviceId: await queue.deviceId());
 
   void build({FakeGateway? fake, int seed = 1}) {
     gateway = fake ?? FakeGateway();
-    auth = AuthSession(gateway, MemorySecretStore(), clock: () => now);
+    auth = AuthSession(gateway, MemorySecretStore(), browser: FakeBrowserSignIn(gateway), clock: () => now);
     engine = SyncEngine(queue: queue, api: gateway, auth: auth, clock: () => now, random: Random(seed));
   }
 
@@ -179,7 +179,7 @@ void main() {
     for (var i = 0; i < 60; i++) {
       await queue.enqueue(sampleEvent());
     }
-    // During the first push this run is too slow: its lease lapses and another isolate's run takes it.
+    // This run is too slow during its first push, so its lease runs out and a run on another isolate takes over.
     gateway.onPush = () async {
       gateway.onPush = null;
       await queue.setState(SyncStateKeys.syncLeaseOwner, 'another-run');
@@ -210,7 +210,7 @@ void main() {
   });
 
   test('§14.1 step 4: a flaky gateway never causes a lost or stuck row', () async {
-    // A third of pushes fail at random while new captures keep arriving.
+    // A third of the pushes fail at random, while new captures keep coming in.
     build(fake: FakeGateway(faultRate: 0.33, random: Random(7)), seed: 7);
     await signedIn();
     final ids = <String>{};

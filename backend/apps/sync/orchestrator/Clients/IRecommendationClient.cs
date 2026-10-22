@@ -4,16 +4,16 @@ using Sync.Common.Contracts;
 
 namespace Orchestrator.Clients;
 
-/// <summary>StatusCode 0 means no HTTP answer at all (timeout, unreachable, open circuit); Error then says why.</summary>
+/// <summary>StatusCode 0 means there was no HTTP answer at all (a timeout, unreachable, or an open circuit), and Error says why.</summary>
 public sealed record RecommendationCallResult(int StatusCode, JsonElement? Body, string? Error);
 
-/// <summary>Interface to the Recommendation Service, so tests and benchmarks can swap in the RAG stub.</summary>
+/// <summary>The interface to the Recommendation Service, so tests and benchmarks can swap in the RAG stub.</summary>
 public interface IRecommendationClient
 {
     Task<RecommendationCallResult> RecommendAsync(RecommendationRequest request, CancellationToken ct);
 }
 
-/// <summary>HTTP client with timeout, retries and circuit breaker; never throws, CallRag maps the result.</summary>
+/// <summary>An HTTP client with a timeout, retries and a circuit breaker. It never throws, and CallRag maps the result.</summary>
 public sealed class HttpRecommendationClient(IHttpClientFactory factory, ILogger<HttpRecommendationClient> logger)
     : IRecommendationClient
 {
@@ -37,7 +37,7 @@ public sealed class HttpRecommendationClient(IHttpClientFactory factory, ILogger
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            // Timeout (Polly TimeoutRejectedException), open circuit (BrokenCircuitException) or unreachable.
+            // A timeout (Polly's TimeoutRejectedException), an open circuit (BrokenCircuitException), or the service is unreachable.
             logger.LogWarning("Recommendation Service call for case {CaseId} failed: {Error}", request.CaseId, ex.Message);
             return new RecommendationCallResult(0, null, $"{ex.GetType().Name}: {ex.Message}");
         }

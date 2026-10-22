@@ -1,0 +1,3 @@
+# Tests tagged integration need the Docker stack and SYNC_BACKEND_URL (see test/integration/).
+tags:
+  integration:

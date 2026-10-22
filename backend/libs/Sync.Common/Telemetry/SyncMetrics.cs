@@ -8,11 +8,11 @@ public static class SyncMetrics
     public const string MeterName = "MelaninWoundCdss";
     private static readonly Meter Meter = new(MeterName);
 
-    /// <summary>Per-event push results at the gateway: ACCEPTED, DUPLICATE (a resend absorbed), REJECTED.</summary>
+    /// <summary>The push result for each event at the gateway: ACCEPTED, DUPLICATE (a resend we absorbed) or REJECTED.</summary>
     public static readonly Counter<long> EventsPushed =
         Meter.CreateCounter<long>("sync.events.pushed", "{event}", "Per-event push results");
 
-    /// <summary>Persister outcomes: persisted, deduplicated (a redelivery absorbed), revision_conflict, dead_letter.</summary>
+    /// <summary>What the persister did: persisted, deduplicated (a redelivery we absorbed), revision_conflict or dead_letter.</summary>
     public static readonly Counter<long> EventsPersisted =
         Meter.CreateCounter<long>("sync.events.persisted", "{event}", "Persister outcomes");
 
@@ -22,11 +22,11 @@ public static class SyncMetrics
     public static readonly Counter<long> OutboxPublished =
         Meter.CreateCounter<long>("sync.outbox.published", "{message}", "Outbox rows published to Kafka");
 
-    /// <summary>Orchestrator run outcomes: Stored, AlreadyProcessed, Superseded, Deferred, DeadLetter, Failed.</summary>
+    /// <summary>How each orchestrator run ended: Stored, AlreadyProcessed, Superseded, Deferred, DeadLetter or Failed.</summary>
     public static readonly Counter<long> OrchestrationOutcomes =
         Meter.CreateCounter<long>("sync.orchestration.outcomes", "{run}", "Orchestrator workflow outcomes");
 
-    /// <summary>Housekeeping (§9.4) per table: outbox (deleted), change_log (archived), inbox (deleted).</summary>
+    /// <summary>Housekeeping (§9.4) for each table: outbox rows deleted, change_log rows archived and inbox rows deleted.</summary>
     public static readonly Counter<long> HousekeepingRows =
         Meter.CreateCounter<long>("sync.housekeeping.rows", "{row}", "Rows removed by housekeeping");
 

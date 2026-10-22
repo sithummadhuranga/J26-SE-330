@@ -6,11 +6,11 @@ using Sync.Common.Recommendations;
 
 namespace Orchestrator.Graph;
 
-/// <summary>The orchestrator workflow: six executors that coordinate and record but never decide clinical content.</summary>
+/// <summary>The orchestrator workflow. Its six executors coordinate and keep records, but never decide anything clinical.</summary>
 public sealed class OrchestratorGraph(IOrchestratorStore store, IRecommendationClient client,
     RecommendationResponseValidator validator)
 {
-    /// <summary>A fresh workflow per run, so runs on different consumers never share executor instances.</summary>
+    /// <summary>A new workflow for every run, so runs on different consumers never share executor instances.</summary>
     public Workflow Create()
     {
         var inbox = new InboxCheckExecutor(store);
@@ -23,7 +23,7 @@ public sealed class OrchestratorGraph(IOrchestratorStore store, IRecommendationC
         return new WorkflowBuilder(inbox)
             .WithName("wound-recommendation")
             .WithDescription("InboxCheck → SupersedeCheck → BuildContext → CallRag → ValidateResponse → PersistResult")
-            // Each step continues only on success; otherwise it has already yielded the run's outcome.
+            // Each step only carries on if it succeeded. Otherwise it has already produced the run's outcome.
             .AddEdge<InboxChecked>(inbox, supersede, m => m is { AlreadyProcessed: false })
             .AddEdge<SupersedeChecked>(supersede, context, m => m is { Superseded: false })
             .AddEdge<ContextBuilt>(context, callRag, m => m is { Request: not null })

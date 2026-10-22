@@ -10,7 +10,7 @@ using Sync.Common.Recommendations;
 
 namespace Orchestrator.Persistence;
 
-/// <summary>PostgreSQL implementation of <see cref="IOrchestratorStore"/> (architecture §9.3, §10.1).</summary>
+/// <summary>The PostgreSQL version of <see cref="IOrchestratorStore"/> (architecture §9.3, §10.1).</summary>
 public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptions ablation) : IOrchestratorStore
 {
     public const string ConsumerName = "orchestrator";
@@ -18,7 +18,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
     public async Task<bool> BeginAsync(OrchestrationJob job, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
-        // §13 ablation: the inbox is not consulted, so a repeated message runs the whole workflow again.
+        // For the §13 ablation we skip the inbox, so a repeated message runs the whole workflow again.
         if (!ablation.Enabled)
         {
             await using var check = new NpgsqlCommand(
@@ -28,7 +28,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
             if ((bool)(await check.ExecuteScalarAsync(ct))!) return true;
         }
 
-        // One row per attempt: retries show up as repeated ORCHESTRATION_STARTED rows in the audit trail.
+        // One row for each attempt, so retries show up as repeated ORCHESTRATION_STARTED rows in the audit trail.
         await ProvenanceAsync(conn, null, job, "ORCHESTRATION_STARTED", "OK", null, ct);
         return false;
     }
@@ -84,7 +84,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
             clinical = JsonDocument.Parse(r.GetString(3)).RootElement.Clone();
         }
 
-        // Healing history: the latest revision of every earlier assessment of the same wound, oldest first.
+        // The healing history: the latest revision of every earlier assessment of the same wound, oldest first.
         var history = new List<HistoryRow>();
         await using (var cmd = new NpgsqlCommand("""
             SELECT captured_at, analytics::text FROM (
@@ -115,7 +115,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
         await using var tx = await conn.BeginTransactionAsync(ct);
         await AdvisoryLock.AcquireForAssessmentAsync(conn, tx, evt.AssessmentId, ct);
 
-        // Ablation: log every recommendation without the unique constraint; the real insert still keeps one.
+        // For the ablation, log every recommendation without the unique constraint. The real insert still only keeps one.
         if (ablation.Enabled)
             await ExecAsync(conn, tx, """
                 INSERT INTO ablation.recommendation (event_id, assessment_id, revision) VALUES (@e, @a, @r)
@@ -138,7 +138,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
 
         if (inserted == 1)
         {
-            // The audit reference ties the answer to a frozen guideline snapshot (§10.2, §12).
+            // The audit reference links the answer to a fixed snapshot of the guidelines (§10.2, §12).
             var auditRef = $"{response.CorpusVersion}/{response.Mode}/{response.RetrievalMode}";
             await ProvenanceAsync(conn, tx, job, "RAG_RETURNED", response.Mode, auditRef, ct);
             await ProvenanceAsync(conn, tx, job, "RECOMMENDATION_STORED", "OK", auditRef, ct);
@@ -176,7 +176,7 @@ public sealed class PostgresOrchestratorStore(NpgsqlDataSource db, AblationOptio
         await tx.CommitAsync(ct);
     }
 
-    /// <summary>A change for the device (§7.2), facility-scoped like the PERSISTED row, at most once per type.</summary>
+    /// <summary>A change for the phone (§7.2), shared across the facility like the PERSISTED row, and added at most once per type.</summary>
     private static Task ChangeOnceAsync(NpgsqlConnection conn, NpgsqlTransaction tx, PersistedEvent evt, string type,
         CancellationToken ct) =>
         ExecAsync(conn, tx, """

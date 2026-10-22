@@ -10,7 +10,7 @@ using Sync.Common.Persistence;
 using Sync.Common.Recommendations;
 using Sync.Common.Telemetry;
 
-// Orchestrator: consumes persisted events, calls the Recommendation Service and stores the result.
+// The orchestrator picks up persisted events, calls the Recommendation Service and stores the result.
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddSyncTelemetry("orchestrator");
 
@@ -29,7 +29,8 @@ builder.Services.AddSingleton<OutcomeRouter>();
 builder.Services.AddSingleton<IProducer<string, byte[]>>(_ => new ProducerBuilder<string, byte[]>(
     KafkaDefaults.Producer(builder.Configuration["Kafka:BootstrapServers"] ?? KafkaDefaults.DefaultBootstrapServers)).Build());
 
-// Allow 60 s per call with bounded retries and a circuit breaker; anything still failing becomes ADVICE_DEFERRED.
+// Give each call 60 seconds, with a limited number of retries and a circuit breaker. Anything that still fails
+// becomes ADVICE_DEFERRED.
 var attemptTimeout = TimeSpan.FromSeconds(rag.GetValue("AttemptTimeoutSeconds", 60));
 builder.Services.AddHttpClient(HttpRecommendationClient.ClientName, client =>
     {

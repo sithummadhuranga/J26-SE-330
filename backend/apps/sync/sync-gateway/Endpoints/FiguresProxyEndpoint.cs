@@ -4,10 +4,10 @@ using Sync.Common.Auth;
 
 namespace SyncGateway.Endpoints;
 
-/// <summary>Proxies guideline figures to the device with strict id checks; 502 if the service is down.</summary>
+/// <summary>Passes guideline figures through to the phone, with strict id checks. Answers 502 if the service is down.</summary>
 public static partial class FiguresProxyEndpoint
 {
-    /// <summary>Upper bound on one figure; anything larger is refused rather than buffered.</summary>
+    /// <summary>The largest a figure can be. Anything bigger is refused rather than buffered.</summary>
     public const long MaxFigureBytes = 10 * 1024 * 1024;
 
     public static readonly string[] PassThroughHeaders =

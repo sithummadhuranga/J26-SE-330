@@ -20,14 +20,16 @@ android {
         // Adjust these values for your app; see https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 23) // flutter_secure_storage needs 23+ (Android Keystore)
         targetSdk = flutter.targetSdkVersion
-        // Version code comes from pubspec.yaml; pass -P force-version-code-ignoring-abi=true to override.
+        // The version code comes from pubspec.yaml. Pass -P force-version-code-ignoring-abi=true to override it.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // After sign-in the identity service sends the browser to lk.sliit.cdss:/oauth2redirect, which opens the app.
+        manifestPlaceholders["appAuthRedirectScheme"] = "lk.sliit.cdss"
     }
 
     buildTypes {
         release {
-            // TODO: add a real release signing config; debug keys for now so `flutter run --release` works.
+            // TODO: add a real release signing config. Debug keys are used for now so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

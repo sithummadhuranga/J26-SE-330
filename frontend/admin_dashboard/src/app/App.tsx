@@ -29,7 +29,7 @@ export function App({ session, restoring }: { session: AuthSession; restoring?: 
     };
   }, [restoring]);
 
-  // A different admin may sign in next in this tab: never show them the previous one's lists.
+  // A different admin might sign in next in this tab, so never show them the previous admin's lists.
   useEffect(
     () =>
       session.subscribe(() => {

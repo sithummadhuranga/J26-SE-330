@@ -14,8 +14,10 @@ import 'package:melanin_wound_cdss/features/sync/data/tables.dart';
 import 'package:melanin_wound_cdss/features/sync/engine/sync_engine.dart';
 
 import '../sync/support/fakes.dart';
+import '../sync/support/password_grant_sign_in.dart';
 
-/// Real engine against the real backend; runs only with SYNC_BACKEND_URL set (flutter test --tags integration).
+/// The real engine against the real backend. It only runs when SYNC_BACKEND_URL is set
+/// (flutter test --tags integration).
 void main() {
   final url = Platform.environment['SYNC_BACKEND_URL'];
 
@@ -25,14 +27,14 @@ void main() {
     final db = AppDatabase.encrypted(File('${dir.path}/it.db'), await DatabaseKeyStore.getOrCreate(secrets));
     final queue = QueueRepository(db);
     final api = _SmallPagesApi(Uri.parse(url!));
-    final auth = AuthSession(api, secrets);
+    final auth = AuthSession(api, secrets, browser: PasswordGrantSignIn(Uri.parse(url), 'n.silva', 'Demo-Pass-2026!'));
     final engine = SyncEngine(queue: queue, api: api, auth: auth);
 
     final deviceId = await queue.deviceId();
-    final clinician = await auth.signIn(username: 'n.silva', password: 'Demo-Pass-2026!', deviceId: deviceId);
+    final clinician = await auth.signIn(deviceId: deviceId);
     expect(clinician.facilityId, 'fac-001');
 
-    // Fresh phone at cursor 0 with tiny pages so the paging path always runs.
+    // A brand new phone at cursor 0, with tiny pages so the paging code always gets exercised.
     expect(await queue.cursor(), 0);
 
     final first = sampleEvent(deviceId: deviceId);
@@ -44,13 +46,15 @@ void main() {
     final pushed = await engine.sync();
     expect(pushed.outcome, SyncOutcome.success, reason: '$pushed');
     expect(pushed.accepted, 3);
-    expect(await queue.cursor(), greaterThan(0), reason: 'pulled the history');
+    // The cursor can still be 0 here: the server stores pushed events in the background, so on an empty
+    // database the pull straight after the push may find nothing yet. It's checked after the loop below.
 
-    // Advice arrives through the orchestrator; pull until every record is final.
+    // Advice comes back through the orchestrator, so keep pulling until every record is final.
     for (var i = 0; i < 30 && (await queue.counts()).of(QueueStatus.complete) + (await queue.counts()).of(QueueStatus.superseded) < 3; i++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       await engine.sync(force: true);
     }
+    expect(await queue.cursor(), greaterThan(0), reason: 'pulled the changes back');
     final rows = {for (final r in await queue.all()) '${r.assessmentId}/${r.revision}': r};
     expect(rows['${first['assessmentId']}/1']!.status, QueueStatus.superseded, reason: 'revision 2 got the advice');
     expect(rows['${first['assessmentId']}/2']!.status, QueueStatus.complete);
@@ -58,7 +62,8 @@ void main() {
     expect(await queue.recommendationFor(first['assessmentId'] as String, 2), isNotNull);
     expect(api.pagesWithMore, greaterThan(0), reason: 'a pull needed more than one page and followed hasMore');
 
-    // A guideline figure through the gateway's figures proxy (§10.4; the stub serves F1-F3), cached with its license.
+    // Fetch a guideline figure through the gateway's figures proxy and cache it with its license (§10.4).
+    // The stub serves F1 to F3.
     final figures = FigureRepository(db, api, auth);
     final figure = await figures.figureFor('iwgdf-2023.r1', 'F1');
     expect(figure.isFound, isTrue, reason: '${figure.miss}');
@@ -75,7 +80,8 @@ void main() {
      timeout: const Timeout(Duration(minutes: 3)));
 }
 
-/// Gateway client with tiny first pages to exercise paging, then normal pages to stay under the rate limit.
+/// A gateway client that asks for tiny pages at first to exercise paging,
+/// then normal ones to stay under the rate limit.
 class _SmallPagesApi extends HttpSyncApi {
   _SmallPagesApi(super.baseUri);
 

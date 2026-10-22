@@ -7,13 +7,14 @@ import '../../core/widgets.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/tables.dart';
 
-/// One saved assessment as the screens show it, read from its queued wound event (contracts/wound-event.schema.json).
+/// One saved assessment, the way the screens show it. It's read from the queued wound event
+/// (contracts/wound-event.schema.json).
 class AssessmentView {
   AssessmentView(this.row); 
 
   final QueuedEvent row;
 
-  /// Decoded lazily so lists only decode the cards they actually build.
+  /// Decoded only when needed, so a list only decodes the cards it actually builds.
   late final Map<String, dynamic> event = jsonDecode(row.payloadJson) as Map<String, dynamic>;
 
   String get assessmentId => row.assessmentId;
@@ -36,7 +37,7 @@ class AssessmentView {
   String get pedalPulses => _clinical['pedalPulses'] as String;
   String get protectiveSensation => _clinical['protectiveSensation'] as String;
 
-  /// A short, readable reference for the assessment ("WA-1A2B3C4D"); the full id stays on the record.
+  /// A short reference that's easy to read, like "WA-1A2B3C4D". The full id stays on the record.
   String get displayId => displayIdOf(assessmentId);
 
   static String displayIdOf(String assessmentId) {
@@ -44,7 +45,7 @@ class AssessmentView {
     return 'WA-${hex.substring(hex.length - 8).toUpperCase()}';
   }
 
-  /// The latest revision of each assessment, newest first: what History and Home list.
+  /// The latest revision of each assessment, newest first. This is what History and Home list.
   static List<AssessmentView> latestPerAssessment(List<QueuedEvent> rows) {
     final byId = <String, QueuedEvent>{};
     for (final r in rows) {
@@ -57,7 +58,7 @@ class AssessmentView {
   }
 }
 
-/// The record's place in the sync lifecycle (§6.1), in a clinician's words.
+/// Where the record is in the sync (§6.1), in words a clinician would use.
 (String, BadgeTone) syncLabel(QueueStatus s) => switch (s) {
   QueueStatus.pending || QueueStatus.inFlight => ('Saved on phone', BadgeTone.warning),
   QueueStatus.accepted => ('Synced', BadgeTone.success),
@@ -67,7 +68,7 @@ class AssessmentView {
   QueueStatus.rejected => ('Not accepted', BadgeTone.error),
 };
 
-/// Tri-state clinical values (§3): "not recorded" is its own answer, never read as "no".
+/// Clinical answers with three options (§3). "Not recorded" is its own answer and never means "no".
 String triStateLabel(String v) => switch (v) {
   'present' => 'Present',
   'absent' => 'Absent',
@@ -76,7 +77,7 @@ String triStateLabel(String v) => switch (v) {
 
 const regionColours = [WoundColors.accent, WoundColors.amber, WoundColors.borderStrong, WoundColors.accent2];
 
-/// Placeholder wound illustration until the capture module (Member 1) provides real photos.
+/// A stand-in wound picture, used until the capture module (Member 1) provides real photos.
 class WoundIllustration extends StatelessWidget {
   const WoundIllustration({super.key, this.seed = 0, this.borderRadius = WoundRadii.m, this.showMarker = true});
 
@@ -148,7 +149,8 @@ class _WoundPainter extends CustomPainter {
   bool shouldRepaint(_WoundPainter old) => old.seed != seed || old.showMarker != showMarker;
 }
 
-/// History / Home list card: thumbnail, reference, date, patient, sync state, area.
+/// The card used in the History and Home lists. It shows the thumbnail, reference, date, patient,
+/// sync state and area.
 class AssessmentCard extends StatelessWidget {
   const AssessmentCard({super.key, required this.view, required this.patientLabel, required this.onTap});
 

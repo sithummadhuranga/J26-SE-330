@@ -8,7 +8,7 @@ import 'package:melanin_wound_cdss/features/sync/data/tables.dart';
 
 import 'support/fakes.dart';
 
-/// The queue rules of architecture §6, §6.1 and §7.2.
+/// The queue rules from architecture §6, §6.1 and §7.2.
 void main() {
   late AppDatabase db;
   late QueueRepository queue;

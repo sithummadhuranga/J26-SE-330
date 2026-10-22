@@ -6,7 +6,7 @@ namespace IdentityService.Admin;
 public sealed record DeviceSummary(string DeviceId, DateTime RegisteredAt, DateTime? RevokedAt, int ActiveSessions,
     DateTime? LastSeenAt, string? LastUsername);
 
-/// <summary>Device management for facility admins, scoped to their facility and audited.</summary>
+/// <summary>Lets facility admins manage devices. It only touches their own facility, and everything is audited.</summary>
 public sealed class DeviceAdminService(NpgsqlDataSource db)
 {
     public async Task<IReadOnlyList<DeviceSummary>> ListAsync(string facilityId, CancellationToken ct)
@@ -36,7 +36,7 @@ public sealed class DeviceAdminService(NpgsqlDataSource db)
         return list;
     }
 
-    /// <summary>Revokes a lost or stolen phone: blocks login and ends all its sessions, permanently.</summary>
+    /// <summary>Revokes a lost or stolen phone for good. It can't sign in any more and all its sessions end.</summary>
     public async Task<string?> RevokeAsync(Guid actorId, string facilityId, string deviceId, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
@@ -49,7 +49,7 @@ public sealed class DeviceAdminService(NpgsqlDataSource db)
             find.Parameters.AddWithValue("d", deviceId);
             find.Parameters.AddWithValue("f", facilityId);
             await using var r = await find.ExecuteReaderAsync(ct);
-            // Devices of other facilities are reported as not found, never as forbidden.
+            // Devices from other facilities just show up as not found, never as forbidden.
             if (!await r.ReadAsync(ct)) return "NOT_FOUND";
             revokedAt = r.IsDBNull(0) ? null : r.GetDateTime(0);
         }

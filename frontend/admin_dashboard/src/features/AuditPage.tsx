@@ -4,14 +4,21 @@ import { useSession } from '../app/sessionContext';
 import { formatDateTime } from '../core/format';
 import { auditActionLabel, auditReasonLabel } from '../core/messages';
 import type { AuthAuditEntry } from '../core/models';
+import { usePaged } from '../core/paging';
 import { fuzzyMatch } from '../core/search';
-import { Centered, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
+import { Centered, EmptyState, LoadError, PageHeader, Spinner, StatusChip } from '../ui/components';
+import { HistoryIcon } from '../ui/icons';
+import { Pagination } from '../ui/Pagination';
 import { useLoadFailureToast } from '../ui/toastContext';
 
 const limits = [100, 250, 500, 1000] as const;
 
-/** MFA_REQUIRED is the server asking for a code, not a failed attempt (same rule as the auth-health metrics). */
-const isFailure = (e: AuthAuditEntry) => !e.success && e.reasonCode !== 'MFA_REQUIRED';
+/**
+ * MFA_REQUIRED and PASSWORD_CHANGE_REQUIRED are the server asking for the next step, not failed attempts.
+ * The auth-health metrics follow the same rule.
+ */
+const prompts = new Set(['MFA_REQUIRED', 'PASSWORD_CHANGE_REQUIRED']);
+const isFailure = (e: AuthAuditEntry) => !e.success && !prompts.has(e.reasonCode ?? '');
 
 function matches(e: AuthAuditEntry, query: string, failuresOnly: boolean): boolean {
   if (failuresOnly && !isFailure(e)) return false;
@@ -19,7 +26,7 @@ function matches(e: AuthAuditEntry, query: string, failuresOnly: boolean): boole
   return fuzzyMatch(query, [e.username, auditActionLabel(e.action), result, e.deviceId, e.actorUsername]);
 }
 
-/** Recent sign-in and admin events for the facility, filtered in the browser (max 1000 rows). */
+/** Recent sign-in and admin events for the facility, filtered in the browser (up to 1000 rows). */
 export function AuditPage() {
   const session = useSession();
   const queryClient = useQueryClient();
@@ -36,6 +43,14 @@ export function AuditPage() {
 
   const all = query.data ?? [];
   const rows = all.filter((e) => matches(e, search.trim(), failuresOnly));
+  const paged = usePaged(rows);
+  // A new search, filter or amount starts again at the newest events.
+  const fresh =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      paged.setPage(0);
+    };
 
   return (
     <>
@@ -61,14 +76,14 @@ export function AuditPage() {
               aria-label="Search audit log"
               placeholder="Search user, action, result or device"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => fresh(setSearch)(e.target.value)}
             />
           </div>
           <div className="segmented" role="group" aria-label="Which events">
-            <button type="button" aria-pressed={!failuresOnly} onClick={() => setFailuresOnly(false)}>
+            <button type="button" aria-pressed={!failuresOnly} onClick={() => fresh(setFailuresOnly)(false)}>
               All events
             </button>
-            <button type="button" aria-pressed={failuresOnly} onClick={() => setFailuresOnly(true)}>
+            <button type="button" aria-pressed={failuresOnly} onClick={() => fresh(setFailuresOnly)(true)}>
               Failures only
             </button>
           </div>
@@ -80,7 +95,7 @@ export function AuditPage() {
           )}
           <label className="toolbar__select">
             <span>Show</span>
-            <select aria-label="How many events" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+            <select aria-label="How many events" value={limit} onChange={(e) => fresh(setLimit)(Number(e.target.value))}>
               {limits.map((l) => (
                 <option key={l} value={l}>
                   Last {l}
@@ -97,7 +112,11 @@ export function AuditPage() {
             <Spinner />
           </Centered>
         ) : rows.length === 0 ? (
-          <Centered>No matching events.</Centered>
+          <EmptyState
+            icon={<HistoryIcon size={24} />}
+            title="No matching events"
+            message="Try a different search, or show all events."
+          />
         ) : (
           <div className="panel__scroll">
             <table className="table table--fixed">
@@ -120,7 +139,7 @@ export function AuditPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((e) => (
+                {paged.rows.map((e) => (
                   <tr key={e.id}>
                     <td className="table__time">{formatDateTime(e.recordedAt)}</td>
                     <td>{auditActionLabel(e.action)}</td>
@@ -140,6 +159,7 @@ export function AuditPage() {
             </table>
           </div>
         )}
+        {query.isSuccess && rows.length > 0 && <Pagination paged={paged} noun="events" />}
       </section>
     </>
   );

@@ -7,7 +7,7 @@ export interface ConfirmOptions {
   destructive?: boolean;
 }
 
-/** Asks before an action that changes someone's access; resolves true only on an explicit yes. */
+/** Asks first before an action that changes someone's access. It only resolves true if they clearly say yes. */
 export type Confirm = (options: ConfirmOptions) => Promise<boolean>;
 
 export const ConfirmContext = createContext<Confirm | null>(null);

@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace DeviceSimulator;
 
-/// <summary>Generates valid synthetic wound events, with a few wounds per device and occasional edits.</summary>
+/// <summary>Makes up valid wound events, with a few wounds per device and the odd edit.</summary>
 public sealed class EventFactory(string deviceId, string facilityId, Random random, double editRate)
 {
     private static readonly string[] TriState = ["present", "absent", "not_recorded"];
@@ -12,7 +12,7 @@ public sealed class EventFactory(string deviceId, string facilityId, Random rand
 
     public JsonObject Next()
     {
-        // An edit creates revision + 1 of the previous assessment (§5: revisions never update in place).
+        // An edit creates the next revision of the previous assessment, because revisions never change in place (§5).
         if (_last is { } last && random.NextDouble() < editRate)
         {
             _last = last with { Revision = last.Revision + 1, Area = last.Area * (0.97 + random.NextDouble() * 0.06) };
@@ -59,6 +59,6 @@ public sealed class EventFactory(string deviceId, string facilityId, Random rand
         };
     }
 
-    /// <summary>UUIDv7: 48-bit millisecond timestamp, version 7, variant 10, random rest.</summary>
+    /// <summary>A UUIDv7: a 48-bit millisecond timestamp, version 7, variant 10, and random bits for the rest.</summary>
     public static Guid Uuid7() => Guid.CreateVersion7();
 }

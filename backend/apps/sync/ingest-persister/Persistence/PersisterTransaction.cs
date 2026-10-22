@@ -11,7 +11,7 @@ namespace IngestPersister.Persistence;
 
 public enum PersistOutcome { Persisted, Deduplicated, RevisionConflict }
 
-/// <summary>Stores one event in one transaction; new events get an outbox row, duplicates are noted.</summary>
+/// <summary>Stores one event in one transaction. New events get an outbox row, and duplicates are noted.</summary>
 public sealed class PersisterTransaction(NpgsqlDataSource db, AblationOptions ablation)
 {
     public async Task<PersistOutcome> ExecuteAsync(
@@ -22,7 +22,8 @@ public sealed class PersisterTransaction(NpgsqlDataSource db, AblationOptions ab
 
         await AdvisoryLock.AcquireForAssessmentAsync(conn, tx, evt.AssessmentId, ct);
 
-        // Ablation: log every message received without dedup, to show what we'd store without idempotency.
+        // For the ablation, log every message we receive without removing duplicates, to show what we'd store
+        // without idempotency.
         if (ablation.Enabled)
             await ExecAsync(conn, tx, """
                 INSERT INTO ablation.wound_assessment (event_id, assessment_id, revision, device_id, kafka_ref)
@@ -92,7 +93,8 @@ public sealed class PersisterTransaction(NpgsqlDataSource db, AblationOptions ab
         }
         else
         {
-            // Nothing inserted: either a harmless redelivery or a different event reusing the same revision (a client bug).
+            // Nothing was inserted. Either it's a harmless redelivery, or a different event reused the same revision,
+            // which would be a client bug.
             await using var check = new NpgsqlCommand(
                 "SELECT EXISTS (SELECT 1 FROM clinical.wound_assessment WHERE event_id = @e)", conn, tx);
             check.Parameters.AddWithValue("e", evt.EventId);

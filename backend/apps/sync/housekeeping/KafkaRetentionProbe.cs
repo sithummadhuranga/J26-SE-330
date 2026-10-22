@@ -4,14 +4,14 @@ using Sync.Common.Kafka;
 
 namespace Housekeeping;
 
-/// <summary>Reads retention.ms of the topics whose consumers record messages in messaging.inbox.</summary>
+/// <summary>Reads retention.ms for the topics whose consumers record messages in messaging.inbox.</summary>
 public sealed class KafkaRetentionProbe(IAdminClient admin, ILogger<KafkaRetentionProbe> logger)
 {
-    /// <summary>Topics the orchestrator reads, including the DLQ since replayed dead letters are redelivered too.</summary>
+    /// <summary>The topics the orchestrator reads. The DLQ is included, because replayed dead letters get redelivered too.</summary>
     public static readonly string[] InboxTopics =
         [Topics.WoundEventsPersisted, Topics.Retry30s, Topics.Retry5m, Topics.DeadLetter];
 
-    /// <returns>retention.ms per topic, or null if Kafka could not be asked.</returns>
+    /// <returns>retention.ms for each topic, or null if we couldn't ask Kafka.</returns>
     public async Task<IReadOnlyCollection<long>?> TopicRetentionsAsync()
     {
         try
