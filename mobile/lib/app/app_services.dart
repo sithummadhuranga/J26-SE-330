@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../features/account/account_api.dart';
 import '../features/assessment/analysis/wound_analyzer.dart';
+import '../features/assessment/photo_source.dart';
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
 import '../features/sync/auth/browser_sign_in.dart';
@@ -24,7 +25,8 @@ const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http:
 /// [scheduler].onSaved(). Use [figures] to show guideline figures, and [analyzer] to analyse a captured wound.
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
-      required this.auth, required this.engine, required this.scheduler, required this.analyzer, required this.account});
+      required this.auth, required this.engine, required this.scheduler, required this.analyzer, required this.account,
+      this.photoSource = const SamplePhotoSource()});
 
   final AppDatabase db;
   final QueueRepository queue;
@@ -41,6 +43,9 @@ class AppServices {
   /// Your own account on the server (name, password, sessions). Needs a connection, unlike the rest of the app.
   final AccountApi account;
 
+  /// Where the capture step gets its photo: the camera and gallery on a phone, a sample in tests.
+  final PhotoSource photoSource;
+
   /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
@@ -51,6 +56,7 @@ class AppServices {
     DateTime Function()? clock,
     WoundAnalyzer? analyzer,
     AccountApi? account,
+    PhotoSource? photoSource,
   }) async {
     final store = secrets ?? const KeystoreSecretStore();
     final database = db ??
@@ -82,7 +88,8 @@ class AppServices {
         engine: engine,
         scheduler: scheduler,
         analyzer: analyzer ?? SampleWoundAnalyzer(),
-        account: account ?? HttpAccountApi(Uri.parse(syncBaseUrl), auth));
+        account: account ?? HttpAccountApi(Uri.parse(syncBaseUrl), auth),
+        photoSource: photoSource ?? const SamplePhotoSource());
   }
 
   /// Signs in on the identity service's page with this phone's device id, and remembers who signed in

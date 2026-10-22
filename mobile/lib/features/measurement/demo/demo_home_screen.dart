@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,16 +6,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme.dart';
 import '../capture/capture_check.dart';
+import '../capture/capture_runner.dart';
 import '../capture/photo_check_screen.dart';
 import 'analysis_session.dart';
 import 'demo_result_screen.dart';
-
-/// Looks at a decoded photo off the main isolate, so the spinner keeps moving while the sticker is searched for.
-Future<CaptureCheck> checkInBackground(DecodedPhoto photo) {
-  final transfer = TransferableTypedData.fromList([photo.rgba]);
-  final w = photo.width, h = photo.height;
-  return Isolate.run(() => checkCapture(transfer.materialize().asUint8List(), w, h));
-}
 
 /// Start screen of the wound measurement demo: take a photo, pick one, or use a sample photo. Every photo is checked first
 /// (is there a usable sticker?) and the verdict is shown before the photo is measured.

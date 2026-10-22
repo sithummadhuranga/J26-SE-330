@@ -24,6 +24,11 @@ class PhotoCheckScreen extends StatelessWidget {
     required this.onMeasure,
     required this.onRetake,
     this.allowMeasureWithoutSticker = false,
+    this.title = 'Check the photo',
+    this.useLabel = 'Measure this photo',
+    this.useAnywayLabel = 'Measure anyway',
+    this.anotherLabel = 'Choose another photo',
+    this.useKey = const Key('measure'),
   });
 
   /// The photo as the camera or gallery gave it (encoded), shown at the size of the screen, not full size.
@@ -34,6 +39,10 @@ class PhotoCheckScreen extends StatelessWidget {
 
   /// Demo only: lets a photo with no usable sticker still be measured (pixel area only, no mm).
   final bool allowMeasureWithoutSticker;
+
+  /// The words and key of the buttons, so the real app can call them what its other screens do.
+  final String title, useLabel, useAnywayLabel, anotherLabel;
+  final Key useKey;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +59,7 @@ class PhotoCheckScreen extends StatelessWidget {
     final sticker = check.scan.stickers.isEmpty ? null : check.scan.stickers.first;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Check the photo')),
+      appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -105,20 +114,20 @@ class PhotoCheckScreen extends StatelessWidget {
 
   List<Widget> _actions(Verdict v) => switch (v) {
         Verdict.ok => [
-            FilledButton(key: const Key('measure'), onPressed: onMeasure, child: const Text('Measure this photo')),
+            FilledButton(key: useKey, onPressed: onMeasure, child: Text(useLabel)),
             const SizedBox(height: 10),
-            OutlinedButton(onPressed: onRetake, child: const Text('Choose another photo')),
+            OutlinedButton(onPressed: onRetake, child: Text(anotherLabel)),
           ],
         Verdict.warn => [
             FilledButton(key: const Key('retake'), onPressed: onRetake, child: const Text('Retake')),
             const SizedBox(height: 10),
-            OutlinedButton(key: const Key('measure'), onPressed: onMeasure, child: const Text('Measure anyway')),
+            OutlinedButton(key: useKey, onPressed: onMeasure, child: Text(useAnywayLabel)),
           ],
         Verdict.retake => [
             FilledButton(key: const Key('retake'), onPressed: onRetake, child: const Text('Retake')),
             if (allowMeasureWithoutSticker) ...[
               const SizedBox(height: 10),
-              TextButton(key: const Key('measure'), onPressed: onMeasure, child: const Text('Measure without a sticker')),
+              TextButton(key: useKey, onPressed: onMeasure, child: const Text('Measure without a sticker')),
               const Padding(
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
