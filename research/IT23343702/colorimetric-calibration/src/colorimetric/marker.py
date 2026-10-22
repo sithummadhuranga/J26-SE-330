@@ -37,6 +37,8 @@ _DATA = Path(__file__).parent / "sticker"
 LAYOUT_PATH = _DATA / "marker_layout.json"
 REFERENCE_PATH = _DATA / "marker_reference.json"
 REFERENCE_SOURCES = ("stand-in", "reference-photos", "measured")
+# Stable reason codes, shared with the Dart side (agreed with CV). The free text in `reason` may change; these may not.
+MARKER_CODES = ("grey_clipped", "grey_not_uniform", "grey_not_neutral", "grey_gain_out_of_range", "skin_patch_off", "crop_invalid")
 
 # Reject rules. There are no real sticker photos yet, so these are judgement, not fitted.
 MAX_GREY_L_STD = 5.0        # L* spread inside the grey patch; a flat matte patch is noise only
@@ -105,6 +107,7 @@ class MarkerResult:
     skin_delta_e: dict[str, float] = field(default_factory=dict)  # CIE76 after the correction
     reference_source: str = ""             # "stand-in" | "reference-photos" | "measured"
     calibration_mode: str = ""             # "relative" | "absolute"
+    code: str = ""                         # one of MARKER_CODES when rejected, "" when used
 
     @property
     def label(self) -> str:
@@ -166,29 +169,29 @@ def estimate_gains(
     reference = reference or load_reference()
     meta = dict(reference_source=reference.source, calibration_mode=layout.calibration_mode)
 
-    def reject(reason: str) -> MarkerResult:
-        return MarkerResult(False, reason, **meta)
+    def reject(reason: str, code: str) -> MarkerResult:
+        return MarkerResult(False, reason, code=code, **meta)
 
     grey = _patch_pixels(crop, "grey", layout)
     if len(grey) < MIN_PATCH_PIXELS:
-        return reject(f"grey patch has only {len(grey)} pixels")
+        return reject(f"grey patch has only {len(grey)} pixels", "crop_invalid")
     clipped = float(np.mean((grey.max(axis=1) >= 250) | (grey.min(axis=1) <= 5)))
     if clipped > MAX_CLIPPED_FRACTION:
-        return reject(f"grey patch clipped ({clipped:.0%} of pixels)")
+        return reject(f"grey patch clipped ({clipped:.0%} of pixels)", "grey_clipped")
     L = cv2.cvtColor(grey.reshape(-1, 1, 3), cv2.COLOR_RGB2LAB)[..., 0].astype(np.float64) * (100.0 / 255.0)
     if L.std() > MAX_GREY_L_STD:
-        return reject(f"grey patch not uniform (L* std {L.std():.1f})")
+        return reject(f"grey patch not uniform (L* std {L.std():.1f})", "grey_not_uniform")
 
     grey_lab = _rgb_median_to_lab(grey)
     ref_grey = np.array(reference.lab["grey"], dtype=np.float64)
     ab_error = float(np.linalg.norm(grey_lab[1:] - ref_grey[1:]))
     if ab_error > MAX_GREY_AB_ERROR:
-        return reject(f"grey patch not neutral (a*b* {ab_error:.1f} from the reference, limit {MAX_GREY_AB_ERROR:.0f})")
+        return reject(f"grey patch not neutral (a*b* {ab_error:.1f} from the reference, limit {MAX_GREY_AB_ERROR:.0f})", "grey_not_neutral")
 
     measured = _srgb_to_linear(np.median(grey, axis=0) / 255.0)
     gains = _lab_to_linear_rgb(ref_grey) / np.maximum(measured, 1e-6)
     if gains.min() < GAIN_RANGE[0] or gains.max() > GAIN_RANGE[1]:
-        return reject(f"grey patch gains out of range ({gains.min():.2f}-{gains.max():.2f})")
+        return reject(f"grey patch gains out of range ({gains.min():.2f}-{gains.max():.2f})", "grey_gain_out_of_range")
 
     res = MarkerResult(True, gains=gains, **meta)
     corrected = apply_gains(crop, gains)
@@ -201,7 +204,7 @@ def estimate_gains(
     if reference.source != "stand-in":
         worst = max(res.skin_delta_e.items(), key=lambda kv: kv[1], default=None)
         if worst is not None and worst[1] > MAX_SKIN_DELTA_E:
-            return reject(f"{worst[0]} patch off by dE {worst[1]:.1f} after correction (limit {MAX_SKIN_DELTA_E:.0f})")
+            return reject(f"{worst[0]} patch off by dE {worst[1]:.1f} after correction (limit {MAX_SKIN_DELTA_E:.0f})", "skin_patch_off")
     return res
 
 
