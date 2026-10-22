@@ -200,6 +200,16 @@
    "best_orientation_contrast": 0.0,
    "stickers": []
   },
+  "sim_one_patch_glare": {
+   "width": 1200,
+   "height": 900,
+   "code": "weak_frame_contrast",
+   "found": 0,
+   "candidates": 1,
+   "best_frame_contrast": 0.983,
+   "best_orientation_contrast": 0.948,
+   "stickers": []
+  },
   "sim_one_washed": {
    "width": 1200,
    "height": 900,

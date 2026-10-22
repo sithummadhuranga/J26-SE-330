@@ -207,10 +207,8 @@ def _orient(gray_blur, q):
     return best
 
 
-def _layout_ok(canon, max_patch=0.9, min_empty=0.8):
-    """The mid-tone patches must lie where marker_layout.json puts them, and the cells where a mirrored sticker would have them
-    (the patch layout with x and y swapped) must be bare white. A mirrored sticker still has one dark corner, but its patches end up
-    in a column instead of a row, so its straightened picture would be misread."""
+def _layout_numbers(canon):
+    """(brightest patch cell, darkest cell where a mirrored sticker would have a patch), both as a share of the white area."""
     s = canon.shape[0] / SIDE_MM
 
     def cell(cx, cy, size):
@@ -220,7 +218,21 @@ def _layout_ok(canon, max_patch=0.9, min_empty=0.8):
     white = _regions(canon)[3] + 1.0
     patches = [cell(*p["centre"], p["size"]) for p in LAYOUT["patches"]]
     swapped = [cell(p["centre"][1], p["centre"][0], p["size"]) for p in LAYOUT["patches"] if p["centre"][0] != p["centre"][1]]
-    return max(patches) / white < max_patch and min(swapped) / white > min_empty
+    return max(patches) / white, min(swapped) / white
+
+
+def _layout_ok(canon, max_patch=0.9, min_empty=0.8):
+    """The mid-tone patches must lie where marker_layout.json puts them, and the cells where a mirrored sticker would have them
+    (the patch layout with x and y swapped) must be bare white. A mirrored sticker still has one dark corner, but its patches end up
+    in a column instead of a row, so its straightened picture would be misread."""
+    patch, empty = _layout_numbers(canon)
+    return patch < max_patch and empty > min_empty
+
+
+def _patches_washed(canon, max_patch=0.9, min_empty=0.8):
+    """No patch can be seen anywhere, in the right cells or the mirrored ones: the patches are washed out (glare), not another sticker."""
+    patch, empty = _layout_numbers(canon)
+    return patch >= max_patch and empty >= min_empty
 
 
 REJECT_CODES = ("no_candidate", "cut_by_edge", "weak_frame_contrast", "weak_orientation", "layout_mismatch", "mirrored")
@@ -235,7 +247,7 @@ class Diagnosis:
     candidates: int                   # how many frame-like shapes were looked at closely
 
 
-def _reject_code(oc, fc, layout, transposed, min_orient, min_frame):
+def _reject_code(oc, fc, layout, transposed, min_orient, min_frame, washed=False):
     """Why one frame-like shape was turned down, in a fixed order: a faint frame first (glare, shadow), then a missing or doubled
     orientation square, then the patch layout. If the layout only fits with x and y swapped, the sticker is mirrored (the fix for
     the nurse is different: use the rear camera). None when the shape is accepted."""
@@ -244,6 +256,8 @@ def _reject_code(oc, fc, layout, transposed, min_orient, min_frame):
     if oc < min_orient:
         return "weak_orientation"
     if not layout:
+        if washed:
+            return "weak_frame_contrast"                 # the frame is fine but the patches are washed out: glare over them
         return "mirrored" if transposed else "layout_mismatch"
     return None
 
@@ -290,7 +304,8 @@ def _scan(rgb, side_mm, max_dim, min_orient, min_frame, lenient=False):
         blur = cv2.GaussianBlur(gray_full, (0, 0), max(0.5, 0.6 * np.linalg.norm(q[0] - q[1]) / 100))
         oc, fc, k, canon = _orient(blur, q)
         layout = _layout_ok(canon)
-        code = _reject_code(oc, fc, layout, False if layout else _layout_ok(canon.T), min_orient, min_frame)
+        code = _reject_code(oc, fc, layout, False if layout else _layout_ok(canon.T), min_orient, min_frame,
+                            washed=False if layout else _patches_washed(canon))
         if lenient and code is None:
             code = "weak_frame_contrast"                      # it passes only because the mask was loosened: the frame is not dark
         if code is not None:

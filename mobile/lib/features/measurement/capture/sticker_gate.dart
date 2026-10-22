@@ -175,10 +175,13 @@ Uint8List straightenSticker(Uint8List rgba, int width, int height, GateSticker s
 double _len((double, double) a, (double, double) b) => math.sqrt(math.pow(a.$1 - b.$1, 2) + math.pow(a.$2 - b.$2, 2));
 
 /// Why one frame-like shape was turned down, in a fixed order (the same as the Python finder). Null when it is accepted.
-FinderCode? _rejectCode(double oc, double fc, bool layout, bool transposed, double minOrient, double minFrame) {
+FinderCode? _rejectCode(double oc, double fc, bool layout, bool transposed, double minOrient, double minFrame, {bool washed = false}) {
   if (fc < minFrame) return FinderCode.weakFrameContrast;
   if (oc < minOrient) return FinderCode.weakOrientation;
-  if (!layout) return transposed ? FinderCode.mirrored : FinderCode.layoutMismatch;
+  if (!layout) {
+    if (washed) return FinderCode.weakFrameContrast; // the frame is fine but the patches are washed out: glare over them
+    return transposed ? FinderCode.mirrored : FinderCode.layoutMismatch;
+  }
   return null;
 }
 
@@ -224,7 +227,8 @@ class _Scan {
       final blur = _blurAround(q);
       final (oc, fc, k, canon) = _orient(blur, q);
       final layout = _layoutOk(canon);
-      var code = _rejectCode(oc, fc, layout, layout ? false : _layoutOk(_transpose(canon)), minOrient, minFrame);
+      var code = _rejectCode(oc, fc, layout, layout ? false : _layoutOk(_transpose(canon)), minOrient, minFrame,
+          washed: layout ? false : _patchesWashed(canon));
       if (lenient && code == null) code = FinderCode.weakFrameContrast;
       final area = (c.area + c.holeArea).toDouble();
       notes.add(_Note(area, code, oc, fc));
@@ -392,10 +396,8 @@ _Regions _regions(Float32List c) {
   return _Regions(orient, others, frame, _mean(c, _whiteX.$1, _whiteX.$2, _whiteY.$1, _whiteY.$2));
 }
 
-/// The mid-tone patches must lie where the layout puts them, and the cells where a mirrored sticker would have them (x and y
-/// swapped) must be bare white.
-bool _layoutOk(Float32List c) {
-  const s = _canon / _sideMm;
+/// (the brightest patch cell, the darkest cell where a mirrored sticker would have a patch), both as a share of the white area.
+(double, double) _layoutNumbers(Float32List c) {
   double cell(double cx, double cy, double size) {
     final half = 0.3 * size;
     return _mean(c, cx - half, cx + half, cy - half, cy + half);
@@ -404,7 +406,20 @@ bool _layoutOk(Float32List c) {
   final white = _regions(c).white + 1.0;
   final patch = [for (final p in _patches) cell(p.$1, p.$2, p.$3)];
   final swapped = [for (final p in _patches) if (p.$1 != p.$2) cell(p.$2, p.$1, p.$3)];
-  return patch.reduce(math.max) / white < 0.9 && swapped.reduce(math.min) / white > 0.8 && s > 0;
+  return (patch.reduce(math.max) / white, swapped.reduce(math.min) / white);
+}
+
+/// The mid-tone patches must lie where the layout puts them, and the cells where a mirrored sticker would have them (x and y
+/// swapped) must be bare white.
+bool _layoutOk(Float32List c) {
+  final (patch, empty) = _layoutNumbers(c);
+  return patch < 0.9 && empty > 0.8;
+}
+
+/// No patch can be seen anywhere, in the right cells or the mirrored ones: the patches are washed out (glare), not another sticker.
+bool _patchesWashed(Float32List c) {
+  final (patch, empty) = _layoutNumbers(c);
+  return patch >= 0.9 && empty >= 0.8;
 }
 
 Float32List _transpose(Float32List c) {

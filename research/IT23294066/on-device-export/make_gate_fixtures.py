@@ -57,6 +57,11 @@ def simulated():
     out["sim_one_no_orientation"] = t.one_sticker(no_square)[0]
     img, hmm, _ = t.one_sticker()
     out["sim_one_cut"] = img[:, int(S.project(hmm, [[40, 40]])[0][0]):]
+    def glare_on_patches(b):
+        b[int(19 * 15):int(31 * 15), int(8 * 15):int(42 * 15)] = 255
+        return b
+
+    out["sim_one_patch_glare"] = t.one_sticker(glare_on_patches)[0]
     out["sim_one_washed"] = np.clip(110 + 0.5 * t.one_sticker()[0].astype(np.float32), 0, 255).astype(np.uint8)
     out["blank"] = np.full((900, 1200, 3), 140, np.uint8)
     return out
