@@ -136,6 +136,30 @@ class AssessmentPhoto extends StatelessWidget {
   );
 }
 
+/// A photo shown whole with the wound outline on it (used where there is no stored assessment to load it from).
+class OutlinedPhoto extends StatelessWidget {
+  const OutlinedPhoto({super.key, required this.photo, required this.outline, this.borderRadius = WoundRadii.m});
+
+  final Uint8List photo;
+  final WoundOutline outline;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(borderRadius),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.memory(photo, fit: BoxFit.contain, cacheWidth: 1400, gaplessPlayback: true),
+        CustomPaint(
+          key: const Key('woundOutline'),
+          painter: _RealOutlinePainter(outline.boundaryFractions(), outline.originalWidth, outline.originalHeight),
+        ),
+      ],
+    ),
+  );
+}
+
 /// The model's outline, as small dots on the boundary pixels. [points] are fractions of the width and height.
 class _RealOutlinePainter extends CustomPainter {
   _RealOutlinePainter(this.points, this.photoWidth, this.photoHeight);

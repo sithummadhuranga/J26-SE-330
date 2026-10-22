@@ -6,6 +6,9 @@ import '../../app/app_services.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../measurement/capture/capture_runner.dart';
+import 'analysis/wound_analyzer.dart';
+import 'local_analysis.dart';
+import 'local_result_screen.dart';
 import '../measurement/capture/photo_check_screen.dart';
 import 'assessment_draft.dart';
 import 'assessment_view.dart';
@@ -34,6 +37,37 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.initState();
     final bytes = widget.draft.capture.imageBytes;
     if (bytes != null) _checked = (widget.checker ?? checkEncodedPhoto)(bytes);
+  }
+
+  /// No usable sticker: outline the wound and show its colours and skin type, with no area. Nothing is saved or synced.
+  Future<void> _withoutArea() async {
+    final analyzer = widget.services.analyzer;
+    final bytes = widget.draft.capture.imageBytes;
+    if (analyzer is! LocalAnalyzer || bytes == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    showDialog<void>(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    LocalAnalysis? result;
+    String? problem;
+    try {
+      result = await (analyzer as LocalAnalyzer).analyzeWithoutScale(bytes);
+    } on AnalysisFailed catch (e) {
+      problem = e.message;
+    } catch (e) {
+      problem = 'The photo could not be analysed: ${e.runtimeType}: $e';
+    }
+    if (!mounted) return;
+    nav.pop(); // the progress circle
+    if (result == null) {
+      messenger.showSnackBar(SnackBar(content: Text(problem ?? 'The photo could not be analysed.')));
+      return;
+    }
+    final shown = result;
+    await nav.push(
+      MaterialPageRoute<void>(
+        builder: (_) => LocalResultScreen(photoBytes: bytes, analysis: shown, onDone: () => nav.popUntil((r) => r.isFirst)),
+      ),
+    );
   }
 
   void _use() => Navigator.of(context).pushAndRemoveUntil(
@@ -77,6 +111,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
           useAnywayLabel: 'Use anyway',
           anotherLabel: 'Retake',
           useKey: const Key('useImage'),
+          allowMeasureWithoutSticker: widget.services.analyzer is LocalAnalyzer,
+          withoutLabel: 'Continue without area',
+          withoutNote: 'Without a sticker the area is not measured. The outline, colours and skin type still are. Nothing is saved or synced.',
+          onWithoutSticker: _withoutArea,
           onMeasure: _use,
           onRetake: () => Navigator.pop(context),
         );

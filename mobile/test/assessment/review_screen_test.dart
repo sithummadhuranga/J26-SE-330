@@ -7,6 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:melanin_wound_cdss/app/app_services.dart';
 import 'package:melanin_wound_cdss/core/theme.dart';
 import 'package:melanin_wound_cdss/features/assessment/analysis/wound_analyzer.dart';
+import 'package:melanin_wound_cdss/features/assessment/local_analysis.dart';
+import 'package:melanin_wound_cdss/features/assessment/local_result_screen.dart';
+import 'package:melanin_wound_cdss/features/assessment/media_store.dart';
+import 'package:melanin_wound_cdss/features/measurement/colour_regions.dart';
 import 'package:melanin_wound_cdss/features/assessment/assessment_draft.dart';
 import 'package:melanin_wound_cdss/features/assessment/processing_screen.dart';
 import 'package:melanin_wound_cdss/features/assessment/review_screen.dart';
@@ -42,6 +46,23 @@ class _StopsEarly implements WoundAnalyzer {
   Future<Map<String, dynamic>> analyze(WoundCapture capture, {void Function(AnalysisStage stage)? onStage}) async {
     calls++;
     throw AnalysisFailed('stopped for the test', stage: AnalysisStage.calibration);
+  }
+}
+
+class _LocalCapable extends _StopsEarly implements LocalAnalyzer {
+  int local = 0;
+  bool fail = false;
+
+  @override
+  Future<LocalAnalysis> analyzeWithoutScale(Uint8List photo) async {
+    local++;
+    if (fail) throw AnalysisFailed('No wound found in the photo. Retake it with the wound in the middle of the frame.');
+    return LocalAnalysis(
+      outline: WoundOutline(mask: Uint8List(640 * 480)..[1000] = 1, scale: 0.5, padLeft: 0, padTop: 0, originalWidth: 1280, originalHeight: 960),
+      colourRegions: const [ColourRegion(1, 100, [150, 60, 60])],
+      fitzpatrickClass: 'IV',
+      notes: const [],
+    );
   }
 }
 
@@ -148,6 +169,41 @@ void main() {
     expect(find.byType(ProcessingScreen), findsOneWidget);
     expect(find.textContaining('use demonstration values'), findsNothing);
     expect(find.textContaining('analysed on this phone'), findsOneWidget);
+  });
+
+  testWidgets('no sticker: an analyzer that can work without one offers to continue without the area', (tester) async {
+    final a = _LocalCapable();
+    await show(tester, bytes: png, checker: (_) async => _checked(Verdict.retake, 'no_candidate'), analyzer: a);
+    await tester.pumpAndSettle();
+    expect(find.text('No sticker found.'), findsOneWidget);
+    expect(find.text('Continue without area'), findsOneWidget);
+    expect(find.textContaining('area is not measured'), findsOneWidget);
+    expect(find.byKey(const Key('useImage')), findsNothing, reason: 'the normal analysis still needs a sticker');
+    await tester.tap(find.text('Continue without area'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(a.local, 1);
+    expect(a.calls, 0, reason: 'the normal analysis (which saves) is not started');
+    expect(find.byType(LocalResultScreen), findsOneWidget);
+    expect(find.text('Not measured'), findsOneWidget);
+  });
+
+  testWidgets('without such an analyzer there is no way to continue without a sticker', (tester) async {
+    await show(tester, bytes: png, checker: (_) async => _checked(Verdict.retake, 'no_candidate'), analyzer: _StopsEarly());
+    await tester.pumpAndSettle();
+    expect(find.text('Continue without area'), findsNothing);
+  });
+
+  testWidgets('if the photo without a sticker has no wound either, the reason is shown and we stay on the review', (tester) async {
+    final a = _LocalCapable()..fail = true;
+    await show(tester, bytes: png, checker: (_) async => _checked(Verdict.retake, 'no_candidate'), analyzer: a);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue without area'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(LocalResultScreen), findsNothing);
+    expect(find.textContaining('No wound found in the photo'), findsOneWidget);
   });
 
   testWidgets('a photo that cannot be opened says so and offers Retake', (tester) async {

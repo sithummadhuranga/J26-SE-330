@@ -29,6 +29,9 @@ class PhotoCheckScreen extends StatelessWidget {
     this.useAnywayLabel = 'Measure anyway',
     this.anotherLabel = 'Choose another photo',
     this.useKey = const Key('measure'),
+    this.withoutLabel = 'Measure without a sticker',
+    this.withoutNote = 'Without a sticker there is no area in mm. Demo only.',
+    this.onWithoutSticker,
   });
 
   /// The photo as the camera or gallery gave it (encoded), shown at the size of the screen, not full size.
@@ -41,8 +44,11 @@ class PhotoCheckScreen extends StatelessWidget {
   final bool allowMeasureWithoutSticker;
 
   /// The words and key of the buttons, so the real app can call them what its other screens do.
-  final String title, useLabel, useAnywayLabel, anotherLabel;
+  final String title, useLabel, useAnywayLabel, anotherLabel, withoutLabel, withoutNote;
   final Key useKey;
+
+  /// What the "without a sticker" button does; [onMeasure] when null (the demo).
+  final VoidCallback? onWithoutSticker;
 
   @override
   Widget build(BuildContext context) {
@@ -127,13 +133,13 @@ class PhotoCheckScreen extends StatelessWidget {
             FilledButton(key: const Key('retake'), onPressed: onRetake, child: const Text('Retake')),
             if (allowMeasureWithoutSticker) ...[
               const SizedBox(height: 10),
-              TextButton(key: useKey, onPressed: onMeasure, child: const Text('Measure without a sticker')),
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
+              TextButton(key: const Key('withoutSticker'), onPressed: onWithoutSticker ?? onMeasure, child: Text(withoutLabel)),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Without a sticker there is no area in mm. Demo only.',
+                  withoutNote,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: WoundColors.textTertiary),
+                  style: const TextStyle(fontSize: 12, color: WoundColors.textTertiary),
                 ),
               ),
             ],
