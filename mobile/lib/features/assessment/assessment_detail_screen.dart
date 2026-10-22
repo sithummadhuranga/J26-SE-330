@@ -10,6 +10,7 @@ import '../recommendations/guidance_screen.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/tables.dart';
 import 'assessment_view.dart';
+import 'media_store.dart';
 
 /// The assessment summary, with measurements, answers, sync status and a link to the guidance.
 /// Everything updates live.
@@ -101,17 +102,30 @@ class _AssessmentDetailScreenState extends State<AssessmentDetailScreen> {
             const SizedBox(height: 14),
             _ImageTabs(segmentation: _segmentation, onChanged: (s) => setState(() => _segmentation = s)),
             const SizedBox(height: 10),
-            MediaFrame(
-              aspectRatio: 4 / 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  WoundIllustration(seed: v.assessmentId.hashCode),
-                  if (_segmentation) CustomPaint(painter: _OutlinePainter(v.assessmentId.hashCode)),
-                  if (_segmentation)
-                    Positioned(left: 10, bottom: 10, child: _OverlayChip('Wound boundary — ${v.segmentationModel}')),
-                ],
-              ),
+            FutureBuilder<AssessmentMedia?>(
+              future: widget.services.media.load(v.assessmentId),
+              builder: (context, media) {
+                final real = media.data;
+                return MediaFrame(
+                  aspectRatio: 4 / 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: WoundColors.surfaceSunken, borderRadius: BorderRadius.circular(WoundRadii.m)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (real != null)
+                          AssessmentPhoto(store: widget.services.media, assessmentId: v.assessmentId, showOutline: _segmentation, cacheWidth: 1400)
+                        else
+                          WoundIllustration(seed: v.assessmentId.hashCode),
+                        // Without a kept photo (the prototype, or another phone) the outline is the stand-in drawing.
+                        if (_segmentation && real == null) CustomPaint(painter: _OutlinePainter(v.assessmentId.hashCode)),
+                        if (_segmentation && (real == null || real.outline != null))
+                          Positioned(left: 10, bottom: 10, child: _OverlayChip('Wound boundary — ${v.segmentationModel}')),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             WoundCard(

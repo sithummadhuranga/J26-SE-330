@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/tables.dart';
+import 'media_store.dart';
 
 /// One saved assessment, the way the screens show it. It's read from the queued wound event
 /// (contracts/wound-event.schema.json).
@@ -76,6 +79,85 @@ String triStateLabel(String v) => switch (v) {
 };
 
 const regionColours = [WoundColors.accent, WoundColors.amber, WoundColors.borderStrong, WoundColors.accent2];
+
+/// The assessment's own photo: [bytes] when the photo is at hand (during the analysis), else the one kept on the phone for
+/// [assessmentId]. With nothing kept (the prototype's sample capture, or an assessment made on another phone) it shows the stand-in
+/// illustration. [showOutline] draws the wound outline the model found, when one was kept.
+class AssessmentPhoto extends StatelessWidget {
+  const AssessmentPhoto({
+    super.key,
+    required this.store,
+    required this.assessmentId,
+    this.bytes,
+    this.borderRadius = WoundRadii.m,
+    this.showOutline = false,
+    this.cacheWidth = 900,
+  });
+
+  final MediaStore store;
+  final String assessmentId;
+  final Uint8List? bytes;
+  final double borderRadius;
+  final bool showOutline;
+  final int cacheWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final given = bytes;
+    if (given != null) return _photo(given, null);
+    return FutureBuilder<AssessmentMedia?>(
+      future: store.load(assessmentId),
+      builder: (context, snap) {
+        final media = snap.data;
+        if (media == null) return WoundIllustration(seed: assessmentId.hashCode, borderRadius: borderRadius);
+        return _photo(media.photo, showOutline ? media.outline : null);
+      },
+    );
+  }
+
+  Widget _photo(Uint8List photo, WoundOutline? outline) => ClipRRect(
+    borderRadius: BorderRadius.circular(borderRadius),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        // With an outline the whole photo must show, so the outline lands on the wound; without one a thumbnail may be cropped.
+        Image.memory(photo, fit: outline == null ? BoxFit.cover : BoxFit.contain, cacheWidth: cacheWidth, gaplessPlayback: true),
+        if (outline != null)
+          CustomPaint(
+            key: const Key('woundOutline'),
+            painter: _RealOutlinePainter(outline.boundaryFractions(), outline.originalWidth, outline.originalHeight),
+          ),
+      ],
+    ),
+  );
+}
+
+/// The model's outline, as small dots on the boundary pixels. [points] are fractions of the width and height.
+class _RealOutlinePainter extends CustomPainter {
+  _RealOutlinePainter(this.points, this.photoWidth, this.photoHeight);
+
+  final List<(double, double)> points;
+  final int photoWidth, photoHeight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // The photo is drawn as large as fits and centred (BoxFit.contain); the outline goes on that rectangle only.
+    final k = size.width / photoWidth < size.height / photoHeight ? size.width / photoWidth : size.height / photoHeight;
+    final w = photoWidth * k, h = photoHeight * k;
+    final left = (size.width - w) / 2, top = (size.height - h) / 2;
+    final halo = Paint()..color = Colors.white.withValues(alpha: 0.8);
+    final dot = Paint()..color = const Color(0xFF0C6D5E);
+    for (final (x, y) in points) {
+      canvas.drawCircle(Offset(left + x * w, top + y * h), 2.6, halo);
+    }
+    for (final (x, y) in points) {
+      canvas.drawCircle(Offset(left + x * w, top + y * h), 1.5, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RealOutlinePainter old) => old.points != points || old.photoWidth != photoWidth || old.photoHeight != photoHeight;
+}
 
 /// A stand-in wound picture, used until the capture module (Member 1) provides real photos.
 class WoundIllustration extends StatelessWidget {
@@ -152,9 +234,12 @@ class _WoundPainter extends CustomPainter {
 /// The card used in the History and Home lists. It shows the thumbnail, reference, date, patient,
 /// sync state and area.
 class AssessmentCard extends StatelessWidget {
-  const AssessmentCard({super.key, required this.view, required this.patientLabel, required this.onTap});
+  const AssessmentCard({super.key, required this.view, required this.patientLabel, required this.onTap, this.media});
 
   final AssessmentView view;
+
+  /// Where the photos are kept; without it the card shows the stand-in illustration.
+  final MediaStore? media;
   final String patientLabel;
   final VoidCallback onTap;
 
@@ -167,7 +252,13 @@ class AssessmentCard extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          SizedBox(width: 48, height: 48, child: WoundIllustration(seed: view.assessmentId.hashCode, borderRadius: 11)),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: media == null
+                ? WoundIllustration(seed: view.assessmentId.hashCode, borderRadius: 11)
+                : AssessmentPhoto(store: media!, assessmentId: view.assessmentId, borderRadius: 11, cacheWidth: 150),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

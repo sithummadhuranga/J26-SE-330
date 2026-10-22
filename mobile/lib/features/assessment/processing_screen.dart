@@ -12,6 +12,7 @@ import 'analysis/wound_analyzer.dart';
 import 'assessment_detail_screen.dart';
 import 'assessment_draft.dart';
 import 'assessment_view.dart';
+import 'media_store.dart';
 
 enum StepState { pending, active, done, attention }
 
@@ -59,6 +60,17 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     _run();
   }
 
+  /// Keeps the photo and the wound outline on this phone under the assessment's id, so the results and the history show the real
+  /// photo. The photo is never uploaded. A problem here must never stop the assessment, which is already saved.
+  Future<void> _keepPhoto() async {
+    final bytes = widget.draft.capture.imageBytes;
+    if (bytes == null) return;
+    try {
+      final source = widget.services.analyzer;
+      await widget.services.media.save(widget.draft.assessmentId, bytes, source is WoundOutlineSource ? (source as WoundOutlineSource).takeOutline() : null);
+    } catch (_) {}
+  }
+
   void _set(int i, StepState state, [String? note]) {
     if (!mounted) return;
     setState(() {
@@ -89,6 +101,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       return;
     }
     _saved = true;
+    await _keepPhoto();
     _set(4, StepState.done);
 
     _set(5, StepState.active);
@@ -193,7 +206,11 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           children: [
             MediaFrame(
               aspectRatio: 16 / 9,
-              child: WoundIllustration(seed: widget.draft.assessmentId.hashCode),
+              child: AssessmentPhoto(
+                store: widget.services.media,
+                assessmentId: widget.draft.assessmentId,
+                bytes: widget.draft.capture.imageBytes,
+              ),
             ),
             const SizedBox(height: 16),
             ClipRRect(

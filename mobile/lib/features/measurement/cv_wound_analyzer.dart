@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 
 import '../assessment/analysis/wound_analyzer.dart';
+import '../assessment/media_store.dart';
 import 'capture/capture_messages.dart';
 import 'capture/capture_runner.dart';
 import 'capture/capture_verdict.dart';
@@ -27,12 +28,21 @@ typedef PipelineFactory = Future<MeasurementPipeline> Function();
 /// returns the numbers the wound event carries. Everything runs on the phone; nothing leaves it.
 ///
 /// The photo is checked again here (the review screen already did) so this class is correct on its own: no sticker, no analysis.
-class CvWoundAnalyzer implements WoundAnalyzer {
+class CvWoundAnalyzer implements WoundAnalyzer, WoundOutlineSource {
   /// [pipeline] builds the measurement once the model is available; the real model file on the phone when null.
   CvWoundAnalyzer({PipelineFactory? pipeline, DemoEngine? engine, double confidence = 0.25})
       : _pipeline = pipeline ?? _onDevice(engine ?? DemoEngine(), confidence);
 
   final PipelineFactory _pipeline;
+  WoundOutline? _outline;
+
+  /// Where the wound was found in the photo analysed last, once; null when that analysis found none or failed.
+  @override
+  WoundOutline? takeOutline() {
+    final o = _outline;
+    _outline = null;
+    return o;
+  }
 
   static PipelineFactory _onDevice(DemoEngine engine, double confidence) {
     MeasurementPipeline? cached;
@@ -49,6 +59,7 @@ class CvWoundAnalyzer implements WoundAnalyzer {
 
   @override
   Future<Map<String, dynamic>> analyze(WoundCapture capture, {void Function(AnalysisStage stage)? onStage}) async {
+    _outline = null;
     final bytes = capture.imageBytes;
     if (bytes == null) throw AnalysisFailed('No photo to analyse. Retake the photo.');
 
@@ -92,12 +103,22 @@ class CvWoundAnalyzer implements WoundAnalyzer {
     final result = pipeline.analyzePrepared(prepared, scale: scale, markerRgb: crop);
     // Nothing found: stop here, so the screen does not show measurement and colour as if they had happened.
     if (result.segmentation.detections.isEmpty) throw _failure('no wound');
+    final outline = WoundOutline(
+      mask: Uint8List.fromList(result.segmentation.mask),
+      scale: prepared.scale,
+      padLeft: prepared.padLeft,
+      padTop: prepared.padTop,
+      originalWidth: prepared.originalWidth,
+      originalHeight: prepared.originalHeight,
+    );
     onStage?.call(AnalysisStage.measurement);
     await _paint();
     onStage?.call(AnalysisStage.colour);
     await _paint();
     try {
-      return result.toAnalytics();
+      final analytics = result.toAnalytics();
+      _outline = outline;
+      return analytics;
     } on MeasurementIncomplete catch (e) {
       throw _failure(e.reason);
     }

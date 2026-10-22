@@ -213,6 +213,7 @@ class RecentAssessments extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 10),
             child: AssessmentCard(
               view: v,
+              media: services.media,
               patientLabel: labels[v.patientRef] ?? 'Unlinked case',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(

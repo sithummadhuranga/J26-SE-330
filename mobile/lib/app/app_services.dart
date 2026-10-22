@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../features/account/account_api.dart';
 import '../features/assessment/analysis/wound_analyzer.dart';
+import '../features/assessment/media_store.dart';
 import '../features/assessment/photo_source.dart';
 import '../features/sync/api/sync_api.dart';
 import '../features/sync/auth/auth_session.dart';
@@ -26,7 +27,8 @@ const syncBaseUrl = String.fromEnvironment('SYNC_BASE_URL', defaultValue: 'http:
 class AppServices {
   AppServices({required this.db, required this.queue, required this.figures, required this.patients, required this.api,
       required this.auth, required this.engine, required this.scheduler, required this.analyzer, required this.account,
-      this.photoSource = const SamplePhotoSource()});
+      this.photoSource = const SamplePhotoSource(), MediaStore? media})
+      : media = media ?? MemoryMediaStore();
 
   final AppDatabase db;
   final QueueRepository queue;
@@ -46,6 +48,9 @@ class AppServices {
   /// Where the capture step gets its photo: the camera and gallery on a phone, a sample in tests.
   final PhotoSource photoSource;
 
+  /// Where each assessment's photo and wound outline are kept on this phone (never uploaded).
+  final MediaStore media;
+
   /// The setup for a real phone: encrypted database, Keystore secrets and real connectivity. Tests pass fakes instead.
   static Future<AppServices> open({
     AppDatabase? db,
@@ -57,6 +62,7 @@ class AppServices {
     WoundAnalyzer? analyzer,
     AccountApi? account,
     PhotoSource? photoSource,
+    MediaStore? media,
   }) async {
     final store = secrets ?? const KeystoreSecretStore();
     final database = db ??
@@ -89,7 +95,8 @@ class AppServices {
         scheduler: scheduler,
         analyzer: analyzer ?? SampleWoundAnalyzer(),
         account: account ?? HttpAccountApi(Uri.parse(syncBaseUrl), auth),
-        photoSource: photoSource ?? const SamplePhotoSource());
+        photoSource: photoSource ?? const SamplePhotoSource(),
+        media: media);
   }
 
   /// Signs in on the identity service's page with this phone's device id, and remembers who signed in

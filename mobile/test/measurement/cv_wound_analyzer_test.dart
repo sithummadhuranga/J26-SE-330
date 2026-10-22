@@ -43,6 +43,27 @@ void main() {
     });
   });
 
+  testWidgets('after an analysis the outline of the wound is available once, mapped back to the photo', (tester) async {
+    await tester.runAsync(() async {
+      final a = _analyzer(OneWoundSegmenter());
+      expect(a.takeOutline(), isNull, reason: 'nothing analysed yet');
+      await a.analyze(_photo('sim_one_ok'));
+      final o = a.takeOutline()!;
+      expect(o.mask.where((v) => v != 0).length, 1000);
+      expect((o.originalWidth, o.originalHeight), (1200, 900));
+      expect(o.scale, closeTo(640 / 1200, 1e-6));
+      expect(a.takeOutline(), isNull, reason: 'it is handed over once');
+    });
+  });
+
+  testWidgets('a failed analysis leaves no outline behind', (tester) async {
+    await tester.runAsync(() async {
+      final a = _analyzer(_NoWound());
+      await expectLater(a.analyze(_photo('sim_one_ok')), throwsA(isA<AnalysisFailed>()));
+      expect(a.takeOutline(), isNull);
+    });
+  });
+
   testWidgets('a photo without a sticker stops with the sentence the nurse would see on the review screen', (tester) async {
     await tester.runAsync(() async {
       final stages = <AnalysisStage>[];
