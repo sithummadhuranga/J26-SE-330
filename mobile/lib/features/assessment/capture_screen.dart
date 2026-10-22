@@ -4,6 +4,7 @@ import '../../app/app_services.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'assessment_draft.dart';
+import 'photo_source.dart';
 import 'review_screen.dart';
 
 /// The capture step. It uses a sample capture until Member 1's camera module is plugged in.
@@ -18,6 +19,19 @@ class CaptureScreen extends StatelessWidget {
       builder: (_) => ReviewScreen(services: services, draft: draft),
     ),
   );
+
+  /// Gets a photo from the camera or the device and goes on to the review. A cancelled picker stays here; a camera that fails says why.
+  Future<void> _take(BuildContext context, PhotoOrigin origin) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final capture = await services.photoSource.pick(origin);
+      if (capture == null || !context.mounted) return;
+      draft.capture = capture;
+      _next(context);
+    } on PhotoUnavailable catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -69,7 +83,7 @@ class CaptureScreen extends StatelessWidget {
             child: InkWell(
               key: const Key('shutter'),
               customBorder: const CircleBorder(),
-              onTap: () => _next(context),
+              onTap: () => _take(context, PhotoOrigin.camera),
               child: Container(
                 width: 72,
                 height: 72,
@@ -98,14 +112,17 @@ class CaptureScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
-          onPressed: () => _next(context),
+          onPressed: () => _take(context, PhotoOrigin.device),
           icon: const Icon(Icons.image_outlined, size: 20),
           label: const Text('Choose from device'),
         ),
         const SizedBox(height: 16),
-        const NoticeStrip(
-          'Prototype: the camera and reference-marker detection come with the calibration module. '
-          'Capturing here uses a sample image so the rest of the assessment can be completed.',
+        NoticeStrip(
+          services.photoSource.isSample
+              ? 'Prototype: the camera and reference-marker detection come with the calibration module. '
+                  'Capturing here uses a sample image so the rest of the assessment can be completed.'
+              : 'Put the sticker flat beside the wound. The photo is checked on this phone and not uploaded: '
+                  'only the measurements are saved.',
           icon: Icons.info_outline_rounded,
         ),
       ],

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+data/raw/
+data/isic_subset/
+*.egg-info/
+
+# Markdown/docs stay local (not in the repo)
+*.md
+docs/
+
+# C++ port build output
+native/build/

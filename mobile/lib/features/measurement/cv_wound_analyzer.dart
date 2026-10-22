@@ -1,0 +1,179 @@
+import 'dart:isolate';
+
+import 'package:flutter/foundation.dart';
+
+import '../assessment/analysis/wound_analyzer.dart';
+import '../assessment/local_analysis.dart';
+import '../assessment/media_store.dart';
+import 'capture/capture_messages.dart';
+import 'capture/capture_runner.dart';
+import 'capture/capture_verdict.dart';
+import 'capture/decoded_photo.dart';
+import 'demo/analysis_session.dart' show DemoEngine;
+import 'image_prepare.dart';
+import 'light_calibrator.dart';
+import 'measurement_pipeline.dart';
+import 'wound_area.dart';
+
+/// The wound model is not on this phone (or could not be loaded).
+class ModelMissing implements Exception {
+  const ModelMissing(this.reason);
+
+  final String reason;
+}
+
+typedef PipelineFactory = Future<MeasurementPipeline> Function();
+
+/// The app's real wound analysis: the CV and colour components behind the [WoundAnalyzer] slot. It looks for the sticker, reads
+/// the light from its patches, fits the photo to the model, finds the wound, measures its area with the sticker as the scale, and
+/// returns the numbers the wound event carries. Everything runs on the phone; nothing leaves it.
+///
+/// The photo is checked again here (the review screen already did) so this class is correct on its own: no sticker, no analysis.
+class CvWoundAnalyzer implements WoundAnalyzer, WoundOutlineSource, LocalAnalyzer {
+  /// [pipeline] builds the measurement once the model is available; the real model file on the phone when null.
+  CvWoundAnalyzer({PipelineFactory? pipeline, DemoEngine? engine, double confidence = 0.25})
+      : _pipeline = pipeline ?? _onDevice(engine ?? DemoEngine(), confidence);
+
+  final PipelineFactory _pipeline;
+  WoundOutline? _outline;
+
+  /// Where the wound was found in the photo analysed last, once; null when that analysis found none or failed.
+  @override
+  WoundOutline? takeOutline() {
+    final o = _outline;
+    _outline = null;
+    return o;
+  }
+
+  static PipelineFactory _onDevice(DemoEngine engine, double confidence) {
+    MeasurementPipeline? cached;
+    return () async {
+      if (cached != null) return cached!;
+      if (!engine.ready) await engine.load();
+      if (!engine.ready) throw ModelMissing(engine.loadError ?? 'The model could not be loaded.');
+      return cached = engine.pipeline(confidence, calibrator: const LightCalibrator());
+    };
+  }
+
+  /// Gives the screen a moment to paint the stage that just started.
+  static Future<void> _paint() => Future<void>.delayed(const Duration(milliseconds: 30));
+
+  @override
+  Future<Map<String, dynamic>> analyze(WoundCapture capture, {void Function(AnalysisStage stage)? onStage}) async {
+    _outline = null;
+    final bytes = capture.imageBytes;
+    if (bytes == null) throw AnalysisFailed('No photo to analyse. Retake the photo.');
+
+    onStage?.call(AnalysisStage.calibration);
+    await _paint();
+    final DecodedPhoto photo;
+    try {
+      photo = await decodePhoto(bytes);
+    } catch (_) {
+      throw AnalysisFailed('This photo could not be opened. Retake it.', stage: AnalysisStage.calibration);
+    }
+    final check = await checkInBackground(photo);
+    final crop = check.stickerCrop;
+    if (!check.scan.found || crop == null || check.verdict.verdict == Verdict.retake) {
+      throw AnalysisFailed(captureMessage(check.verdict.code), stage: AnalysisStage.calibration);
+    }
+    final MeasurementPipeline pipeline;
+    try {
+      pipeline = await _pipeline();
+    } on ModelMissing catch (e) {
+      debugPrint('wound model not available: ${e.reason}');
+      final notThere = e.reason.contains('not on this phone');
+      throw AnalysisFailed(
+        notThere
+            ? 'The wound model is not on this phone yet. Ask for it to be installed, then try again.'
+            : 'The wound model could not be started on this phone. Close the app and open it again.',
+        stage: AnalysisStage.segmentation,
+      );
+    }
+
+    final w = photo.width, h = photo.height;
+    final transfer = TransferableTypedData.fromList([photo.rgba]);
+    final prepared = await Isolate.run(() => prepareImage(transfer.materialize().asUint8List(), w, h));
+    // The sticker's corners in the 640 x 480 picture the model sees; its side is 50 mm, which gives the area.
+    final scale = HomographyScale.fromSquare([
+      for (final c in check.scan.stickers.first.corners) ((c.$1 + 0.5) * prepared.scale + prepared.padLeft, (c.$2 + 0.5) * prepared.scale + prepared.padTop),
+    ], 50.0);
+
+    onStage?.call(AnalysisStage.segmentation);
+    await _paint();
+    final result = pipeline.analyzePrepared(prepared, scale: scale, markerRgb: crop);
+    // Nothing found: stop here, so the screen does not show measurement and colour as if they had happened.
+    if (result.segmentation.detections.isEmpty) throw _failure('no wound');
+    final outline = WoundOutline(
+      mask: Uint8List.fromList(result.segmentation.mask),
+      scale: prepared.scale,
+      padLeft: prepared.padLeft,
+      padTop: prepared.padTop,
+      originalWidth: prepared.originalWidth,
+      originalHeight: prepared.originalHeight,
+    );
+    onStage?.call(AnalysisStage.measurement);
+    await _paint();
+    onStage?.call(AnalysisStage.colour);
+    await _paint();
+    try {
+      final analytics = result.toAnalytics();
+      _outline = outline;
+      return analytics;
+    } on MeasurementIncomplete catch (e) {
+      throw _failure(e.reason);
+    }
+  }
+
+  /// A photo with no usable sticker: the wound is outlined and its colours and the skin type are read, but there is no area (the
+  /// sticker is the scale) and the colours are not corrected (its grey patch is the reference). Nothing here is saved or synced.
+  @override
+  Future<LocalAnalysis> analyzeWithoutScale(Uint8List photoBytes) async {
+    final DecodedPhoto photo;
+    try {
+      photo = await decodePhoto(photoBytes);
+    } catch (_) {
+      throw AnalysisFailed('This photo could not be opened. Retake it.', stage: AnalysisStage.calibration);
+    }
+    final MeasurementPipeline pipeline;
+    try {
+      pipeline = await _pipeline();
+    } on ModelMissing catch (e) {
+      debugPrint('wound model not available: ${e.reason}');
+      throw AnalysisFailed(
+        e.reason.contains('not on this phone')
+            ? 'The wound model is not on this phone yet. Ask for it to be installed, then try again.'
+            : 'The wound model could not be started on this phone. Close the app and open it again.',
+        stage: AnalysisStage.segmentation,
+      );
+    }
+    final w = photo.width, h = photo.height;
+    final transfer = TransferableTypedData.fromList([photo.rgba]);
+    final prepared = await Isolate.run(() => prepareImage(transfer.materialize().asUint8List(), w, h));
+    final result = pipeline.analyzePrepared(prepared); // no scale, no sticker picture: skin type from the skin pixels, colours as they are
+    if (result.segmentation.detections.isEmpty) throw _failure('no wound');
+    return LocalAnalysis(
+      outline: WoundOutline(
+        mask: Uint8List.fromList(result.segmentation.mask),
+        scale: prepared.scale,
+        padLeft: prepared.padLeft,
+        padTop: prepared.padTop,
+        originalWidth: prepared.originalWidth,
+        originalHeight: prepared.originalHeight,
+      ),
+      colourRegions: result.colourRegions,
+      fitzpatrickClass: result.fitzpatrickClass,
+      notes: result.notes,
+    );
+  }
+
+  AnalysisFailed _failure(String reason) {
+    if (reason.contains('no wound')) {
+      return AnalysisFailed('No wound found in the photo. Retake it with the wound in the middle of the frame.', stage: AnalysisStage.segmentation);
+    }
+    if (reason.contains('skin type')) {
+      return AnalysisFailed('Skin tone could not be read. Include more skin in the photo.', stage: AnalysisStage.calibration);
+    }
+    return AnalysisFailed('The sticker could not be used to measure the area. Retake the photo.', stage: AnalysisStage.measurement);
+  }
+}

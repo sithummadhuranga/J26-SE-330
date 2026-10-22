@@ -119,6 +119,23 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('with the stand-in guidance service there is no chat button, only a plain note, because the stand-in cannot chat', (tester) async {
+    await show(tester, {...response(), 'corpusVersion': 'stub-0', 'caseId': 'c-1', 'revision': 1});
+    await scrollTo(tester, find.textContaining('Guideline snapshot'));
+    expect(find.byKey(const Key('askAboutGuidance')), findsNothing);
+    expect(find.byKey(const Key('chatNotConnected')), findsOneWidget);
+    expect(find.textContaining('Follow-up questions need the guideline service'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('with a real guideline corpus the chat button is there as before', (tester) async {
+    await show(tester, {...response(), 'caseId': 'c-1', 'revision': 1});
+    await scrollTo(tester, find.byKey(const Key('askAboutGuidance')));
+    expect(find.byKey(const Key('askAboutGuidance')), findsOneWidget);
+    expect(find.byKey(const Key('chatNotConnected')), findsNothing);
+    await close(tester);
+  });
+
   testWidgets('a stalled wound shows the escalation with its weeks, area reduction and rule', (tester) async {
     await show(tester, response(escalation: {
       'triggered': true, 'rule': 'IWGDF-STALL', 'par': 12.5, 'elapsedWeeks': 6.0, 'clock': 'capturedAt',

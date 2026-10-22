@@ -1,0 +1,9 @@
+# Extra packages for the evaluation and training scripts in scripts/ only.
+# The calibration package (src/colorimetric) does not import any of them.
+-r requirements.txt
+scikit-learn>=1.4   # fst_baseline.py, fst_context.py, fst_gate_eval.py, export_gate_model.py
+
+# scripts/train_fst_cnn.py (T52) also needs TensorFlow/Keras:
+#   pip install tensorflow
+piexif>=1.1.3       # strip_location.py (with Pillow): copy photos for sharing without the GPS location
+Pillow>=10.1        # strip_location.py

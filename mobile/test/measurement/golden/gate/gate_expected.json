@@ -1,0 +1,538 @@
+{
+ "max_dim": 1200,
+ "cases": {
+  "sim_six_tilt25": {
+   "width": 1200,
+   "height": 900,
+   "code": null,
+   "found": 6,
+   "candidates": 6,
+   "best_frame_contrast": 0.98,
+   "best_orientation_contrast": 0.94,
+   "stickers": [
+    {
+     "corners": [
+      [
+       543.8,
+       55.7
+      ],
+      [
+       690.0,
+       150.7
+      ],
+      [
+       603.7,
+       296.1
+      ],
+      [
+       468.8,
+       208.6
+      ]
+     ],
+     "px_per_mm": 3.358
+    },
+    {
+     "corners": [
+      [
+       719.1,
+       169.5
+      ],
+      [
+       865.3,
+       264.4
+      ],
+      [
+       765.2,
+       401.0
+      ],
+      [
+       630.4,
+       313.5
+      ]
+     ],
+     "px_per_mm": 3.357
+    },
+    {
+     "corners": [
+      [
+       455.3,
+       236.1
+      ],
+      [
+       588.1,
+       322.3
+      ],
+      [
+       516.3,
+       443.2
+      ],
+      [
+       392.9,
+       363.1
+      ]
+     ],
+     "px_per_mm": 2.923
+    },
+    {
+     "corners": [
+      [
+       894.2,
+       283.2
+      ],
+      [
+       1040.3,
+       378.2
+      ],
+      [
+       926.7,
+       505.9
+      ],
+      [
+       791.9,
+       418.4
+      ]
+     ],
+     "px_per_mm": 3.357
+    },
+    {
+     "corners": [
+      [
+       614.4,
+       339.4
+      ],
+      [
+       747.2,
+       425.7
+      ],
+      [
+       664.1,
+       539.2
+      ],
+      [
+       540.8,
+       459.1
+      ]
+     ],
+     "px_per_mm": 2.923
+    },
+    {
+     "corners": [
+      [
+       773.5,
+       442.7
+      ],
+      [
+       906.2,
+       529.0
+      ],
+      [
+       811.8,
+       635.1
+      ],
+      [
+       688.5,
+       555.0
+      ]
+     ],
+     "px_per_mm": 2.923
+    }
+   ]
+  },
+  "sim_one_ok": {
+   "width": 1200,
+   "height": 900,
+   "code": null,
+   "found": 1,
+   "candidates": 1,
+   "best_frame_contrast": 0.983,
+   "best_orientation_contrast": 0.948,
+   "stickers": [
+    {
+     "corners": [
+      [
+       374.5,
+       164.5
+      ],
+      [
+       524.5,
+       164.5
+      ],
+      [
+       524.5,
+       314.5
+      ],
+      [
+       374.5,
+       314.5
+      ]
+     ],
+     "px_per_mm": 3.001
+    }
+   ]
+  },
+  "sim_one_mirrored": {
+   "width": 1200,
+   "height": 900,
+   "code": "mirrored",
+   "found": 0,
+   "candidates": 1,
+   "best_frame_contrast": 0.973,
+   "best_orientation_contrast": 1.0,
+   "stickers": []
+  },
+  "sim_one_no_orientation": {
+   "width": 1200,
+   "height": 900,
+   "code": "weak_orientation",
+   "found": 0,
+   "candidates": 1,
+   "best_frame_contrast": 0.973,
+   "best_orientation_contrast": 0.057,
+   "stickers": []
+  },
+  "sim_one_cut": {
+   "width": 1000,
+   "height": 1200,
+   "code": "cut_by_edge",
+   "found": 0,
+   "candidates": 0,
+   "best_frame_contrast": 0.0,
+   "best_orientation_contrast": 0.0,
+   "stickers": []
+  },
+  "sim_one_patch_glare": {
+   "width": 1200,
+   "height": 900,
+   "code": "weak_frame_contrast",
+   "found": 0,
+   "candidates": 1,
+   "best_frame_contrast": 0.983,
+   "best_orientation_contrast": 0.948,
+   "stickers": []
+  },
+  "sim_one_washed": {
+   "width": 1200,
+   "height": 900,
+   "code": "weak_frame_contrast",
+   "found": 0,
+   "candidates": 1,
+   "best_frame_contrast": 0.532,
+   "best_orientation_contrast": 0.937,
+   "stickers": []
+  },
+  "blank": {
+   "width": 1200,
+   "height": 900,
+   "code": "no_candidate",
+   "found": 0,
+   "candidates": 0,
+   "best_frame_contrast": 0.0,
+   "best_orientation_contrast": 0.0,
+   "stickers": []
+  },
+  "sim_shadows_no_sticker": {
+   "width": 1200,
+   "height": 900,
+   "code": "no_candidate",
+   "found": 0,
+   "candidates": 0,
+   "best_frame_contrast": 0.0,
+   "best_orientation_contrast": 0.0,
+   "stickers": []
+  },
+  "real_iphone_tilt": {
+   "width": 900,
+   "height": 1200,
+   "code": null,
+   "found": 6,
+   "candidates": 6,
+   "best_frame_contrast": 0.751,
+   "best_orientation_contrast": 0.967,
+   "stickers": [
+    {
+     "corners": [
+      [
+       142.9,
+       127.2
+      ],
+      [
+       326.6,
+       142.8
+      ],
+      [
+       323.4,
+       326.0
+      ],
+      [
+       147.3,
+       315.8
+      ]
+     ],
+     "px_per_mm": 3.652
+    },
+    {
+     "corners": [
+      [
+       361.6,
+       145.8
+      ],
+      [
+       532.7,
+       161.7
+      ],
+      [
+       521.6,
+       338.8
+      ],
+      [
+       357.2,
+       328.7
+      ]
+     ],
+     "px_per_mm": 3.476
+    },
+    {
+     "corners": [
+      [
+       567.0,
+       167.0
+      ],
+      [
+       720.0,
+       182.0
+      ],
+      [
+       704.0,
+       347.0
+      ],
+      [
+       554.0,
+       338.0
+      ]
+     ],
+     "px_per_mm": 3.198
+    },
+    {
+     "corners": [
+      [
+       147.7,
+       351.3
+      ],
+      [
+       323.7,
+       361.2
+      ],
+      [
+       322.8,
+       528.3
+      ],
+      [
+       153.2,
+       523.7
+      ]
+     ],
+     "px_per_mm": 3.421
+    },
+    {
+     "corners": [
+      [
+       359.0,
+       365.0
+      ],
+      [
+       517.0,
+       374.0
+      ],
+      [
+       507.0,
+       531.0
+      ],
+      [
+       356.0,
+       528.0
+      ]
+     ],
+     "px_per_mm": 3.142
+    },
+    {
+     "corners": [
+      [
+       551.0,
+       376.0
+      ],
+      [
+       700.0,
+       382.0
+      ],
+      [
+       683.0,
+       534.0
+      ],
+      [
+       540.0,
+       531.0
+      ]
+     ],
+     "px_per_mm": 2.995
+    }
+   ]
+  },
+  "real_pixel_flat": {
+   "width": 900,
+   "height": 1200,
+   "code": null,
+   "found": 6,
+   "candidates": 6,
+   "best_frame_contrast": 0.858,
+   "best_orientation_contrast": 0.97,
+   "stickers": [
+    {
+     "corners": [
+      [
+       107.1,
+       88.1
+      ],
+      [
+       303.4,
+       86.8
+      ],
+      [
+       300.9,
+       282.7
+      ],
+      [
+       102.9,
+       283.2
+      ]
+     ],
+     "px_per_mm": 3.928
+    },
+    {
+     "corners": [
+      [
+       343.0,
+       86.2
+      ],
+      [
+       542.5,
+       87.1
+      ],
+      [
+       541.1,
+       284.9
+      ],
+      [
+       340.9,
+       283.8
+      ]
+     ],
+     "px_per_mm": 3.975
+    },
+    {
+     "corners": [
+      [
+       581.9,
+       87.8
+      ],
+      [
+       779.5,
+       90.5
+      ],
+      [
+       780.6,
+       285.8
+      ],
+      [
+       580.8,
+       285.0
+      ]
+     ],
+     "px_per_mm": 3.948
+    },
+    {
+     "corners": [
+      [
+       101.8,
+       322.4
+      ],
+      [
+       301.0,
+       322.7
+      ],
+      [
+       300.7,
+       523.2
+      ],
+      [
+       99.7,
+       521.3
+      ]
+     ],
+     "px_per_mm": 3.998
+    },
+    {
+     "corners": [
+      [
+       340.7,
+       323.7
+      ],
+      [
+       540.7,
+       325.0
+      ],
+      [
+       538.5,
+       525.0
+      ],
+      [
+       340.5,
+       523.9
+      ]
+     ],
+     "px_per_mm": 3.99
+    },
+    {
+     "corners": [
+      [
+       580.2,
+       325.2
+      ],
+      [
+       780.2,
+       325.6
+      ],
+      [
+       779.2,
+       525.5
+      ],
+      [
+       577.9,
+       525.3
+      ]
+     ],
+     "px_per_mm": 4.007
+    }
+   ]
+  },
+  "real_glare_a": {
+   "width": 900,
+   "height": 1200,
+   "code": "weak_frame_contrast",
+   "found": 0,
+   "candidates": 6,
+   "best_frame_contrast": 0.561,
+   "best_orientation_contrast": 0.972,
+   "stickers": []
+  },
+  "real_glare_b": {
+   "width": 900,
+   "height": 1200,
+   "code": "weak_frame_contrast",
+   "found": 0,
+   "candidates": 6,
+   "best_frame_contrast": 0.547,
+   "best_orientation_contrast": 0.96,
+   "stickers": []
+  }
+ }
+}
