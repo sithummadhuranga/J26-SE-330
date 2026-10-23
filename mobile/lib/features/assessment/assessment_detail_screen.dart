@@ -9,6 +9,7 @@ import '../../core/widgets.dart';
 import '../recommendations/guidance_screen.dart';
 import '../sync/data/app_database.dart';
 import '../sync/data/tables.dart';
+import 'analysis/wound_analyzer.dart';
 import 'assessment_view.dart';
 import 'media_store.dart';
 
@@ -153,27 +154,35 @@ class _AssessmentDetailScreenState extends State<AssessmentDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SectionTitle('Color distribution'),
-                  _ColourBar(v.regionPercents),
-                  const SizedBox(height: 10),
-                  for (var i = 0; i < v.regionPercents.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
+                  FutureBuilder<AssessmentMedia?>(
+                    future: widget.services.media.load(v.assessmentId),
+                    builder: (context, media) {
+                      final colours = regionSwatchColours(media.data?.outline?.regionRgb ?? const [], v.regionPercents.length);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: regionColours[i % regionColours.length],
-                              borderRadius: BorderRadius.circular(3),
+                          _ColourBar(v.regionPercents, colours),
+                          const SizedBox(height: 10),
+                          for (var i = 0; i < v.regionPercents.length; i++)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(color: colours[i], borderRadius: BorderRadius.circular(3)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text('Color region ${String.fromCharCode(65 + i)}')),
+                                  Text('${v.regionPercents[i]}%', style: const TextStyle(fontWeight: FontWeight.w700)),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text('Color region ${String.fromCharCode(65 + i)}')),
-                          Text('${v.regionPercents[i]}%', style: const TextStyle(fontWeight: FontWeight.w700)),
                         ],
-                      ),
-                    ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 6),
                   const Text(
                     'Color clusters represent image appearance and are not clinical tissue diagnoses.',
@@ -230,11 +239,13 @@ class _AssessmentDetailScreenState extends State<AssessmentDetailScreen> {
                       Text('${formatDate(v.capturedAt)}, ${formatTime(v.capturedAt)}', style: _value),
                     ),
                     KeyValueRow('Revision', Text('${v.revision}', style: _value)),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Measurement values are demonstration data until the on-device pipeline is added.',
-                      style: TextStyle(fontSize: 11.5, color: WoundColors.textTertiary),
-                    ),
+                    if (widget.services.analyzer is SampleWoundAnalyzer) ...[
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Measurement values are demonstration data until the on-device pipeline is added.',
+                        style: TextStyle(fontSize: 11.5, color: WoundColors.textTertiary),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -402,9 +413,10 @@ class _OutlinePainter extends CustomPainter {
 }
 
 class _ColourBar extends StatelessWidget {
-  const _ColourBar(this.percents);
+  const _ColourBar(this.percents, this.colours);
 
   final List<double> percents;
+  final List<Color> colours;
 
   @override
   Widget build(BuildContext context) => ClipRRect(
@@ -417,7 +429,7 @@ class _ColourBar extends StatelessWidget {
             if (percents[i] > 0)
               Expanded(
                 flex: (percents[i] * 10).round(),
-                child: Container(color: regionColours[i % regionColours.length]),
+                child: Container(color: colours[i]),
               ),
         ],
       ),
