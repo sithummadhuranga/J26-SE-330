@@ -104,6 +104,66 @@ void main() {
     }
   });
 
+  for (final withColours in [true, false]) {
+    testWidgets('the colour swatches ${withColours ? "show the colours of the wound itself" : "are neutral grey, never the app green, when the real colours are not known"}', (tester) async {
+      final a = _OutlineAnalyzer();
+      if (withColours) {
+        final o = a.pending!;
+        a.pending = WoundOutline(
+          mask: o.mask, scale: o.scale, padLeft: 0, padTop: 0, originalWidth: o.originalWidth, originalHeight: o.originalHeight,
+          regionRgb: const [0xFF941823, 0xFFAB4F57, 0xFFC48E8E],
+        );
+      }
+      final png = Uint8List.fromList(const [
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84,
+        120, 156, 99, 248, 207, 192, 240, 31, 0, 5, 0, 1, 255, 137, 153, 61, 29, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+      ]);
+      final draft = await run(tester, analyzer: a, bytes: png);
+      await tester.pumpWidget(MaterialApp(theme: woundTheme(), home: AssessmentDetailScreen(services: services, assessmentId: draft.assessmentId)));
+      for (var i = 0; i < 20; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.scrollUntilVisible(find.text('Color region A'), 300, scrollable: find.byType(Scrollable).first);
+      final swatches = <Color>[
+        for (final c in tester.widgetList<Container>(find.byType(Container)))
+          if (c.constraints?.maxWidth == 10 && c.decoration is BoxDecoration) (c.decoration! as BoxDecoration).color!,
+      ];
+      expect(swatches, isNotEmpty);
+      expect(swatches, isNot(contains(WoundColors.accent)), reason: 'green is not a wound colour');
+      if (withColours) {
+        expect(swatches.first, const Color(0xFF941823));
+      } else {
+        for (final s in swatches) {
+          expect((s.r - s.g).abs() < 0.02 && (s.g - s.b).abs() < 0.04, isTrue, reason: 'neutral grey: $s');
+        }
+      }
+      await tester.pumpWidget(const SizedBox());
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    });
+  }
+
+  for (final real in [true, false]) {
+    testWidgets('the analysis details ${real ? 'do not call real measurements demonstration data' : 'still say the sample values are demonstration data'}', (tester) async {
+      final draft = await run(tester, analyzer: real ? _OutlineAnalyzer() : SampleWoundAnalyzer(stageDuration: Duration.zero));
+      await tester.pumpWidget(MaterialApp(theme: woundTheme(), home: AssessmentDetailScreen(services: services, assessmentId: draft.assessmentId)));
+      for (var i = 0; i < 10; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.scrollUntilVisible(find.text('Analysis details'), 300, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text('Analysis details'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.textContaining('demonstration data'), real ? findsNothing : findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    });
+  }
+
   testWidgets('with no photo (the sample flow) nothing is kept and the outline source is not asked', (tester) async {
     final a = _OutlineAnalyzer();
     final draft = await run(tester, analyzer: a);

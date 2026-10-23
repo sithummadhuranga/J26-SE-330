@@ -111,6 +111,7 @@ class CvWoundAnalyzer implements WoundAnalyzer, WoundOutlineSource, LocalAnalyze
       padTop: prepared.padTop,
       originalWidth: prepared.originalWidth,
       originalHeight: prepared.originalHeight,
+      regionRgb: [for (final r in result.colourRegions) _rgbOf(r.centre)],
     );
     onStage?.call(AnalysisStage.measurement);
     await _paint();
@@ -176,4 +177,10 @@ class CvWoundAnalyzer implements WoundAnalyzer, WoundOutlineSource, LocalAnalyze
     }
     return AnalysisFailed('The sticker could not be used to measure the area. Retake the photo.', stage: AnalysisStage.measurement);
   }
+}
+
+/// An average colour [r, g, b] (0..255) as an opaque 0xFFRRGGBB.
+int _rgbOf(List<double> c) {
+  int ch(double v) => v.round().clamp(0, 255);
+  return 0xFF000000 | (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2]);
 }

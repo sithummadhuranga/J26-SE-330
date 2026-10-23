@@ -32,6 +32,24 @@ void main() {
     expect(o.mask, _outline().mask);
   });
 
+  test('the real colour of each colour region is kept with the outline, and an older outline without colours still loads', () async {
+    final store = FileMediaStore(dir);
+    final o = _outline();
+    final withColours = WoundOutline(
+      mask: o.mask, scale: o.scale, padLeft: 0, padTop: 0, originalWidth: 1280, originalHeight: 960,
+      regionRgb: const [0xFF941823, 0xFFAB4F57, 0xFFC48E8E],
+    );
+    await store.save('col-1', Uint8List.fromList([1]), withColours);
+    expect((await store.load('col-1'))!.outline!.regionRgb, [0xFF941823, 0xFFAB4F57, 0xFFC48E8E]);
+
+    await store.save('col-2', Uint8List.fromList([1]), _outline());
+    expect((await store.load('col-2'))!.outline!.regionRgb, isEmpty);
+
+    // A file written before the colours were kept has no such field at all.
+    final json = withColours.toJson()..remove('regionRgb');
+    expect(WoundOutline.fromJson(json).regionRgb, isEmpty);
+  });
+
   test('a photo without an outline is stored too, and an unknown id gives null', () async {
     final store = FileMediaStore(dir);
     await store.save('b-2', Uint8List.fromList([9]), null);

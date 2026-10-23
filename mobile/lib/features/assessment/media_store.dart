@@ -13,11 +13,16 @@ class WoundOutline {
     required this.originalHeight,
     this.maskWidth = 640,
     this.maskHeight = 480,
+    this.regionRgb = const [],
   }) : assert(mask.length == maskWidth * maskHeight);
 
   final Uint8List mask;
   final double scale;
   final int padLeft, padTop, originalWidth, originalHeight, maskWidth, maskHeight;
+
+  /// The average colour of each colour region as 0xFFRRGGBB, in the same order as the saved percentages. Only the percentages
+  /// are synced, so the colours live here, on the phone. Empty when they are not known (an older outline).
+  final List<int> regionRgb;
 
   /// The pixels on the edge of the wound (a wound pixel with an empty neighbour, or at the edge of the mask), as fractions of the
   /// original photo's width and height, ready to draw on top of it.
@@ -44,7 +49,7 @@ class WoundOutline {
     }
     return {
       'scale': scale, 'padLeft': padLeft, 'padTop': padTop, 'originalWidth': originalWidth, 'originalHeight': originalHeight,
-      'maskWidth': maskWidth, 'maskHeight': maskHeight, 'mask': base64Encode(packed),
+      'maskWidth': maskWidth, 'maskHeight': maskHeight, 'mask': base64Encode(packed), 'regionRgb': regionRgb,
     };
   }
 
@@ -64,6 +69,7 @@ class WoundOutline {
       originalHeight: j['originalHeight'] as int,
       maskWidth: w,
       maskHeight: h,
+      regionRgb: [for (final c in (j['regionRgb'] as List? ?? const [])) c as int],
     );
   }
 }

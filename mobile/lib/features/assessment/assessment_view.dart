@@ -78,7 +78,14 @@ String triStateLabel(String v) => switch (v) {
   _ => 'Not recorded',
 };
 
-const regionColours = [WoundColors.accent, WoundColors.amber, WoundColors.borderStrong, WoundColors.accent2];
+/// What the colour swatches show when the wound's own colours are not known (for example a record made on another phone):
+/// neutral greys, so the bar never suggests a colour the wound does not have.
+const neutralRegionColours = [Color(0xFF6E7378), Color(0xFF9EA2A6), Color(0xFFC9CCCF), Color(0xFFE3E5E7)];
+
+/// The colour of each swatch: the wound's own average colours when there is one per region, otherwise neutral greys.
+List<Color> regionSwatchColours(List<int> rgb, int count) => rgb.length == count
+    ? [for (final c in rgb) Color(c)]
+    : [for (var i = 0; i < count; i++) neutralRegionColours[i % neutralRegionColours.length]];
 
 /// The assessment's own photo: [bytes] when the photo is at hand (during the analysis), else the one kept on the phone for
 /// [assessmentId]. With nothing kept (the prototype's sample capture, or an assessment made on another phone) it shows the stand-in
