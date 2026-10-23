@@ -56,6 +56,19 @@ void main() {
     });
   });
 
+  testWidgets('the outline carries the real average colour of each colour region, in the same order as the saved percentages', (tester) async {
+    await tester.runAsync(() async {
+      final a = _analyzer(OneWoundSegmenter());
+      final analytics = await a.analyze(_photo('sim_one_ok'));
+      final regions = analytics['colourRegions'] as List;
+      final rgb = a.takeOutline()!.regionRgb;
+      expect(rgb.length, regions.length);
+      for (final c in rgb) {
+        expect(c >> 24, 0xFF, reason: 'opaque 0xFFRRGGBB');
+      }
+    });
+  });
+
   testWidgets('a failed analysis leaves no outline behind', (tester) async {
     await tester.runAsync(() async {
       final a = _analyzer(_NoWound());
