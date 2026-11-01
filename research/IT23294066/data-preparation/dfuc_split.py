@@ -41,6 +41,67 @@ def stratified_group_split(groups, strata, fraction, seed):
     return held, rest
 
 
+def kfold_stratified_groups(groups, strata, k, seed):
+    """k folds of image ids. Whole groups stay in one fold and every stratum is spread evenly over the folds.
+
+    Inside each stratum the groups are shuffled and dealt to whichever fold is smallest so far, so fold sizes stay within one
+    group of each other. Used for cross-validation over all labelled photos."""
+    if k < 2:
+        raise ValueError("need at least 2 folds")
+    if len(groups) < k:
+        raise ValueError(f"{len(groups)} groups cannot fill {k} folds")
+    rng = random.Random(seed)
+    by_stratum = {}
+    for g in groups:
+        by_stratum.setdefault(strata[g[0]], []).append(g)
+    folds = [[] for _ in range(k)]
+    for key in sorted(by_stratum):
+        gs = by_stratum[key]
+        rng.shuffle(gs)
+        for g in sorted(gs, key=len, reverse=True):          # big groups first, so the sizes even out
+            smallest = min(range(k), key=lambda n: (len(folds[n]), n))
+            folds[smallest].extend(g)
+    return folds
+
+
+def write_folds(args, clusters, strata, info):
+    """K cross-validation sets over every labelled photo: <out>/fold<n>/{images,labels}/{train,val}, train.txt, val.txt,
+    data.yaml, plus <out>/folds.json. A photo is in `val` of exactly one fold and in `train` of the others, and duplicate
+    groups never sit on both sides."""
+    folds = kfold_stratified_groups(clusters, strata, args.folds, args.seed)
+    all_ids = sorted(i for f in folds for i in f)
+    assert all_ids == sorted(info), "folds do not cover the report"
+    img_dir = os.path.join(args.dfuc_train, "DFUC2022_train_images")
+    for n, val_ids in enumerate(folds):
+        val_set = set(val_ids)
+        sides = {"train": sorted(i for i in all_ids if i not in val_set), "val": sorted(val_ids)}
+        for side, ids in sides.items():
+            for sub in ("images", "labels"):
+                os.makedirs(os.path.join(args.out, f"fold{n}", sub, side), exist_ok=True)
+            for i in ids:
+                for sub, src, ext in (("images", os.path.join(img_dir, i + ".jpg"), ".jpg"),
+                                      ("labels", os.path.join(args.labels, i + ".txt"), ".txt")):
+                    dst = os.path.join(args.out, f"fold{n}", sub, side, i + ext)
+                    if os.path.lexists(dst):
+                        os.remove(dst)
+                    os.symlink(os.path.abspath(src), dst)
+            with open(os.path.join(args.out, f"fold{n}", f"{side}.txt"), "w") as f:
+                f.write("\n".join(ids) + "\n")
+        with open(os.path.join(args.out, f"fold{n}", "data.yaml"), "w") as f:
+            f.write(f"path: {os.path.abspath(os.path.join(args.out, f'fold{n}'))}\ntrain: images/train\nval: images/val\n"
+                    "names:\n  0: ulcer\n")
+    with open(os.path.join(args.out, "folds.json"), "w") as f:
+        json.dump({"seed": args.seed, "folds": [sorted(v) for v in folds]}, f)
+    areas = np.array([info[i][1] for i in all_ids], float)
+    print(f"seed {args.seed}; {args.folds} folds over {len(all_ids)} photos")
+    print("fold  images  multi-ulcer imgs  median px")
+    for n, v in enumerate(folds):
+        a = np.array([info[i][1] for i in v])
+        u = np.array([info[i][0] for i in v])
+        print(f"fold{n}  {len(v):>5}  {int((u > 1).sum()):>14}  {int(np.median(a)):>9}")
+    print(f"all photos median {int(np.median(areas))} px")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dfuc-train", required=True)
@@ -49,6 +110,7 @@ def main():
     ap.add_argument("--report", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--folds", type=int, default=0, help="write K cross-validation sets over all photos instead of train/val/test")
     args = ap.parse_args()
 
     info = {}
@@ -61,6 +123,10 @@ def main():
     areas = np.array([v[1] for v in info.values()], float)
     q = np.percentile(areas, [25, 50, 75])
     strata = {i: (int(np.searchsorted(q, a)), min(u, 2)) for i, (u, a) in info.items()}
+
+    if args.folds:
+        write_folds(args, clusters, strata, info)
+        return
 
     test_ids, rest_ids = stratified_group_split(clusters, strata, 0.20, args.seed)
     rest_set = set(rest_ids)

@@ -151,6 +151,39 @@ class SplitTest(unittest.TestCase):
         self.assertEqual(a, DS.stratified_group_split(groups, strata, 0.2, 1))
         self.assertNotEqual(set(a[0]), set(DS.stratified_group_split(groups, strata, 0.2, 2)[0]))
 
+    def test_kfold_gives_every_image_exactly_one_fold_and_keeps_groups_together(self):
+        ids, groups, strata = self.groups_and_strata()
+        folds = DS.kfold_stratified_groups(groups, strata, 5, 42)
+        self.assertEqual(sorted(i for f in folds for i in f), sorted(ids))
+        self.assertEqual(len(folds), 5)
+        where = {i: n for n, f in enumerate(folds) for i in f}
+        for g in groups:
+            self.assertEqual(len({where[i] for i in g}), 1, f"group split across folds: {g}")
+
+    def test_kfold_folds_are_about_equal_in_size_and_in_every_stratum(self):
+        ids, groups, strata = self.groups_and_strata()
+        folds = DS.kfold_stratified_groups(groups, strata, 5, 42)
+        for f in folds:
+            self.assertAlmostEqual(len(f) / len(ids), 0.2, delta=0.04)
+        for s in set(strata.values()):
+            members = [i for i in ids if strata[i] == s]
+            for f in folds:
+                share = sum(i in set(f) for i in members) / len(members)
+                self.assertAlmostEqual(share, 0.2, delta=0.15, msg=str(s))
+
+    def test_kfold_same_seed_same_folds_different_seed_different_folds(self):
+        ids, groups, strata = self.groups_and_strata()
+        a = DS.kfold_stratified_groups(groups, strata, 5, 1)
+        self.assertEqual(a, DS.kfold_stratified_groups(groups, strata, 5, 1))
+        self.assertNotEqual([set(f) for f in a], [set(f) for f in DS.kfold_stratified_groups(groups, strata, 5, 2)])
+
+    def test_kfold_needs_at_least_two_folds_and_no_more_folds_than_groups(self):
+        ids, groups, strata = self.groups_and_strata()
+        with self.assertRaises(ValueError):
+            DS.kfold_stratified_groups(groups, strata, 1, 42)
+        with self.assertRaises(ValueError):
+            DS.kfold_stratified_groups(groups[:3], strata, 5, 42)
+
     def make_dataset(self, n=80, mismatch=False):
         d = tempfile.mkdtemp()
         train = os.path.join(d, "train_release")
@@ -206,6 +239,31 @@ class SplitTest(unittest.TestCase):
             yaml = f.read()
         for line in ("train: images/train", "val: images/val", "test: images/test", "0: ulcer"):
             self.assertIn(line, yaml)
+
+    def test_main_with_folds_writes_k_leak_free_cross_validation_sets(self):
+        d, train, labels, report, clusters, ids, pairs = self.make_dataset()
+        out = os.path.join(d, "cv")
+        text = run_main(DS, ["dfuc_split.py", "--dfuc-train", train, "--labels", labels, "--clusters", clusters, "--report", report,
+                             "--out", out, "--folds", "4"])
+        self.assertIn("fold", text)
+        folds = json.load(open(os.path.join(out, "folds.json")))
+        self.assertEqual(sorted(i for f in folds["folds"] for i in f), sorted(ids))
+        self.assertEqual(len(folds["folds"]), 4)
+        for n in range(4):
+            val = set(self.read(os.path.join(out, f"fold{n}", "val.txt")))
+            tr = set(self.read(os.path.join(out, f"fold{n}", "train.txt")))
+            self.assertEqual(val, set(folds["folds"][n]))
+            self.assertEqual(val | tr, set(ids))
+            self.assertEqual(val & tr, set())
+            for a, b in pairs:                                               # duplicates never across train and val
+                self.assertEqual(a[:-4] in val, b[:-4] in val)
+            for i in list(val)[:2] + list(tr)[:2]:
+                side = "val" if i in val else "train"
+                link = os.path.join(out, f"fold{n}", "images", side, i + ".jpg")
+                self.assertTrue(os.path.islink(link) and os.path.exists(link))
+            yaml = open(os.path.join(out, f"fold{n}", "data.yaml")).read()
+            for line in ("train: images/train", "val: images/val", "0: ulcer"):
+                self.assertIn(line, yaml)
 
     def test_a_cluster_file_that_does_not_match_the_report_is_refused(self):
         d, train, labels, report, clusters, ids, pairs = self.make_dataset(mismatch=True)

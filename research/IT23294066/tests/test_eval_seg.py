@@ -103,6 +103,74 @@ class ScoreTest(unittest.TestCase):
         self.assertGreaterEqual(hi, s["mean_dice"])
 
 
+class PostProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.a = square(40, 40, 5, 5, 10)                       # best instance, 100 px
+        self.b = square(40, 40, 25, 25, 8)                      # weaker instance, 64 px
+        self.c = square(40, 40, 25, 5, 6)                       # weakest, 36 px
+        self.inst = np.stack([self.b, self.a, self.c])
+        self.conf = np.array([0.6, 0.9, 0.3])
+
+    def test_select_keeps_everything_above_the_threshold_by_default_like_score_did(self):
+        kept = E.select_instances(self.inst, self.conf, 0.25)
+        self.assertEqual(len(kept), 3)
+
+    def test_top_k_keeps_only_the_most_confident_instances(self):
+        kept = E.select_instances(self.inst, self.conf, 0.25, top_k=1)
+        self.assertEqual(len(kept), 1)
+        self.assertTrue(np.array_equal(kept[0], self.a))
+        self.assertEqual(len(E.select_instances(self.inst, self.conf, 0.25, top_k=2)), 2)
+
+    def test_threshold_still_applies_before_top_k(self):
+        self.assertEqual(len(E.select_instances(self.inst, self.conf, 0.95, top_k=2)), 0)
+
+    def test_relative_confidence_drops_instances_far_below_the_best_one(self):
+        kept = E.select_instances(self.inst, self.conf, 0.25, rel=0.5)           # keeps 0.9 and 0.6, drops 0.3
+        self.assertEqual(len(kept), 2)
+
+    def test_no_instances_gives_no_instances(self):
+        self.assertEqual(len(E.select_instances(np.zeros((0, 40, 40), bool), np.zeros(0), 0.25, top_k=1)), 0)
+
+    def test_fill_holes_closes_a_hole_inside_a_wound_but_not_a_notch_open_to_the_outside(self):
+        m = square(40, 40, 5, 5, 20)
+        m[8:12, 8:12] = False                                                     # closed hole, 16 px
+        m[5:12, 18:20] = False                                                    # notch from the top edge, 14 px, open
+        out = E.clean_mask(m, fill_holes=True)
+        self.assertTrue(out[9, 9])                                                # hole filled
+        self.assertFalse(out[6, 18])                                              # notch still open
+        self.assertEqual(int(out.sum()), 400 - 14)
+        self.assertEqual(int(E.clean_mask(m, fill_holes=False).sum()), 400 - 14 - 16)
+
+    def test_min_area_drops_small_blobs_but_never_the_whole_mask(self):
+        m = square(40, 40, 5, 5, 10) | square(40, 40, 30, 30, 2)
+        out = E.clean_mask(m, min_area=20)
+        self.assertEqual(int(out.sum()), 100)
+        tiny = square(40, 40, 5, 5, 3)
+        self.assertEqual(int(E.clean_mask(tiny, min_area=50).sum()), 9)           # last blob is kept
+
+    def test_score_with_top_k_changes_only_what_was_asked(self):
+        gt = square(40, 40, 5, 5, 10)
+        records = [("a", gt, np.stack([gt, self.b]), np.array([0.9, 0.8]))]
+        base = E.score(records, 0.25)[0]
+        top1 = E.score(records, 0.25, top_k=1)[0]
+        self.assertEqual(base["pred_px"], 164)
+        self.assertEqual(top1["pred_px"], 100)
+        self.assertEqual(top1["dice"], 1.0)
+
+    def test_paired_bootstrap_of_identical_scores_is_zero_and_of_a_shift_is_that_shift(self):
+        a = np.random.default_rng(1).uniform(0, 1, 100)
+        d, lo, hi = E.paired_bootstrap_diff(a, a)
+        self.assertEqual((d, lo, hi), (0.0, 0.0, 0.0))
+        d, lo, hi = E.paired_bootstrap_diff(a + 0.05, a)
+        self.assertAlmostEqual(d, 0.05)
+        self.assertAlmostEqual(lo, 0.05)
+        self.assertAlmostEqual(hi, 0.05)
+
+    def test_paired_bootstrap_needs_same_length(self):
+        with self.assertRaises(ValueError):
+            E.paired_bootstrap_diff(np.zeros(3), np.zeros(4))
+
+
 class CollectTest(unittest.TestCase):
     def make_dir(self, n, h=40, w=40):
         d = tempfile.mkdtemp()
@@ -182,6 +250,24 @@ class MainTest(unittest.TestCase):
         self.assertEqual(data["summary"]["mean_dice"], 1.0)
         self.assertEqual(data["summary"]["conf"], 0.25)
         self.assertEqual(len(data["summary"]["weights_sha256"]), 16)
+
+    def test_sweep_post_compares_each_variant_with_the_plain_run_on_the_same_images(self):
+        text = self.run_main("--conf", "0.05", "--sweep-post")
+        self.assertIn("variant", text)
+        rows = {l.split()[0]: l for l in text.splitlines() if l.split() and l.split()[0] in ("plain", "top1", "top2", "rel0.5", "fill", "min20")}
+        self.assertEqual(set(rows), {"plain", "top1", "top2", "rel0.5", "fill", "min20"})
+        plain = float(rows["plain"].split()[1])
+        top1 = float(rows["top1"].split()[1])
+        self.assertLess(plain, 1.0)                                          # the 0.12 false instance is merged in
+        self.assertEqual(top1, 1.0)                                          # keeping only the best instance removes it
+        self.assertGreater(float(rows["top1"].split()[2]), 0.0)              # paired difference vs plain is positive
+
+    def test_scoring_run_can_apply_top_k(self):
+        out_file = os.path.join(self.tmp, "out2.json")
+        self.run_main("--conf", "0.05", "--top-k", "1", "--out", out_file)
+        data = json.load(open(out_file))
+        self.assertEqual(data["summary"]["mean_dice"], 1.0)
+        self.assertEqual(data["summary"]["top_k"], 1)
 
     def test_neither_conf_nor_sweep_is_an_error(self):
         with mock.patch.object(sys, "argv", ["eval_seg.py", "--weights", self.weights, "--split-dir", self.split, "--dfuc-train", self.tmp]):
